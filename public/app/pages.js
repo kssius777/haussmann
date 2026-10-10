@@ -347,6 +347,7 @@ async function profilePage() {
     <div style="margin-top:10px"><button class="btn block light" data-push="party" ${wait > 0 ? "disabled" : ""}>${wait > 0 ? `Changer de parti possible dans ${hm(wait)}` : "Changer de parti"}</button></div>
     <h2 class="h2">Compte</h2>
     <button class="btn block ghost" id="logout">Se déconnecter</button>
+    <p class="sub" style="margin-top:16px;text-align:center"><a href="/terms" target="_blank">Conditions d'utilisation</a> · <a href="/privacy" target="_blank">Confidentialité</a></p>
   </div>`;
 }
 async function partyPage() {
