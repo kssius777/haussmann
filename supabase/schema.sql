@@ -797,7 +797,10 @@ create or replace function arr_info(p_arr int) returns json language sql stable 
 $$;
 
 -- Droits d'exécution
-revoke all on all functions in schema public from public;
+-- Les fonctions internes (_draw, _sync, _add_value…) ne doivent JAMAIS être appelables depuis le site.
+-- Supabase donne par défaut le droit d'exécution à anon/authenticated : on le retire partout, puis on le rend aux seules fonctions publiques.
+revoke all on all functions in schema public from public, anon, authenticated;
+alter default privileges in schema public revoke execute on functions from public, anon, authenticated;
 do $$ declare f text; begin
   foreach f in array array['join_game(text,text)','set_party(text)','state()','open_booster(text)','bank_buy(int,int)',
     'list_item(int,int,int,bigint)','unlist(bigint)','buy_listing(bigint)','mortgage(int,int)','lift(int,int)',
