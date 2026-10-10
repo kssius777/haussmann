@@ -25,7 +25,8 @@ function showOnb(step) {
     O.querySelector("#tohome").onclick = () => showOnb("home");
     O.querySelector("[data-mode=up]").onclick = () => { onbSignup = true; showOnb("login"); };
     O.querySelector("[data-mode=in]").onclick = () => { onbSignup = false; showOnb("login"); };
-    O.querySelector("#google").onclick = async () => { try { await signInGoogle(); if (LOCAL_MODE) afterLogin(); } catch (e) { $("#autherr").textContent = e.message; } };
+    O.querySelector("#google").onclick = async () => { try { if (await googleReady()) { await signInGoogle(); if (LOCAL_MODE) afterLogin(); } else { await guestSignIn(); afterLogin(); } } catch (e) { $("#autherr").textContent = e.message; } };
+    googleReady().then(ok => { if (!ok && $("#google")) $("#google").innerHTML = "Jouer sans compte (sur cet appareil)"; });
     O.querySelector("#authf").onsubmit = async e => {
       e.preventDefault(); const em = $("#em").value.trim(), pw = $("#pw").value; const b = e.target.querySelector("button"); b.disabled = true;
       try {

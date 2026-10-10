@@ -17,7 +17,9 @@ async function landingHTML() {
     ["💶", "Touchez vos loyers", "Vos biens rapportent de l'argent en continu, même quand vous n'êtes pas connecté. Réinvestissez-le dans de nouveaux boosters, des parts de monuments ou des appartements mis en vente par les autres joueurs."],
     ["🏛️", "Devenez maire", "Le plus gros propriétaire de chaque arrondissement en devient le maire et touche 8 % des loyers du quartier. Rejoignez l'un des 5 partis : chaque semaine, celui qui a le plus de maires remporte l'Hôtel de Ville."]
   ];
-  const cta = `<div class="lcta"><button class="btn block gbtn" data-l="google">${G_ICON}Commencer avec Google</button><button class="btn block light" data-l="email">Créer un compte avec un e-mail</button></div>`;
+  const gOk = await googleReady();
+  const cta = gOk ? `<div class="lcta"><button class="btn block gbtn" data-l="google">${G_ICON}Commencer avec Google</button><button class="btn block light" data-l="email">Créer un compte avec un e-mail</button></div>`
+    : `<div class="lcta"><button class="btn block" data-l="guest">Jouer tout de suite</button><button class="btn block light" data-l="email">Créer un compte avec un e-mail</button><p class="sub small" style="margin:0">Sans compte, votre partie est gardée sur cet appareil. La connexion avec Google arrive très bientôt.</p></div>`;
   return `<div class="landing">
     <header class="lhead"><span class="plaque-mini">HAUSSMANN</span><button class="btn sm light" data-l="signin">Se connecter</button></header>
     <div class="ltop"><section class="lhero">
@@ -55,6 +57,7 @@ async function showLanding() {
   O.onclick = async e => {
     const b = e.target.closest("[data-l]"); if (!b) return; const a = b.dataset.l;
     if (a === "google") { try { await signInGoogle(); if (LOCAL_MODE) { O.onclick = null; afterLogin(); } } catch (err) { toast(err.message, "bad"); } }
+    if (a === "guest") { b.disabled = true; b.textContent = "Création de votre partie…"; try { await guestSignIn(); O.onclick = null; afterLogin(); } catch (err) { b.disabled = false; b.textContent = "Jouer tout de suite"; toast(err.message, "bad"); } }
     if (a === "email" || a === "signin") { onbSignup = a === "email"; O.onclick = null; showOnb("login"); }
   };
 }

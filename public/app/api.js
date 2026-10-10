@@ -44,8 +44,31 @@ async function signInGoogle() {
   const { error } = await SB.auth.signInWithOAuth({ provider: "google", options: { redirectTo: location.origin } });
   if (error) throw new Error(frErr(error.message));
 }
+// La connexion Google est-elle activée dans Supabase ? (sinon on propose de jouer sans compte)
+let GOOGLE_READY = null;
+async function googleReady() {
+  if (GOOGLE_READY !== null) return GOOGLE_READY;
+  if (LOCAL_MODE) return (GOOGLE_READY = false);
+  try { const r = await fetch(SUPABASE_URL + "/auth/v1/settings", { headers: { apikey: SUPABASE_ANON } }); const j = await r.json(); GOOGLE_READY = !!j.external?.google; }
+  catch (e) { GOOGLE_READY = false; }
+  return GOOGLE_READY;
+}
+// Jouer sans compte : un compte invisible est créé et gardé sur cet appareil
+async function guestSignIn() {
+  let cred = null; try { cred = JSON.parse(localStorage.getItem("hm_guest") || "null"); } catch (e) { }
+  if (!cred) {
+    const id = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now()).replace(/-/g, "");
+    cred = { email: `joueur-${id.slice(0, 14)}@haussmann.app`, password: id + "Hm!" };
+    try { localStorage.setItem("hm_guest", JSON.stringify(cred)); } catch (e) { }
+    const r = await signUp(cred.email, cred.password);
+    if (r.needsConfirm) throw new Error("Le mode sans compte nécessite de désactiver la confirmation d'e-mail dans Supabase.");
+    return r;
+  }
+  return signIn(cred.email, cred.password);
+}
 async function signOut() {
   if (LOCAL_MODE) localStorage.removeItem("hm_uid"); else await SB.auth.signOut();
+  try { localStorage.removeItem("hm_guest"); } catch (e) { }
   location.reload();
 }
 async function localSignIn(email) {
