@@ -4,11 +4,12 @@
 // =====================================================================
 let onbStep = "login", onbPseudo = "", onbSignup = true;
 function showOnb(step) {
-  onbStep = step || onbStep; const O = $("#onb"); O.hidden = false; $("#loading")?.remove();
+  onbStep = step || onbStep; if (onbStep === "home") return showLanding();
+  const O = $("#onb"); O.hidden = false; O.onclick = null; $("#loading")?.remove(); O.scrollTop = 0;
   const steps = n => `<div class="steps">${[1, 2, 3].map(k => `<i class="${k <= n ? "on" : ""}"></i>`).join("")}</div>`;
   if (onbStep === "login") {
     O.innerHTML = `<div class="onb">${steps(1)}
-      <span class="plaque-mini big" style="align-self:flex-start">HAUSSMANN</span>
+      <button class="back" id="tohome" style="align-self:flex-start">${ICON.back}Accueil</button>
       <h1>Collectionnez les vrais immeubles de Paris.</h1>
       <p>Ouvrez des boosters, touchez les loyers, devenez maire de votre arrondissement.</p>
       <div class="seg" role="tablist" style="margin:4px 0 0"><button data-mode="up" aria-selected="${onbSignup}">Créer un compte</button><button data-mode="in" aria-selected="${!onbSignup}">J'ai un compte</button></div>
@@ -21,6 +22,7 @@ function showOnb(step) {
       <p class="sub" id="autherr" style="color:var(--danger);min-height:20px"></p>
       <p class="sub" style="font-size:12.5px;text-align:center">En continuant, vous acceptez les <a href="/terms" target="_blank">conditions d'utilisation</a> et la <a href="/privacy" target="_blank">politique de confidentialité</a>.</p>
     </div>`;
+    O.querySelector("#tohome").onclick = () => showOnb("home");
     O.querySelector("[data-mode=up]").onclick = () => { onbSignup = true; showOnb("login"); };
     O.querySelector("[data-mode=in]").onclick = () => { onbSignup = false; showOnb("login"); };
     O.querySelector("#google").onclick = async () => { try { await signInGoogle(); if (LOCAL_MODE) afterLogin(); } catch (e) { $("#autherr").textContent = e.message; } };

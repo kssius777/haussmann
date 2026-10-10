@@ -80,13 +80,13 @@ function plaqueTitle(c) { return c.name ? cap(c.name) : (c.adr || "Immeuble"); }
 function cardHTML(c, { w, item, tier, count } = {}) {
   const r = tier || c.r, n = item ? Math.max(1, itemUnits(item)) : 1;
   const t = plaqueTitle(c), long = t.length > 22;
-  return `<div class="hc t${r}" style="${w ? `--w:${w}` : ""}"><div class="in">
+  return `<div class="hc t${r}" style="${w ? `--w:${w}` : ""}"><div class="fr"><div class="in">
     <div class="plq"><small>${c.arr === 1 ? "1<sup>er</sup>" : c.arr + "<sup>e</sup>"} Arr<sup>t</sup></small><b class="${long ? "long" : ""}">${esc(t)}</b></div>
     <div class="ph">${photo(c)}<span class="rb">${RAR[r].l}</span>${count ? `<span class="cnt">${esc(count)}</span>` : ""}</div>
     <div class="bd"><div class="kd">${esc(itemLabel(c, item) || kindLabel(c))}</div>
       <div class="nums num"><div><span>LOYER / JOUR</span><b class="g">${fmtE(c.rent * n)}</b></div><div class="r"><span>VALEUR</span><b>${fmtE(c.v * n)}</b></div></div>
       <div class="rn"><span>${RAR[r].n.toUpperCase()}</span><em>N° ${String(c.arr).padStart(2, "0")}-${String(li(c.g)).padStart(5, "0")}</em></div></div>
-  </div></div>`;
+  </div></div></div>`;
 }
 function chanceText(it) {
   if (it.out) return it.out;
@@ -98,11 +98,11 @@ function chanceCardHTML(it, w) {
   const col = bad ? ["#FDECEC", "#C62828", "MALUS"] : ["#E7F6EC", "#15803D", "BONUS"];
   const amt = it.amount ? (it.amount > 0 ? "+" : "−") + fmtE(Math.abs(it.amount)) : (it.out || "");
   const desc = it.amount ? "" : (CHANCE_TXT[it.k] || "");
-  return `<div class="hc chance tC" style="--rc:${col[1]};--rt:${col[1]};--chs:${col[0]};--chc:${col[1]};${w ? `--w:${w}` : ""}"><div class="in">
+  return `<div class="hc chance tC" style="--rc:${col[1]};--rt:${col[1]};--chs:${col[0]};--chc:${col[1]};${w ? `--w:${w}` : ""}"><div class="fr"><div class="in">
     <div class="plq"><small>Carte Chance · ${col[2]}</small><b>${esc(n)}</b></div>
     <div class="ph"><span class="glyph">${esc(g)}</span></div>
     <div class="bd"><div class="desc">${esc(desc)}</div>${amt ? `<div class="amt num">${esc(amt)}</div>` : ""}</div>
-  </div></div>`;
+  </div></div></div>`;
 }
 function itemFace(it, w) {
   if (it.t === "chance") return chanceCardHTML(it, w);

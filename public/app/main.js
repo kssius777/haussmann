@@ -10,9 +10,9 @@ async function boot() {
     IDX = idx; FIELDS = idx.fields; ARR = new Array(20).fill(null); BASE = base; (idx.hide || []).forEach(g => hideSet.add(g));
     getJSON(DATA + "mons.json").then(m => MONS = m).catch(() => { });
     initMapUI();
-    if (SB) SB.auth.onAuthStateChange((ev, session) => { if (ev === "SIGNED_IN" && session && !started && $("#onb").hidden === false && onbStep === "login") { ME = session.user.id; afterLogin(); } });
+    if (SB) SB.auth.onAuthStateChange((ev, session) => { if (ev === "SIGNED_IN" && session && !started && $("#onb").hidden === false && (onbStep === "login" || onbStep === "home")) { ME = session.user.id; $("#onb").onclick = null; afterLogin(); } });
     await currentUser();
-    if (!ME) return showOnb("login");
+    if (!ME) return showOnb("home");
     await afterLogin();
   } catch (e) {
     console.error(e); $("#loadmsg") && ($("#loadmsg").textContent = "Impossible de charger le jeu : " + e.message);
