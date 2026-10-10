@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   const head = await fetch(SUPABASE_URL + "/rest/v1/cards?select=id&limit=1", { headers: { ...H, Prefer: "count=exact" } });
   if (!head.ok) {
     const t = await head.text();
-    if (/Invalid API key|JWT/i.test(t)) return res.status(500).json({ error: "La clé SUPABASE_SERVICE_ROLE_KEY est refusée par Supabase : recopiez la clé « service_role » (ou « secret ») dans Vercel, puis redéployez.", detail: t, keyStart: key.trim().slice(0, 8) + "…", keyLength: key.trim().length });
+    if (/Invalid API key|JWT/i.test(t)) return res.status(500).json({ error: "La clé SUPABASE_SERVICE_ROLE_KEY est refusée par Supabase : recopiez la clé « service_role » (ou « secret ») dans Vercel, puis redéployez.", detail: t, keyStart: key.trim().slice(0, 8) + "…", keyLength: key.trim().length, keyInfo: info(key) });
     return res.status(500).json({ error: "Table cards introuvable : collez d'abord supabase/schema.sql dans le SQL Editor.", detail: t });
   }
   const have = +((head.headers.get("content-range") || "*/0").split("/")[1] || 0);
@@ -28,3 +28,6 @@ export default async function handler(req, res) {
   }
   res.status(200).json({ ok: true, message: `${rows.length} immeubles chargés. Le jeu est prêt !` });
 }
+
+// affiche seulement le projet et le rôle inscrits dans la clé (jamais la clé elle-même)
+function info(k) { try { const p = JSON.parse(Buffer.from(k.trim().split(".")[1], "base64url").toString()); return { projet: p.ref, role: p.role, attendu: "fmqixxakhphkijtsyeqd / service_role" }; } catch (e) { return "illisible"; } }
