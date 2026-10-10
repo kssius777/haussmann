@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="theme-color" content="#EAF3FA">
+<title>Haussmann</title>
+<meta name="description" content="Collectionnez les vrais immeubles de Paris, touchez leurs loyers, devenez maire de votre arrondissement.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='4' y='14' width='56' height='36' rx='8' fill='%231F3B73' stroke='%232E7B5A' stroke-width='3'/%3E%3Ctext x='32' y='40' font-family='Arial' font-weight='800' font-size='22' fill='white' text-anchor='middle'%3EH%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Fraunces:opsz,wght@9..144,700;9..144,800&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.css" rel="stylesheet">
+<link href="/app/style.css" rel="stylesheet">
+</head>
+<body>
+<header id="bar">
+  <button class="brand" data-go="map" aria-label="Haussmann, retour à la carte"><span class="plaque-mini">HAUSSMANN</span></button>
+  <div class="wallet">
+    <button class="money" data-push="shop" aria-label="Trésorerie, acheter des crédits">
+      <span class="mv"><span class="num" id="cash">—</span><span class="rate num" id="rate"></span></span><i class="plus">+</i>
+    </button>
+    <button class="avatar" id="avatar" data-push="profile" aria-label="Mon profil">?</button>
+  </div>
+</header>
+
+<main id="pages">
+  <section class="page" id="p-map">
+    <div id="map"></div>
+    <div class="maptop">
+      <button class="score" id="score" data-push="results" aria-label="Résultats de l'Hôtel de Ville"></button>
+      <div class="mapbtns">
+        <button class="mbtn" id="t-search" aria-label="Rechercher">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
+      </div>
+    </div>
+    <div id="search" hidden>
+      <input id="q" type="search" placeholder="Une adresse, un monument…" autocomplete="off" enterkeyhint="search">
+      <div id="results"></div>
+    </div>
+    <div class="mapside">
+      <button class="mbtn" id="t-tilt" aria-label="Vue 3D ou à plat"><b>3D</b></button>
+      <button class="mbtn" id="t-north" aria-label="Revenir au nord">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 3l4 9h-8z" fill="#D32F2F"/><path d="M12 21l-4-9h8z" fill="#9AA6B2"/></svg></button>
+      <button class="mbtn" id="t-home" aria-label="Voir tout Paris">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+    </div>
+    <div class="mapbottom">
+      <div id="preview" hidden></div>
+      <div class="filter" id="filter" role="tablist">
+        <button data-m="all" aria-selected="true">Tout</button>
+        <button data-m="mine" aria-selected="false"><i class="dot mine"></i>Mes biens <span id="n-mine"></span></button>
+        <button data-m="sale" aria-selected="false"><i class="dot sale"></i>À vendre <span id="n-sale"></span></button>
+      </div>
+    </div>
+  </section>
+  <section class="page dark" id="p-booster" hidden></section>
+  <section class="page" id="p-assets" hidden></section>
+  <section class="page" id="p-market" hidden></section>
+  <section class="page" id="p-paris" hidden></section>
+  <section class="page detail" id="p-detail" hidden></section>
+</main>
+
+<nav id="tabs" aria-label="Navigation">
+  <button data-tab="map" aria-selected="true"><svg viewBox="0 0 24 24"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg><span>Carte</span></button>
+  <button data-tab="booster" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="2"/><path d="M6 6.5h12M6 17.5h12"/></svg><span>Boosters</span><b class="badge" id="packbadge" hidden></b></button>
+  <button data-tab="assets" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 21V9l8-6 8 6v12"/><path d="M9 21v-6h6v6"/></svg><span>Patrimoine</span></button>
+  <button data-tab="market" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0L3 13V3h10l7.6 7.6a2 2 0 010 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg><span>Marché</span></button>
+  <button data-tab="paris" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 21h16M6 21V10M10 21V10M14 21V10M18 21V10M3 10l9-6 9 6"/></svg><span>Paris</span></button>
+</nav>
+
+<div id="reveal" hidden></div>
+<div id="onb" hidden></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="loading"><span class="plaque-mini big">HAUSSMANN</span><p id="loadmsg">Chargement de Paris…</p></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="/app/models.js"></script>
+<script src="/app/core.js"></script>
+<script src="/app/api.js"></script>
+<script src="/app/cards.js"></script>
+<script src="/app/map.js"></script>
+<script src="/app/pages.js"></script>
+<script src="/app/booster.js"></script>
+<script src="/app/onboard.js"></script>
+<script src="/app/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+{
+  "name": "haussmann",
+  "private": true,
+  "type": "module",
+  "description": "Haussmann — le jeu de cartes des vrais immeubles de Paris"
+}
