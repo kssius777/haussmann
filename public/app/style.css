@@ -502,3 +502,16 @@ input{font:inherit;color:inherit}
 .chs.grid .chc .lt{width:28px;height:28px;font-size:14px}
 .chs.grid .chc .t b{font-size:13px}
 .chs.grid .tag{font-size:12px}
+
+/* bandeau Hôtel de Ville compact */
+.score{flex:0 1 auto;width:min(100%,250px);padding:7px 11px;border-radius:12px}
+.score .t{justify-content:flex-start;gap:5px;font-size:12.5px;white-space:nowrap}
+.score .t b{font-size:12.5px}
+.score .t span{font-weight:600;color:var(--muted)}
+.score .t em{margin-left:auto;font-style:normal;font-weight:800;color:var(--ink);font-size:12px}
+.score .t svg{flex:0 0 auto}
+.score .seats{height:5px;margin-top:5px}
+.maptop{justify-content:space-between}
+#filter{top:66px;transform:none;padding:3px;gap:2px}
+#filter button{height:30px;padding:0 11px;font-size:12.5px}
+@media (min-width:720px){#filter{top:10px;left:270px}}

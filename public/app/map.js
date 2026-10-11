@@ -194,9 +194,9 @@ function renderScore() {
   const s = seatCounts(), tot = ST.mayors.filter(Boolean).length, none = tot - Object.values(s).reduce((a, b) => a + b, 0);
   const lead = Object.entries(s).sort((a, b) => b[1] - a[1])[0];
   const w = ST.state?.week;
-  $("#score").innerHTML = `<div class="t"><span>Hôtel de Ville${w?.party ? ` · cette semaine : <b style="color:${PARTIES[w.party]?.c}">${esc(PARTIES[w.party]?.n || "")}</b>` : ""}</span><b>${tot}/20 maires</b></div>
-    <div class="seats">${PARTY_ORDER.map(k => s[k] ? `<i style="width:${s[k] * 5}%;background:${PARTIES[k].c}"></i>` : "").join("")}${none ? `<i style="width:${none * 5}%;background:#94A3B8"></i>` : ""}</div>
-    <div class="leg">${PARTY_ORDER.filter(k => s[k]).map(k => `<span>${emblemSVG(k, 14)}${esc(PARTIES[k].n)} ${s[k]}</span>`).join("")}${none ? `<span><i style="background:#94A3B8"></i>Sans parti ${none}</span>` : ""}${!tot ? `<span>Aucun maire élu pour l'instant</span>` : ""}</div>`;
+  const lk = lead && lead[1] ? lead[0] : null;
+  $("#score").innerHTML = `<div class="t">${lk ? `${emblemSVG(lk, 16)}<b style="color:${PARTIES[lk].c}">${esc(PARTIES[lk].n)}</b><span>mène</span>` : `<span>🏛 ${tot ? "Hôtel de Ville" : "Aucun maire élu"}</span>`}<em>${tot}/20 maires</em></div>
+    <div class="seats">${PARTY_ORDER.map(k => s[k] ? `<i style="width:${s[k] * 5}%;background:${PARTIES[k].c}"></i>` : "").join("")}${none ? `<i style="width:${none * 5}%;background:#94A3B8"></i>` : ""}</div>`;
 }
 async function loadAllProgressive() {
   const c = map.getCenter(); const order = IDX.arr.map((a, i) => [i, Math.hypot(a.center[0] - c.lng, a.center[1] - c.lat)]).sort((a, b) => a[1] - b[1]).map(x => x[0]);

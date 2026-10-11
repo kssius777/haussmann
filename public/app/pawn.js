@@ -119,7 +119,7 @@ function fitTargets() {
   if (!pending) return; const pts = pending.choices.flatMap(c => c.line); const lo = pts.map(p => p[0]), la = pts.map(p => p[1]);
   const bottom = ($(".mapbottom")?.offsetHeight || 200) + 30;
   map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
-  map.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], { padding: { top: 120, bottom, left: 30, right: 70 }, maxZoom: 17, pitch: 40, duration: 900 });
+  map.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], { padding: { top: 110, bottom, left: 30, right: 70 }, maxZoom: 17, pitch: 40, duration: 900 });
 }
 function paintTargets() {
   if (!mapReady) return;
@@ -231,7 +231,7 @@ function showNearbyKeep() { const head = $("#movebar .mvh")?.outerHTML || ""; co
 function pawnOff() {
   const el = $("#pawnoff"); if (!pawnMk || !el) return;
   const W = map.getContainer().clientWidth, H = map.getContainer().clientHeight, pt = map.project(pawnMk.getLngLat());
-  const top = 150, bot = H - (($(".mapbottom")?.offsetHeight || 80) + 24), left = 30, right = W - 30;
+  const top = 110, bot = H - (($(".mapbottom")?.offsetHeight || 80) + 24), left = 30, right = W - 30;
   if (pt.x > left && pt.x < right && pt.y > top && pt.y < bot) { el.hidden = true; return; }
   const cx = W / 2, cy = (top + bot) / 2, dx = pt.x - cx, dy = pt.y - cy;
   const k = Math.min((right - 50 - cx) / Math.abs(dx || 1e-6), (bot - 20 - cy) / Math.abs(dy || 1e-6));
