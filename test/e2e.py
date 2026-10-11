@@ -81,7 +81,7 @@ async def main():
         fg = await E("(async()=>{ await loadArr(10); for(let k=0;k<4000;k++){ const g=10*1e5+k, c=card(g); if(c&&c.lk==='l'&&c.lots>=4&&c.lots<=12&&!ST.own.has(g)&&c.v<300000) return g; } })()")
         await E(f"previewBuilding({fg}); 1"); await W("document.querySelector('#preview .pvbtns')"); await pg.wait_for_timeout(300); await pg.screenshot(path=T + "06a_preview_far.png")
         check("trop loin du pion : achat bloqué", await E("document.querySelector('#preview').innerText.includes('Trop loin')"))
-        db.sql(f"update profiles set pos={fg}"); await E("refreshState().then(()=>placePawn(false)).then(()=>1)")
+        db.sql(f"update profiles set pos={fg}, cash=cash+1000000"); await E("refreshState().then(()=>placePawn(false)).then(()=>1)")
         await E(f"previewBuilding({fg}); 1"); await W("document.querySelector('[data-pvbuy]:not([disabled])')"); await pg.wait_for_timeout(300); await pg.screenshot(path=T + "06b_preview_buy.png")
         await pg.click("[data-pvbuy]"); await W(f"(ST.mine.get({fg})||[]).length===1")
         check("achat direct depuis la carte, sans booster", True)
