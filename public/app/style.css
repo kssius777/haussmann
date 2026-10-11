@@ -516,3 +516,20 @@ input{font:inherit;color:inherit}
 #filter button{height:30px;padding:0 11px;font-size:12.5px}
 @media (min-width:720px){#filter{top:10px;left:270px}}
 .hc .kd .yr{opacity:.7;font-weight:600}
+/* la case où l'on tombe */
+.land{position:relative;display:grid;grid-template-columns:128px minmax(0,1fr);gap:12px;align-items:start}
+.land .lc{cursor:pointer}
+.land .lr{display:grid;gap:7px;padding-right:30px;min-width:0}
+.land .lh{font-size:17px;font-weight:900;line-height:1.2}
+.land .lh.free{color:#15803D} .land .lh.bad{color:#B91C1C} .land .lh.home{color:#0E7C78}
+.land .lb{display:grid;gap:6px;margin-top:2px}
+.land .lb .btn{min-height:42px;font-size:14px;padding:0 10px}
+.land .lb small{font-size:12px}
+.land>.x{position:absolute;top:-2px;right:-2px;width:32px;height:32px;border-radius:50%;background:var(--soft);font-size:18px;line-height:32px}
+#movebar .land .ln{padding:6px 9px;font-size:13px}
+.die{grid-template-columns:repeat(3,1fr);padding:13px;gap:2px}
+.die i{border-radius:50%;margin:3px}
+.die i.on{background:#0F1B2D}
+.die{place-items:stretch}
+.land .lb .btn{width:100%;white-space:normal;line-height:1.2;padding:8px 10px;text-align:center}
+.land .lb .btn .green{font-size:12px}

@@ -272,9 +272,9 @@ async function buildingPage(g) {
   </div>`;
 }
 // la barre du bas : acheter (ou agir sur le logement choisi dans le plan)
-function farHTML(d, g) { return `<div class="buyfar"><b>📍 Trop loin de votre pion (${fmtDist(d)})</b><span class="muted">On ne peut acheter à la banque que dans un rayon de ${BUY_RADIUS} m autour de son pion. Lancez le dé pour vous approcher, ou téléportez-vous sur un de vos biens.</span><button class="btn sm light" data-mapto="${g}">Aller sur la carte</button></div>`; }
+function farHTML(d, g) { return `<div class="buyfar"><b>🎲 Pour l'acheter, tombez dessus avec le dé</b><span class="muted">À la banque, on n'achète que l'immeuble où son pion s'arrête. Vous pouvez aussi trouver ce bien dans un booster, ou l'acheter au Marché si un joueur le vend.</span><button class="btn sm light" data-mapto="${g}">Voir sur la carte</button></div>`; }
 function buyActions(c, g, owners, free, isP) {
-  const cash = liveCash(), far = farFromPawn(g);
+  const cash = liveCash(), far = notLanded(g);
   if (selLot !== null && !isP) {
     const k = selLot, o = owners.get(k), l = bInfo.listings.find(x => x.k === k);
     const head = `<div class="what"><b>${lotName(c, k)}${c.lk === "l" ? " · " + ord(floorOfLot(c, k)) + " étage" : ""}</b><span class="num">${o ? (o.o === ME ? "À vous" : "À " + esc(o.ps)) : "Libre"} · ${fmtE(c.v)} · +${fmtE(c.rent)}/jour</span></div>`;

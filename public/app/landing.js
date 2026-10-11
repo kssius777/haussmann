@@ -13,7 +13,7 @@ async function landingHTML() {
   }).join("");
   const steps = [
     ["📦", "Ouvrez des boosters", "Chaque booster contient 4 biens parisiens bien réels (un appartement, un étage entier, un immeuble complet ou des parts d'un monument) et 1 carte Chance. Vous en recevez 5 à l'inscription, puis un gratuit chaque jour."],
-    ["🎲", "Arpentez Paris avec votre pion", "Lancez le dé et marchez dans les vraies rues. Vous achetez ce qui se trouve autour de votre pion ; tombez chez un autre joueur et vous lui payez un péage. Gare aux cases Chance !"],
+    ["🎲", "Lancez le dé, comme au Monopoly", "Votre pion marche dans les vraies rues de Paris et s'arrête sur un immeuble : s'il est libre, achetez-le ; s'il appartient à un joueur, payez-lui son loyer. Gare aux cases Chance !"],
     ["🔑", "Construisez votre patrimoine", "Chaque appartement de Paris n'existe qu'une seule fois dans le jeu et n'a qu'un propriétaire. Complétez un étage (+25 % de loyer) ou un immeuble entier (+60 %), achetez les logements libres de vos immeubles, revendez au marché."],
     ["💶", "Touchez vos loyers", "Vos biens rapportent de l'argent en continu, même quand vous n'êtes pas connecté. Réinvestissez-le dans de nouveaux boosters, des parts de monuments ou des appartements mis en vente par les autres joueurs."],
     ["🏛️", "Devenez maire", "Le plus gros propriétaire de chaque arrondissement en devient le maire et touche 8 % des loyers du quartier. Rejoignez l'un des 5 partis : chaque semaine, celui qui a le plus de maires remporte l'Hôtel de Ville."]

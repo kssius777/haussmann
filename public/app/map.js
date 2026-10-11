@@ -209,7 +209,7 @@ function showOnMap(g) { go("map"); setTimeout(() => { flyTo(g); previewBuilding(
 
 async function previewBuilding(g) {
   await ensureCards([g]); const c = card(g); if (!c) return; sel = g; paintAll(); closeSearch();
-  if (!pending && !moving && panelKind !== "") setMovebar("");
+  if (!moving && panelKind !== "" && panelKind !== "land") setMovebar("");
   const ks = ST.mine.get(g), np = ST.mineParts.get(g); const o = ST.own.get(g);
   const isP = c.lk === "p"; const taken = isP ? (o?.parts || 0) : (o?.n || 0); const free = c.lots - taken;
   const mine = ks ? itemLabel(c, { t: "own", ks, n: 0 }) : np ? itemLabel(c, { t: "own", ks: [], n: np }) : null;
@@ -219,16 +219,16 @@ async function previewBuilding(g) {
     : free > 0 ? `<span class="pill" style="background:#DCFCE7;color:#15803D">${isP ? `${fmtN(free)} parts disponibles` : `${free} libre${free > 1 ? "s" : ""} sur ${c.lots}`}</span>`
     : `<span class="pill">Tout est déjà pris</span>`;
   if (ST.sale.has(g)) status += `<span class="pill" style="background:var(--sale);color:#fff">En vente</span>`;
-  const canBuy = free > 0, cash = liveCash(), far = farFromPawn(g);
-  const buyBtn = canBuy ? (far ? `<button class="btn sm" disabled>Trop loin · ${fmtDist(far)}</button>` : `<button class="btn sm green" data-pvbuy="${g}" ${cash < c.v ? "disabled" : ""}>Acheter · ${fmtE(c.v)}</button>`) : "";
+  const canBuy = free > 0, cash = liveCash(), far = notLanded(g);
+  const buyBtn = canBuy ? (far ? "" : `<button class="btn sm green" data-pvbuy="${g}" ${cash < c.v ? "disabled" : ""}>Acheter · ${fmtE(c.v)}</button>`) : "";
   pv.innerHTML = `<div class="th">${photo(c)}</div><div class="t"><b>${esc(title(c))}</b><span>${ord(c.arr)} arr. · ${esc(kindLabel(c))} ${rarSq(c.r, 18)}</span>
     <div class="meta">${status}</div>
     <div class="meta num"><b>${fmtE(c.v)}</b><span class="muted">${unit}</span><b class="green">+${fmtE(c.rent)}/jour</b></div>
     <div class="pvbtns">${buyBtn}<button class="btn sm ${canBuy ? "light" : ""}" data-open="${g}">${canBuy ? "Détails" : "Voir l'immeuble"}</button></div>
-    ${canBuy && far ? `<small class="muted">On n'achète qu'autour de son pion (${BUY_RADIUS} m). Lancez le dé pour vous approcher, ou trouvez-le dans un booster ou au marché.</small>` : canBuy && cash < c.v ? `<small class="muted">Il vous manque ${fmtE(c.v - cash)}. Les loyers arrivent tout seuls, ou ouvrez un booster.</small>` : ""}</div><button class="x" data-closepv aria-label="Fermer">×</button>`;
+    ${canBuy && far ? `<small class="muted">🎲 Pour l'acheter à la banque, tombez dessus avec le dé. Ou trouvez-le dans un booster, ou au Marché.</small>` : canBuy && cash < c.v ? `<small class="muted">Il vous manque ${fmtE(c.v - cash)}. Les loyers arrivent tout seuls, ou ouvrez un booster.</small>` : ""}</div><button class="x" data-closepv aria-label="Fermer">×</button>`;
   hideHint();
 }
-function hidePreview() { if (!pending && !moving) setMovebar(""); const pv = $("#preview"); if (pv && !pv.hidden) { pv.hidden = true; sel = null; paintAll(); } }
+function hidePreview() { if (!moving && panelKind !== "land") setMovebar(""); const pv = $("#preview"); if (pv && !pv.hidden) { pv.hidden = true; sel = null; paintAll(); } }
 function closeSearch() { $("#search").hidden = true; }
 
 function initMapUI() {
@@ -262,6 +262,6 @@ function initMapUI() {
 }
 
 // petit message d'aide sur la carte, jusqu'au premier achat ou aperçu
-function showHint() { try { if (localStorage.getItem("hm_hint")) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "🎲 Lancez le dé pour faire marcher votre pion dans Paris. Les immeubles en vert, dans son cercle, sont à vendre : touchez-les pour acheter."; $("#p-map").appendChild(h); }
+function showHint() { try { if (localStorage.getItem("hm_hint")) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "🎲 Lancez le dé : votre pion marche dans Paris et s'arrête sur un immeuble. S'il est libre, vous pouvez l'acheter !"; $("#p-map").appendChild(h); }
 function hideHint() { $("#maphint")?.remove(); try { localStorage.setItem("hm_hint", "1"); } catch (e) { } }
 function celebrate(c) { toast(`Félicitations ! ${title(c)} est à vous. Loyer : +${fmtE(c.rent)}/jour`, "good"); if (window.confetti) confetti("#0EA5A0", 30); }
