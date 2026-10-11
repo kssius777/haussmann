@@ -21,12 +21,12 @@ const linesGeo = list => ({ type: "FeatureCollection", features: list.map(([k, f
 const polysGeo = list => ({ type: "FeatureCollection", features: list.map(rs => ({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: rs.map(r => { const d = decodeRing(r); return d.concat([d[0]]); }) } })) });
 
 function colorExprs(m) {
-  const st = ["coalesce", ["feature-state", "s"], 0], se = ["boolean", ["feature-state", "sel"], false];
+  const st = ["coalesce", ["feature-state", "s"], 0], se = ["boolean", ["feature-state", "sel"], false], tg = ["coalesce", ["feature-state", "tgt"], 0];
   const rarR = d => ["match", ["get", "r"], "M", "#B98AE8", "L", "#E2B23A", d], rarB = d => ["match", ["get", "r"], "M", "#EBDDF9", "L", "#F8E7B8", d];
   if (m === "mine") return { roof: ["case", se, MC.sel, [">=", st, 3], MC.mine, MC.muteR], body: ["case", se, MC.selB, [">=", st, 3], MC.mineB, MC.mute] };
   if (m === "sale") return { roof: ["case", se, MC.sel, ["==", st, 4], MC.sale, MC.muteR], body: ["case", se, MC.selB, ["==", st, 4], MC.saleB, MC.mute] };
-  return { roof: ["case", se, MC.sel, [">=", st, 3], MC.mine, ["==", st, 2], MC.theirs, ["==", st, 4], MC.sale, rarR(MC.zinc)],
-           body: ["case", se, MC.selB, [">=", st, 3], MC.mineB, ["==", st, 2], MC.theirsB, ["==", st, 4], MC.saleB, rarB(MC.stone)] };
+  return { roof: ["case", ["==", tg, 2], "#A855F7", ["==", tg, 1], "#FACC15", se, MC.sel, [">=", st, 3], MC.mine, ["==", st, 2], MC.theirs, ["==", st, 4], MC.sale, rarR(MC.zinc)],
+           body: ["case", ["==", tg, 2], "#D8B4FE", ["==", tg, 1], "#FDE68A", se, MC.selB, [">=", st, 3], MC.mineB, ["==", st, 2], MC.theirsB, ["==", st, 4], MC.saleB, rarB(MC.stone)] };
 }
 function partyFill() {
   return ["match", ["coalesce", ["feature-state", "p"], ""], ...PARTY_ORDER.flatMap(k => [k, PARTIES[k].c]), "#FFFFFF"];
@@ -44,7 +44,7 @@ function addArrToMap(i) {
     map.addLayer({ id: "bd" + i, type: "fill-extrusion", source: "b" + i, minzoom: 12.6, paint: { "fill-extrusion-color": e.body, "fill-extrusion-height": ["-", ["get", "h"], 1], "fill-extrusion-opacity": 1, "fill-extrusion-vertical-gradient": true } }, "anchor-top");
     map.addLayer({ id: "rf" + i, type: "fill-extrusion", source: "b" + i, minzoom: 15.2, paint: { "fill-extrusion-color": e.roof, "fill-extrusion-height": ["get", "h"], "fill-extrusion-base": ["-", ["get", "h"], 1], "fill-extrusion-opacity": 1 } }, "anchor-top");
     for (const L of ["bd" + i, "rf" + i]) {
-      map.on("click", L, ev => { const f = ev.features[0]; if (f) { ev.preventDefault(); previewBuilding(f.id); } });
+      map.on("click", L, ev => { const f = ev.features[0]; if (f) { ev.preventDefault(); onBuildingTap(f.id); } });
       map.on("mouseenter", L, () => map.getCanvas().style.cursor = "pointer"); map.on("mouseleave", L, () => map.getCanvas().style.cursor = "");
     }
     for (const g of [...lastState.keys()]) if (ai(g) === i) lastState.delete(g);
@@ -77,7 +77,7 @@ function paintAll() {
     const s = stateFor(g), se = g === sel, k = s * 2 + (se ? 1 : 0); if (lastState.get(g) === k) continue;
     lastState.set(g, k); map.setFeatureState({ source: "b" + ai(g), id: g }, { s, sel: se });
   }
-  painted = want; renderMarks(); renderTags(); renderScore(); renderFilterCounts();
+  painted = want; renderMarks(); renderTags(); renderScore(); renderFilterCounts(); paintTargets();
 }
 let arrKey = "";
 function updateArrFill() {
@@ -124,7 +124,7 @@ function buildMap(base) {
   map.on("load", () => {
     mapReady = true; pumpGeo();
     if (window.THREE && window.addMonuments) addMonuments(map, IDX.models);
-    map.on("click", "mfill", e => { const f = e.features[0]; if (f) previewBuilding(f.id); });
+    map.on("click", "mfill", e => { const f = e.features[0]; if (f) onBuildingTap(f.id); });
     map.on("click", e => { if (e.defaultPrevented) return; if (!map.queryRenderedFeatures(e.point).some(f => /^(bd|rf)\d|^mfill$/.test(f.layer.id))) hidePreview(); closeSearch(); });
     IDX.arr.forEach((a, i) => {
       const el = document.createElement("button"); el.className = "amark"; el.innerHTML = `<b>${ord(a.n)}</b><span id="am${i}"></span>`;
@@ -133,7 +133,7 @@ function buildMap(base) {
     });
     buildMonMarkers();
     map.on("zoom", renderMarks); map.on("moveend", renderTags);
-    updateArrFill(); applyMode(); paintAll();
+    updateArrFill(); applyMode(); paintAll(); initPawnLayers();
     loadAllProgressive();
   });
 }
@@ -142,7 +142,7 @@ function buildMonMarkers() {
   monMarks = IDX.mons.filter(m => m[2] === "M" || m[2] === "L").map(([g, n, r, lon, lat]) => {
     const model = IDX.models.find(x => x.g === g); const el = document.createElement("button"); el.className = "mmark"; el.style.setProperty("--mc", RAR[r].c);
     el.innerHTML = `<i></i>${esc(cap(n))}`;
-    el.addEventListener("click", ev => { ev.stopPropagation(); previewBuilding(g); });
+    el.addEventListener("click", ev => { ev.stopPropagation(); onBuildingTap(g); });
     const mk = new maplibregl.Marker({ element: el, anchor: "bottom" }).setLngLat(model ? [model.lon, model.lat] : [lon, lat]); if (model) mk.setOffset([0, -Math.min(140, model.h * .35)]);
     return { g, r, mk, el, on: false };
   });
@@ -217,16 +217,16 @@ async function previewBuilding(g) {
     : free > 0 ? `<span class="pill" style="background:#DCFCE7;color:#15803D">${isP ? `${fmtN(free)} parts disponibles` : `${free} libre${free > 1 ? "s" : ""} sur ${c.lots}`}</span>`
     : `<span class="pill">Tout est déjà pris</span>`;
   if (ST.sale.has(g)) status += `<span class="pill" style="background:var(--sale);color:#fff">En vente</span>`;
-  const canBuy = free > 0, cash = liveCash();
-  const buyBtn = canBuy ? `<button class="btn sm green" data-pvbuy="${g}" ${cash < c.v ? "disabled" : ""}>Acheter · ${fmtE(c.v)}</button>` : "";
+  const canBuy = free > 0, cash = liveCash(), far = farFromPawn(g);
+  const buyBtn = canBuy ? (far ? `<button class="btn sm" disabled>Trop loin · ${fmtDist(far)}</button>` : `<button class="btn sm green" data-pvbuy="${g}" ${cash < c.v ? "disabled" : ""}>Acheter · ${fmtE(c.v)}</button>`) : "";
   pv.innerHTML = `<div class="th">${photo(c)}</div><div class="t"><b>${esc(title(c))}</b><span>${ord(c.arr)} arr. · ${esc(kindLabel(c))} ${rarSq(c.r, 18)}</span>
     <div class="meta">${status}</div>
     <div class="meta num"><b>${fmtE(c.v)}</b><span class="muted">${unit}</span><b class="green">+${fmtE(c.rent)}/jour</b></div>
     <div class="pvbtns">${buyBtn}<button class="btn sm ${canBuy ? "light" : ""}" data-open="${g}">${canBuy ? "Détails" : "Voir l'immeuble"}</button></div>
-    ${canBuy && cash < c.v ? `<small class="muted">Il vous manque ${fmtE(c.v - cash)}. Les loyers arrivent tout seuls, ou ouvrez un booster.</small>` : ""}</div><button class="x" data-closepv aria-label="Fermer">×</button>`;
+    ${canBuy && far ? `<small class="muted">On n'achète qu'autour de son pion (${BUY_RADIUS} m). Lancez les dés pour vous approcher, ou trouvez-le dans un booster ou au marché.</small>` : canBuy && cash < c.v ? `<small class="muted">Il vous manque ${fmtE(c.v - cash)}. Les loyers arrivent tout seuls, ou ouvrez un booster.</small>` : ""}</div><button class="x" data-closepv aria-label="Fermer">×</button>`;
   hideHint();
 }
-function hidePreview() { const pv = $("#preview"); if (pv && !pv.hidden) { pv.hidden = true; sel = null; paintAll(); } }
+function hidePreview() { if (!pending && !moving) setMovebar(""); const pv = $("#preview"); if (pv && !pv.hidden) { pv.hidden = true; sel = null; paintAll(); } }
 function closeSearch() { $("#search").hidden = true; }
 
 function initMapUI() {
@@ -260,6 +260,6 @@ function initMapUI() {
 }
 
 // petit message d'aide sur la carte, jusqu'au premier achat ou aperçu
-function showHint() { try { if (localStorage.getItem("hm_hint")) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "👆 Touchez un immeuble pour voir son prix et l'acheter"; $("#p-map").appendChild(h); }
+function showHint() { try { if (localStorage.getItem("hm_hint")) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "🎲 Lancez les dés pour faire avancer votre pion dans Paris. Vous pouvez acheter les immeubles dans le cercle autour de lui."; $("#p-map").appendChild(h); }
 function hideHint() { $("#maphint")?.remove(); try { localStorage.setItem("hm_hint", "1"); } catch (e) { } }
 function celebrate(c) { toast(`Félicitations ! ${title(c)} est à vous. Loyer : +${fmtE(c.rent)}/jour`, "good"); if (window.confetti) confetti("#0EA5A0", 30); }

@@ -44,14 +44,21 @@
       <button class="mbtn" id="t-home" aria-label="Voir tout Paris">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
     </div>
+    <div class="filter" id="filter" role="tablist">
+      <button data-m="all" aria-selected="true">Tout</button>
+      <button data-m="mine" aria-selected="false"><i class="dot mine"></i>Mes biens <span id="n-mine"></span></button>
+      <button data-m="sale" aria-selected="false"><i class="dot sale"></i>À vendre <span id="n-sale"></span></button>
+    </div>
     <div class="mapbottom">
+      <div id="movebar" hidden></div>
       <div id="preview" hidden></div>
-      <div class="filter" id="filter" role="tablist">
-        <button data-m="all" aria-selected="true">Tout</button>
-        <button data-m="mine" aria-selected="false"><i class="dot mine"></i>Mes biens <span id="n-mine"></span></button>
-        <button data-m="sale" aria-selected="false"><i class="dot sale"></i>À vendre <span id="n-sale"></span></button>
+      <div class="dicebar" id="dicebar">
+        <button class="dbtn" id="b-roll"><span class="dic">🎲</span><span><b>Lancer les dés</b><small id="rolls">10/10</small></span></button>
+        <button class="dbtn tp" id="b-tp" aria-label="Se téléporter sur un de ses biens"><span class="dic">✨</span><span><b>Téléport</b><small id="tps">3/3</small></span></button>
+        <button class="dbtn me" id="b-me" aria-label="Revenir à mon pion"><span class="dic">📍</span></button>
       </div>
     </div>
+    <div id="dice3d" hidden></div>
   </section>
   <section class="page dark" id="p-booster" hidden></section>
   <section class="page" id="p-assets" hidden></section>
@@ -81,6 +88,7 @@
 <script src="/app/api.js"></script>
 <script src="/app/cards.js"></script>
 <script src="/app/map.js"></script>
+<script src="/app/pawn.js"></script>
 <script src="/app/pages.js"></script>
 <script src="/app/booster.js"></script>
 <script src="/app/onboard.js"></script>

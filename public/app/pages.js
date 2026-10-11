@@ -272,18 +272,21 @@ async function buildingPage(g) {
   </div>`;
 }
 // la barre du bas : acheter (ou agir sur le logement choisi dans le plan)
+function farHTML(d, g) { return `<div class="buyfar"><b>📍 Trop loin de votre pion (${fmtDist(d)})</b><span class="muted">On ne peut acheter à la banque que dans un rayon de ${BUY_RADIUS} m autour de son pion. Lancez les dés pour vous approcher, ou téléportez-vous sur un de vos biens.</span><button class="btn sm light" data-mapto="${g}">Aller sur la carte</button></div>`; }
 function buyActions(c, g, owners, free, isP) {
-  const cash = liveCash();
+  const cash = liveCash(), far = farFromPawn(g);
   if (selLot !== null && !isP) {
     const k = selLot, o = owners.get(k), l = bInfo.listings.find(x => x.k === k);
     const head = `<div class="what"><b>${lotName(c, k)}${c.lk === "l" ? " · " + ord(floorOfLot(c, k)) + " étage" : ""}</b><span class="num">${o ? (o.o === ME ? "À vous" : "À " + esc(o.ps)) : "Libre"} · ${fmtE(c.v)} · +${fmtE(c.rent)}/jour</span></div>`;
     let btn;
-    if (!o) btn = `<button class="btn block green" data-act="bank" data-k="${k}" ${cash < c.v ? "disabled" : ""}>Acheter ce ${c.lk === "l" ? "logement" : "local"} · ${fmtE(c.v)}</button>`;
+    if (!o && far) btn = farHTML(far, g);
+    else if (!o) btn = `<button class="btn block green" data-act="bank" data-k="${k}" ${cash < c.v ? "disabled" : ""}>Acheter ce ${c.lk === "l" ? "logement" : "local"} · ${fmtE(c.v)}</button>`;
     else if (o.o === ME) btn = `<div class="sub" style="margin:0">Il est à vous : gérez-le dans « Vous possédez » plus haut.</div>`;
     else btn = l ? `<button class="btn block green" data-act="buyl" data-id="${l.id}" ${cash < l.price ? "disabled" : ""}>Acheter à ${esc(l.pseudo)} · ${fmtE(l.price)}</button>` : `<div class="sub" style="margin:0">Ce logement appartient à ${esc(o.ps)} et n'est pas en vente.</div>`;
     return head + btn + `<button class="btn sm ghost" data-act="unpick">Annuler la sélection</button>`;
   }
   if (free <= 0) return `<div class="what"><b>Tout est déjà pris</b><span>Surveillez le Marché : les propriétaires peuvent mettre leurs biens en vente.</span></div>`;
+  if (far) return farHTML(far, g);
   const total = c.v * c.lots, allFree = !isP && owners.size === 0 && c.lots > 1;
   const miss = cash < c.v ? `<div class="sub" style="margin:0;font-size:13px">Il vous manque ${fmtE(c.v - cash)}. Vos loyers arrivent en continu, ou ouvrez un booster.</div>` : "";
   return `<button class="btn block green" data-act="bank" ${cash < c.v ? "disabled" : ""}>${isP ? "Acheter 1 part" : `Acheter un ${c.lk === "l" ? "logement" : "local"}`} · ${fmtE(c.v)}</button>

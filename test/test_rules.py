@@ -86,15 +86,16 @@ cid = next((l[0] for l in hold if db.sql("select lots from cards where id=%s", l
 if cid:
     free = db.sql("select g from generate_series(0,(select lots-1 from cards where id=%s)) g where g not in (select k from lots where card=%s) limit 1", cid, cid)[0][0]
     db.sql("update profiles set cash = cash + 50000000 where id=%s", str(A))
+    db.sql("update profiles set pos=%s where id=%s", cid, str(A))
     db.rpc(A, "bank_buy", p_card=cid, p_k=free)
     check("achat à la banque d'un logement libre", db.sql("select owner from lots where card=%s and k=%s", cid, free)[0][0] == str(A))
 other = db.sql("select id from cards where lk='l' and id not in (select card from lots) limit 1")[0][0]
 c0 = db.sql("select cash from profiles where id=%s", str(A))[0][0]; db.sql("update profiles set rent_at=now() where id=%s", str(A))
-db.rpc(A, "bank_buy", p_card=other, p_k=None)
+db.sql("update profiles set pos=%s where id=%s", other, str(A)); db.rpc(A, "bank_buy", p_card=other, p_k=None)
 check("achat direct d'un logement sans carte préalable", db.sql("select owner from lots where card=%s and k=0", other)[0][0] == str(A))
 big = db.sql("select id, lots, v from cards where lk='l' and lots between 4 and 10 and id not in (select card from lots) limit 1")[0]
 db.sql("update profiles set cash = cash + %s where id=%s", big[1]*big[2], str(A))
-db.rpc(A, "buy_building", p_card=big[0])
+db.sql("update profiles set pos=%s where id in (%s,%s)", big[0], str(A), str(B)); db.rpc(A, "buy_building", p_card=big[0])
 check("achat d'un immeuble entier libre", db.sql("select count(*) from lots where card=%s and owner=%s", big[0], str(A))[0][0] == big[1])
 check("immeuble déjà entamé : achat entier refusé", "appartient déjà" in (err(lambda: db.rpc(B, "buy_building", p_card=big[0])) or ""))
 

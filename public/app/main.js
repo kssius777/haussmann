@@ -24,7 +24,7 @@ async function startGame(first) {
   await refreshAll();
   try { buildMap(BASE); } catch (e) { console.error(e); $("#map").innerHTML = `<div class="empty" style="margin:120px 16px 0">La carte 3D ne peut pas s'afficher sur cet appareil. Le reste du jeu fonctionne.</div>`; }
   $("#loading")?.remove();
-  go("map"); renderWallet();
+  go("map"); renderWallet(); initPawnUI(); renderDice();
   setInterval(() => {
     renderWallet();
     const w = $("#worth"); if (w && cur() === "assets") w.textContent = fmtE(worthNow());
@@ -51,7 +51,8 @@ function showWelcome() {
   R.innerHTML = `<div class="bstage"><div class="rays"></div><div class="welcome">
     <p class="eyebrow" style="color:#9FB4D6">Bienvenue à Paris</p>
     <h2>${esc(p.pseudo)}, voici de quoi démarrer</h2>
-    <div class="wl"><span>💶</span><div><b>${fmtE(p.cash)} sur votre compte</b><p>Touchez n'importe quel immeuble sur la carte : s'il reste des logements libres, vous pouvez en acheter un tout de suite, au vrai prix du quartier.</p></div></div>
+    <div class="wl"><span>💶</span><div><b>${fmtE(p.cash)} sur votre compte</b><p>Votre pion vous attend devant Notre-Dame. Lancez les dés pour avancer d'immeuble en immeuble : vous pouvez acheter tout ce qui se trouve dans le cercle autour de lui, au vrai prix du quartier.</p></div></div>
+    <div class="wl"><span>🎲</span><div><b>10 lancers de dés, un de plus toutes les 2 h</b><p>Tombez chez un autre joueur et vous lui payez un péage. Les cases violettes sont des cases Chance. Et 3 fois par jour, vous pouvez vous téléporter sur un de vos biens.</p></div></div>
     <div class="wl"><span>🎁</span><div><b>${p.welcome} boosters offerts</b><p>Un booster, c'est une pochette surprise : 4 biens de Paris tirés au hasard (un appartement, parfois un étage ou un immeuble entier, voire un bout de monument) et 1 carte Chance. C'est la façon la moins chère de démarrer.</p></div></div>
     <div class="wl"><span>🏠</span><div><b>Vos biens rapportent tout seuls</b><p>Chaque bien verse un loyer en continu, même quand vous n'êtes pas là. Réinvestissez-le pour grandir et devenir maire de votre arrondissement.</p></div></div>
     <div class="bbtns"><button class="btn white block" data-w="open">Ouvrir mon premier booster</button><button class="btn glass block" data-w="map">D'abord, explorer la carte</button></div>
