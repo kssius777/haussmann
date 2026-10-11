@@ -195,11 +195,13 @@ function plaqueTitle(c) { return c.name ? cap(c.name) : (c.adr || "Immeuble"); }
 function cardHTML(c, { w, item, tier, count } = {}) {
   const r = tier || c.r, n = item ? Math.max(1, itemUnits(item)) : 1;
   const t = plaqueTitle(c), long = t.length > 22;
+  // carte d'un immeuble entier (pas d'un bien possédé) : les chiffres sont ceux d'UN logement
+  const per = !item && c.lots > 1 ? (c.lk === "p" ? "/ PART" : c.lk === "l" ? "/ LOGT" : "/ LOCAL") : "";
   return `<div class="hc t${r}" style="${w ? `--w:${w}` : ""}"><div class="fr"><div class="in">
     <div class="plq"><small>${c.arr === 1 ? "1<sup>er</sup>" : c.arr + "<sup>e</sup>"} Arr<sup>t</sup></small><b class="${long ? "long" : ""}">${esc(t)}</b></div>
     <div class="ph">${photo(c)}<span class="rb">${RAR[r].l}</span>${count ? `<span class="cnt">${esc(count)}</span>` : ""}</div>
     <div class="bd"><div class="kd">${esc(itemLabel(c, item) || kindLabel(c))}${c.y && c.lk !== "p" ? `<span class="yr"> · vers ${esc(c.y)}</span>` : ""}</div>
-      <div class="nums num"><div><span>LOYER / JOUR</span><b class="g">${fmtE(c.rent * n)}</b></div><div class="r"><span>VALEUR</span><b>${fmtE(c.v * n)}</b></div></div>
+      <div class="nums num"><div><span>${per ? "LOYER " + per : "LOYER / JOUR"}</span><b class="g">${fmtE(c.rent * n)}</b></div><div class="r"><span>${per ? "PRIX " + per : "VALEUR"}</span><b>${fmtE(c.v * n)}</b></div></div>
       <div class="rn"><span>${RAR[r].n.toUpperCase()}</span><em>N° ${String(c.arr).padStart(2, "0")}-${String(li(c.g)).padStart(5, "0")}</em></div></div>
   </div></div></div>`;
 }

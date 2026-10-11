@@ -123,15 +123,17 @@ function showLand(L) {
   if (L?.bonus > 0) lines.push(`<span class="ln good">Bonus : une journée de loyer offerte, <b>+${fmtE(L.bonus)}</b></span>`);
   if (L?.chance) { const ch = L.chance; const [nm] = CHANCE[ch.k] || ["Chance"]; lines.push(`<span class="ln ${BAD.has(ch.k) ? "bad" : "good"}">🃏 Case Chance : <b>${esc(nm)}</b> ${esc(chanceText(ch))}</span>`); }
   let btns = "";
+  const word = n => lotWord(c, n), tot = c.lots;
+  const info = isP ? `${fmtN(free)} parts libres` : tot > 1 ? `Immeuble de ${tot} ${word(tot)} · <b>${free} libre${free > 1 ? "s" : ""}</b>` : "";
   if (free > 0) {
-    const unit = isP ? "1 part" : c.lk === "l" ? "un logement" : "un local", allFree = !isP && free === c.lots && c.lots > 1, total = c.v * c.lots;
-    btns += `<button class="btn block green" data-lbuy="${g}" ${cash < c.v ? "disabled" : ""}>Acheter ${unit} · ${fmtE(c.v)}</button>`;
-    if (allFree) btns += `<button class="btn block light" data-lbuild="${g}" ${cash < total ? "disabled" : ""}>Tout l'immeuble · ${fmtE(total)}</button>`;
+    const unit = isP ? "1 part" : tot > 1 ? `1 ${word(1)}` : c.lk === "l" ? "le logement" : "le local", allFree = !isP && free === tot && tot > 1, total = c.v * tot;
+    btns += `<button class="btn block green" data-lbuy="${g}" ${cash < c.v ? "disabled" : ""}><span>Acheter ${unit} · ${fmtE(c.v)}</span><small>+${fmtE(c.rent)} / jour</small></button>`;
+    if (allFree) btns += `<button class="btn block light" data-lbuild="${g}" ${cash < total ? "disabled" : ""}><span>Acheter les ${tot} · ${fmtE(total)}</span><small>tout l'immeuble : +60 % de loyer</small></button>`;
     if (cash < c.v) btns += `<small class="muted">Il vous manque ${fmtE(c.v - cash)}.</small>`;
     btns += `<button class="btn block ghost" data-mvclose>Passer</button>`;
   } else btns = `<button class="btn block" data-mvclose>OK</button>`;
   setMovebar(`<div class="land"><div class="lc" data-lopen="${g}">${cardHTML(c, { w: "128px" })}</div>
-    <div class="lr"><b class="lh ${cls}">${head}</b>${free > 0 && mine > 0 ? `<span class="ln">Il reste ${free} ${lotWord(c, free)} libre${free > 1 ? "s" : ""} ici.</span>` : ""}${lines.join("")}<div class="lb">${btns}</div></div>
+    <div class="lr"><b class="lh ${cls}">${head}</b>${info ? `<span class="linfo">${info}</span>` : ""}${lines.join("")}<div class="lb">${btns}</div></div>
     <button class="x" data-mvclose aria-label="Fermer">×</button></div>`, "land");
   if (L?.chance && window.confetti && !BAD.has(L.chance.k)) confetti("#A855F7", 24);
 }
