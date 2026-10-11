@@ -21,12 +21,12 @@ const linesGeo = list => ({ type: "FeatureCollection", features: list.map(([k, f
 const polysGeo = list => ({ type: "FeatureCollection", features: list.map(rs => ({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: rs.map(r => { const d = decodeRing(r); return d.concat([d[0]]); }) } })) });
 
 function colorExprs(m) {
-  const st = ["coalesce", ["feature-state", "s"], 0], se = ["boolean", ["feature-state", "sel"], false], tg = ["coalesce", ["feature-state", "tgt"], 0];
+  const st = ["coalesce", ["feature-state", "s"], 0], se = ["boolean", ["feature-state", "sel"], false], tg = ["coalesce", ["feature-state", "tgt"], 0], nr = ["coalesce", ["feature-state", "near"], 0];
   const rarR = d => ["match", ["get", "r"], "M", "#B98AE8", "L", "#E2B23A", d], rarB = d => ["match", ["get", "r"], "M", "#EBDDF9", "L", "#F8E7B8", d];
   if (m === "mine") return { roof: ["case", se, MC.sel, [">=", st, 3], MC.mine, MC.muteR], body: ["case", se, MC.selB, [">=", st, 3], MC.mineB, MC.mute] };
   if (m === "sale") return { roof: ["case", se, MC.sel, ["==", st, 4], MC.sale, MC.muteR], body: ["case", se, MC.selB, ["==", st, 4], MC.saleB, MC.mute] };
-  return { roof: ["case", ["==", tg, 2], "#A855F7", ["==", tg, 1], "#FACC15", se, MC.sel, [">=", st, 3], MC.mine, ["==", st, 2], MC.theirs, ["==", st, 4], MC.sale, rarR(MC.zinc)],
-           body: ["case", ["==", tg, 2], "#D8B4FE", ["==", tg, 1], "#FDE68A", se, MC.selB, [">=", st, 3], MC.mineB, ["==", st, 2], MC.theirsB, ["==", st, 4], MC.saleB, rarB(MC.stone)] };
+  return { roof: ["case", ["==", tg, 2], "#A855F7", ["==", tg, 1], "#FACC15", se, MC.sel, [">=", st, 3], MC.mine, ["==", st, 4], MC.sale, ["==", nr, 1], "#4FCB7E", ["==", st, 2], MC.theirs, rarR(MC.zinc)],
+           body: ["case", ["==", tg, 2], "#D8B4FE", ["==", tg, 1], "#FDE68A", se, MC.selB, [">=", st, 3], MC.mineB, ["==", st, 4], MC.saleB, ["==", nr, 1], "#E3F4E8", ["==", st, 2], MC.theirsB, rarB(MC.stone)] };
 }
 function partyFill() {
   return ["match", ["coalesce", ["feature-state", "p"], ""], ...PARTY_ORDER.flatMap(k => [k, PARTIES[k].c]), "#FFFFFF"];
@@ -133,6 +133,7 @@ function buildMap(base) {
     });
     buildMonMarkers();
     map.on("zoom", renderMarks); map.on("moveend", renderTags);
+    ARR.forEach((A, i) => { if (A?.cards) addArrToMap(i); });   // arrondissements chargés avant la carte (ex. celui du pion)
     updateArrFill(); applyMode(); paintAll(); initPawnLayers();
     loadAllProgressive();
   });
@@ -208,6 +209,7 @@ function showOnMap(g) { go("map"); setTimeout(() => { flyTo(g); previewBuilding(
 
 async function previewBuilding(g) {
   await ensureCards([g]); const c = card(g); if (!c) return; sel = g; paintAll(); closeSearch();
+  if (!pending && !moving && panelKind !== "") setMovebar("");
   const ks = ST.mine.get(g), np = ST.mineParts.get(g); const o = ST.own.get(g);
   const isP = c.lk === "p"; const taken = isP ? (o?.parts || 0) : (o?.n || 0); const free = c.lots - taken;
   const mine = ks ? itemLabel(c, { t: "own", ks, n: 0 }) : np ? itemLabel(c, { t: "own", ks: [], n: np }) : null;
@@ -223,7 +225,7 @@ async function previewBuilding(g) {
     <div class="meta">${status}</div>
     <div class="meta num"><b>${fmtE(c.v)}</b><span class="muted">${unit}</span><b class="green">+${fmtE(c.rent)}/jour</b></div>
     <div class="pvbtns">${buyBtn}<button class="btn sm ${canBuy ? "light" : ""}" data-open="${g}">${canBuy ? "Détails" : "Voir l'immeuble"}</button></div>
-    ${canBuy && far ? `<small class="muted">On n'achète qu'autour de son pion (${BUY_RADIUS} m). Lancez les dés pour vous approcher, ou trouvez-le dans un booster ou au marché.</small>` : canBuy && cash < c.v ? `<small class="muted">Il vous manque ${fmtE(c.v - cash)}. Les loyers arrivent tout seuls, ou ouvrez un booster.</small>` : ""}</div><button class="x" data-closepv aria-label="Fermer">×</button>`;
+    ${canBuy && far ? `<small class="muted">On n'achète qu'autour de son pion (${BUY_RADIUS} m). Lancez le dé pour vous approcher, ou trouvez-le dans un booster ou au marché.</small>` : canBuy && cash < c.v ? `<small class="muted">Il vous manque ${fmtE(c.v - cash)}. Les loyers arrivent tout seuls, ou ouvrez un booster.</small>` : ""}</div><button class="x" data-closepv aria-label="Fermer">×</button>`;
   hideHint();
 }
 function hidePreview() { if (!pending && !moving) setMovebar(""); const pv = $("#preview"); if (pv && !pv.hidden) { pv.hidden = true; sel = null; paintAll(); } }
@@ -260,6 +262,6 @@ function initMapUI() {
 }
 
 // petit message d'aide sur la carte, jusqu'au premier achat ou aperçu
-function showHint() { try { if (localStorage.getItem("hm_hint")) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "🎲 Lancez les dés pour faire avancer votre pion dans Paris. Vous pouvez acheter les immeubles dans le cercle autour de lui."; $("#p-map").appendChild(h); }
+function showHint() { try { if (localStorage.getItem("hm_hint")) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "🎲 Lancez le dé pour faire marcher votre pion dans Paris. Les immeubles en vert, dans son cercle, sont à vendre : touchez-les pour acheter."; $("#p-map").appendChild(h); }
 function hideHint() { $("#maphint")?.remove(); try { localStorage.setItem("hm_hint", "1"); } catch (e) { } }
 function celebrate(c) { toast(`Félicitations ! ${title(c)} est à vous. Loyer : +${fmtE(c.rent)}/jour`, "good"); if (window.confetti) confetti("#0EA5A0", 30); }

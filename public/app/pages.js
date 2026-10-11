@@ -272,7 +272,7 @@ async function buildingPage(g) {
   </div>`;
 }
 // la barre du bas : acheter (ou agir sur le logement choisi dans le plan)
-function farHTML(d, g) { return `<div class="buyfar"><b>📍 Trop loin de votre pion (${fmtDist(d)})</b><span class="muted">On ne peut acheter à la banque que dans un rayon de ${BUY_RADIUS} m autour de son pion. Lancez les dés pour vous approcher, ou téléportez-vous sur un de vos biens.</span><button class="btn sm light" data-mapto="${g}">Aller sur la carte</button></div>`; }
+function farHTML(d, g) { return `<div class="buyfar"><b>📍 Trop loin de votre pion (${fmtDist(d)})</b><span class="muted">On ne peut acheter à la banque que dans un rayon de ${BUY_RADIUS} m autour de son pion. Lancez le dé pour vous approcher, ou téléportez-vous sur un de vos biens.</span><button class="btn sm light" data-mapto="${g}">Aller sur la carte</button></div>`; }
 function buyActions(c, g, owners, free, isP) {
   const cash = liveCash(), far = farFromPawn(g);
   if (selLot !== null && !isP) {
