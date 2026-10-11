@@ -4,8 +4,9 @@
 // =====================================================================
 let map = null, mapReady = false, mode = "all", sel = null;
 const hideSet = new Set(), lastState = new Map(); let painted = new Set();
-const MC = { mine: "#0EA5A0", mineB: "#9FE3DE", theirs: "#7C8BA1", theirsB: "#DCE3EC", sale: "#F59E0B", saleB: "#FBE1B0",
-  sel: "#0F1B2D", selB: "#94A3B8", mute: "#EEF2F6", muteR: "#E1E7EE" };
+// Palette « Paris » : pierre de taille et toits en zinc
+const MC = { mine: "#0EA5A0", mineB: "#8FDDD6", theirs: "#5E6B7D", theirsB: "#CBD3DD", sale: "#F59E0B", saleB: "#F9D58F",
+  sel: "#0F1B2D", selB: "#7DD3FC", mute: "#EEEAE3", muteR: "#DAD5CC", stone: "#F2E7D3", zinc: "#7F90A2" };
 
 function geoArr(i) {
   const A = ARR[i], feats = []; const ih = FIELDS.indexOf("h"), ir = FIELDS.indexOf("r");
@@ -21,11 +22,11 @@ const polysGeo = list => ({ type: "FeatureCollection", features: list.map(rs => 
 
 function colorExprs(m) {
   const st = ["coalesce", ["feature-state", "s"], 0], se = ["boolean", ["feature-state", "sel"], false];
-  const rarR = d => ["match", ["get", "r"], "M", RAR.M.roof, "L", RAR.L.roof, "R", RAR.R.roof, d], rarB = d => ["match", ["get", "r"], "M", RAR.M.body, "L", RAR.L.body, "R", RAR.R.body, d];
+  const rarR = d => ["match", ["get", "r"], "M", "#B98AE8", "L", "#E2B23A", d], rarB = d => ["match", ["get", "r"], "M", "#EBDDF9", "L", "#F8E7B8", d];
   if (m === "mine") return { roof: ["case", se, MC.sel, [">=", st, 3], MC.mine, MC.muteR], body: ["case", se, MC.selB, [">=", st, 3], MC.mineB, MC.mute] };
   if (m === "sale") return { roof: ["case", se, MC.sel, ["==", st, 4], MC.sale, MC.muteR], body: ["case", se, MC.selB, ["==", st, 4], MC.saleB, MC.mute] };
-  return { roof: ["case", se, MC.sel, [">=", st, 3], MC.mine, ["==", st, 2], MC.theirs, ["==", st, 4], MC.sale, rarR("#E1E7EE")],
-           body: ["case", se, MC.selB, [">=", st, 3], MC.mineB, ["==", st, 2], MC.theirsB, ["==", st, 4], MC.saleB, rarB("#FFFFFF")] };
+  return { roof: ["case", se, MC.sel, [">=", st, 3], MC.mine, ["==", st, 2], MC.theirs, ["==", st, 4], MC.sale, rarR(MC.zinc)],
+           body: ["case", se, MC.selB, [">=", st, 3], MC.mineB, ["==", st, 2], MC.theirsB, ["==", st, 4], MC.saleB, rarB(MC.stone)] };
 }
 function partyFill() {
   return ["match", ["coalesce", ["feature-state", "p"], ""], ...PARTY_ORDER.flatMap(k => [k, PARTIES[k].c]), "#FFFFFF"];
@@ -99,18 +100,18 @@ function buildMap(base) {
     return { type: "Feature", id: m.g, properties: {}, geometry: { type: "Polygon", coordinates: [pts] } }; }) };
   const ev = ST.state?.event;
   map = new maplibregl.Map({
-    container: "map", attributionControl: false, center: [2.3420, 48.8580], zoom: 11.9, pitch: 35, bearing: -14, maxPitch: 75, minZoom: 10.8,
+    container: "map", attributionControl: false, center: [2.3440, 48.8566], zoom: 14.2, pitch: 55, bearing: -20, maxPitch: 75, minZoom: 10.8,
     maxBounds: [[2.10, 48.74], [2.60, 48.98]], fadeDuration: 0, dragRotate: true, touchPitch: true, pitchWithRotate: true,
     style: { version: 8,
-      light: { anchor: "viewport", color: "#FFFFFF", intensity: .3, position: [1.15, 200, 30] },
-      sky: { "sky-color": "#BFDDF3", "horizon-color": "#EAF3FA", "fog-color": "#EAF3FA", "sky-horizon-blend": .6, "horizon-fog-blend": .7, "fog-ground-blend": .8, "atmosphere-blend": 0 },
+      light: { anchor: "viewport", color: "#FFF6E8", intensity: .45, position: [1.15, 210, 40] },
+      sky: { "sky-color": "#9FCBEF", "horizon-color": "#F4E9DA", "fog-color": "#EFE7DA", "sky-horizon-blend": .6, "horizon-fog-blend": .7, "fog-ground-blend": .8, "atmosphere-blend": 0 },
       sources: { water: { type: "geojson", data: polysGeo(base.water) }, parks: { type: "geojson", data: polysGeo(base.parks) }, major: { type: "geojson", data: linesGeo(base.major) }, arr: { type: "geojson", data: outline }, mfill: { type: "geojson", data: mfill } },
       layers: [
-        { id: "bg", type: "background", paint: { "background-color": "#EEF2F5" } },
+        { id: "bg", type: "background", paint: { "background-color": "#E7E2D8" } },
         { id: "arrfill", type: "fill", source: "arr", paint: { "fill-color": partyFill(), "fill-opacity": ["interpolate", ["linear"], ["zoom"], 11, .5, 13.5, .28, 15.5, .06] } },
-        { id: "parks", type: "fill", source: "parks", paint: { "fill-color": "#CFE8C9", "fill-opacity": .85 } },
-        { id: "water", type: "fill", source: "water", paint: { "fill-color": "#9FD0EE" } },
-        { id: "major-case", type: "line", source: "major", paint: { "line-color": "#DCE3EA", "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "k"], 3, 1.6, .6], 18, ["match", ["get", "k"], 3, 34, 20]] } },
+        { id: "parks", type: "fill", source: "parks", paint: { "fill-color": "#AED79B", "fill-opacity": .95 } },
+        { id: "water", type: "fill", source: "water", paint: { "fill-color": "#6FB3E0" } },
+        { id: "major-case", type: "line", source: "major", paint: { "line-color": "#D6CFC2", "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "k"], 3, 1.6, .6], 18, ["match", ["get", "k"], 3, 34, 20]] } },
         { id: "major", type: "line", source: "major", paint: { "line-color": "#FFFFFF", "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "k"], 3, 1.2, .4], 18, ["match", ["get", "k"], 3, 30, 17]] } },
         { id: "mfill", type: "fill", source: "mfill", paint: { "fill-color": "#C9921A", "fill-opacity": ["interpolate", ["linear"], ["zoom"], 12, .2, 16, .06] } },
         { id: "anchor-b", type: "background", layout: { visibility: "none" }, paint: {} },
@@ -189,12 +190,12 @@ function renderFilterCounts() {
 // bandeau « résultats » en haut de la carte
 function seatCounts() { const s = {}; for (const m of ST.mayors) if (m?.party) s[m.party] = (s[m.party] || 0) + 1; return s; }
 function renderScore() {
-  const s = seatCounts(), tot = Object.values(s).reduce((a, b) => a + b, 0);
+  const s = seatCounts(), tot = ST.mayors.filter(Boolean).length, none = tot - Object.values(s).reduce((a, b) => a + b, 0);
   const lead = Object.entries(s).sort((a, b) => b[1] - a[1])[0];
   const w = ST.state?.week;
   $("#score").innerHTML = `<div class="t"><span>Hôtel de Ville${w?.party ? ` · cette semaine : <b style="color:${PARTIES[w.party]?.c}">${esc(PARTIES[w.party]?.n || "")}</b>` : ""}</span><b>${tot}/20 maires</b></div>
-    <div class="seats">${PARTY_ORDER.map(k => s[k] ? `<i style="width:${s[k] * 5}%;background:${PARTIES[k].c}"></i>` : "").join("")}</div>
-    <div class="leg">${PARTY_ORDER.filter(k => s[k]).map(k => `<span>${emblemSVG(k, 14)}${esc(PARTIES[k].n)} ${s[k]}</span>`).join("") || `<span>Aucun maire élu pour l'instant</span>`}</div>`;
+    <div class="seats">${PARTY_ORDER.map(k => s[k] ? `<i style="width:${s[k] * 5}%;background:${PARTIES[k].c}"></i>` : "").join("")}${none ? `<i style="width:${none * 5}%;background:#94A3B8"></i>` : ""}</div>
+    <div class="leg">${PARTY_ORDER.filter(k => s[k]).map(k => `<span>${emblemSVG(k, 14)}${esc(PARTIES[k].n)} ${s[k]}</span>`).join("")}${none ? `<span><i style="background:#94A3B8"></i>Sans parti ${none}</span>` : ""}${!tot ? `<span>Aucun maire élu pour l'instant</span>` : ""}</div>`;
 }
 async function loadAllProgressive() {
   const c = map.getCenter(); const order = IDX.arr.map((a, i) => [i, Math.hypot(a.center[0] - c.lng, a.center[1] - c.lat)]).sort((a, b) => a[1] - b[1]).map(x => x[0]);
@@ -208,25 +209,40 @@ function showOnMap(g) { go("map"); setTimeout(() => { flyTo(g); previewBuilding(
 async function previewBuilding(g) {
   await ensureCards([g]); const c = card(g); if (!c) return; sel = g; paintAll(); closeSearch();
   const ks = ST.mine.get(g), np = ST.mineParts.get(g); const o = ST.own.get(g);
-  const owned = c.lk === "p" ? (o?.parts || 0) : (o?.n || 0);
+  const isP = c.lk === "p"; const taken = isP ? (o?.parts || 0) : (o?.n || 0); const free = c.lots - taken;
   const mine = ks ? itemLabel(c, { t: "own", ks, n: 0 }) : np ? itemLabel(c, { t: "own", ks: [], n: np }) : null;
+  const unit = isP ? "la part" : c.lk === "l" ? "le logement" : "le local";
   const pv = $("#preview"); pv.hidden = false;
-  pv.innerHTML = `<div class="th">${photo(c)}</div><div class="t"><b>${esc(title(c))}</b><span>${ord(c.arr)} arr. · ${esc(kindLabel(c))}</span>
-    <div class="meta">${rarSq(c.r)}${mine ? `<span class="pill" style="background:var(--mine);color:#fff">À vous · ${esc(mine)}</span>` : `<span class="pill num">${c.lk === "p" ? `${fmtN(owned)}/${fmtN(c.lots)} parts prises` : `${owned}/${c.lots} pris`}</span>`}${ST.sale.has(g) ? `<span class="pill" style="background:var(--sale);color:#fff">En vente</span>` : ""}</div>
-    <div class="meta num"><b>${fmtE(c.v)}</b><span class="muted">${c.lk === "p" ? "la part" : c.lk === "l" ? "le logement" : "le local"}</span><b class="green">+${fmtE(c.rent)}/j</b></div>
-    <button class="btn sm" data-open="${g}">Voir la fiche</button></div><button class="x" data-closepv aria-label="Fermer">×</button>`;
+  let status = mine ? `<span class="pill" style="background:var(--mine);color:#fff">À vous · ${esc(mine)}</span>`
+    : free > 0 ? `<span class="pill" style="background:#DCFCE7;color:#15803D">${isP ? `${fmtN(free)} parts disponibles` : `${free} libre${free > 1 ? "s" : ""} sur ${c.lots}`}</span>`
+    : `<span class="pill">Tout est déjà pris</span>`;
+  if (ST.sale.has(g)) status += `<span class="pill" style="background:var(--sale);color:#fff">En vente</span>`;
+  const canBuy = free > 0, cash = liveCash();
+  const buyBtn = canBuy ? `<button class="btn sm green" data-pvbuy="${g}" ${cash < c.v ? "disabled" : ""}>Acheter · ${fmtE(c.v)}</button>` : "";
+  pv.innerHTML = `<div class="th">${photo(c)}</div><div class="t"><b>${esc(title(c))}</b><span>${ord(c.arr)} arr. · ${esc(kindLabel(c))} ${rarSq(c.r, 18)}</span>
+    <div class="meta">${status}</div>
+    <div class="meta num"><b>${fmtE(c.v)}</b><span class="muted">${unit}</span><b class="green">+${fmtE(c.rent)}/jour</b></div>
+    <div class="pvbtns">${buyBtn}<button class="btn sm ${canBuy ? "light" : ""}" data-open="${g}">${canBuy ? "Détails" : "Voir l'immeuble"}</button></div>
+    ${canBuy && cash < c.v ? `<small class="muted">Il vous manque ${fmtE(c.v - cash)}. Les loyers arrivent tout seuls, ou ouvrez un booster.</small>` : ""}</div><button class="x" data-closepv aria-label="Fermer">×</button>`;
+  hideHint();
 }
 function hidePreview() { const pv = $("#preview"); if (pv && !pv.hidden) { pv.hidden = true; sel = null; paintAll(); } }
 function closeSearch() { $("#search").hidden = true; }
 
 function initMapUI() {
-  $("#preview").addEventListener("click", e => { if (e.target.closest("[data-closepv]")) return hidePreview(); const o = e.target.closest("[data-open]"); if (o) push("b", +o.dataset.open); });
+  $("#preview").addEventListener("click", async e => {
+    if (e.target.closest("[data-closepv]")) return hidePreview();
+    const o = e.target.closest("[data-open]"); if (o) return push("b", +o.dataset.open);
+    const b = e.target.closest("[data-pvbuy]"); if (b) { const g = +b.dataset.pvbuy; b.disabled = true; b.textContent = "Achat…";
+      if (await act("bank_buy", { p_card: g, p_k: null }, null)) { const c = card(g); celebrate(c); }
+      previewBuilding(g); }
+  });
   $("#filter").addEventListener("click", e => {
     const b = e.target.closest("[data-m]"); if (!b) return; mode = b.dataset.m;
     $$("#filter button").forEach(x => x.setAttribute("aria-selected", x === b)); hidePreview(); applyMode();
     if (mode === "mine") { const hs = holdings(); if (hs.length) { const pts = hs.map(h => centerOf(h.g)); const lo = pts.map(p => p[0]), la = pts.map(p => p[1]); map.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], { padding: 90, maxZoom: 15.5, pitch: 45, duration: 1100 }); } else toast("Vous n'avez encore aucun bien : ouvrez un booster !"); }
   });
-  $("#t-home").addEventListener("click", () => map.flyTo({ center: [2.3420, 48.8580], zoom: 11.9, pitch: 35, bearing: -14, duration: 1200 }));
+  $("#t-home").addEventListener("click", () => map.flyTo({ center: [2.3420, 48.8580], zoom: 11.9, pitch: 30, bearing: -14, duration: 1200 }));
   $("#t-north").addEventListener("click", () => map.easeTo({ bearing: 0, duration: 600 }));
   $("#t-tilt").addEventListener("click", () => map.easeTo({ pitch: map.getPitch() > 20 ? 0 : 58, duration: 700 }));
   $("#t-search").addEventListener("click", e => { e.stopPropagation(); const s = $("#search"); s.hidden = !s.hidden; if (!s.hidden) $("#q").focus(); });
@@ -242,3 +258,8 @@ function initMapUI() {
   });
   $("#results").addEventListener("click", async e => { const b = e.target.closest("[data-g]"); if (!b) return; const g = +b.dataset.g; closeSearch(); await ensureCards([g]); flyTo(g); previewBuilding(g); });
 }
+
+// petit message d'aide sur la carte, jusqu'au premier achat ou aperçu
+function showHint() { try { if (localStorage.getItem("hm_hint")) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "👆 Touchez un immeuble pour voir son prix et l'acheter"; $("#p-map").appendChild(h); }
+function hideHint() { $("#maphint")?.remove(); try { localStorage.setItem("hm_hint", "1"); } catch (e) { } }
+function celebrate(c) { toast(`Félicitations ! ${title(c)} est à vous. Loyer : +${fmtE(c.rent)}/jour`, "good"); if (window.confetti) confetti("#0EA5A0", 30); }

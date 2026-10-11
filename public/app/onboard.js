@@ -8,7 +8,7 @@ function showOnb(step) {
   const O = $("#onb"); O.hidden = false; O.onclick = null; $("#loading")?.remove(); O.scrollTop = 0;
   const steps = n => `<div class="steps">${[1, 2, 3].map(k => `<i class="${k <= n ? "on" : ""}"></i>`).join("")}</div>`;
   if (onbStep === "login") {
-    O.innerHTML = `<div class="onb">${steps(1)}
+    O.innerHTML = `<div class="onb">
       <button class="back" id="tohome" style="align-self:flex-start">${ICON.back}Accueil</button>
       <h1>Collectionnez les vrais immeubles de Paris.</h1>
       <p>Ouvrez des boosters, touchez les loyers, devenez maire de votre arrondissement.</p>
@@ -37,10 +37,14 @@ function showOnb(step) {
     };
   }
   if (onbStep === "pseudo") {
-    O.innerHTML = `<div class="onb">${steps(2)}<h1>Votre nom de propriétaire</h1><p>C'est le nom que verront les autres joueurs, sur la carte et au classement.</p>
+    O.innerHTML = `<div class="onb"><h1>Comment voulez-vous qu'on vous appelle ?</h1><p>C'est le nom que verront les autres joueurs sur la carte et au classement. C'est la seule chose à remplir : vous entrez ensuite directement dans Paris.</p>
       <form id="pf" style="display:grid;gap:10px"><input class="inp" id="ps" maxlength="20" minlength="2" placeholder="Ex. : Baron Haussmann" value="${esc(onbPseudo)}" required autocomplete="nickname">
-      <button class="btn block" type="submit">Continuer</button></form><p class="sub" id="perr" style="color:var(--danger)"></p></div>`;
-    O.querySelector("#pf").onsubmit = e => { e.preventDefault(); const v = $("#ps").value.trim(); if (v.length < 2) return; onbPseudo = v; showOnb("party"); };
+      <button class="btn block" type="submit">Entrer dans Paris</button></form><p class="sub" id="perr" style="color:var(--danger)"></p></div>`;
+    O.querySelector("#pf").onsubmit = async e => {
+      e.preventDefault(); const v = $("#ps").value.trim(); if (v.length < 2) return; onbPseudo = v; const b = e.target.querySelector("button"); b.disabled = true;
+      try { setState(await rpc("join_game", { p_pseudo: v, p_party: null })); O.onclick = null; O.hidden = true; startGame(true); }
+      catch (err) { b.disabled = false; $("#perr").textContent = err.message; }
+    };
     setTimeout(() => $("#ps")?.focus(), 50);
   }
   if (onbStep === "party") {

@@ -163,6 +163,7 @@ async function renderParis() {
   const seats = seatCounts(); const w = ST.state?.week; const ev = ST.state?.event;
   el.innerHTML = `<div class="wrap">
     <h1 class="h1">Paris</h1>
+    ${!ST.state?.profile?.party ? `<button class="box party-cta" data-push="party"><div class="pc-em">${PARTY_ORDER.map(k => emblemSVG(k, 30)).join("")}</div><b>Choisissez votre camp</b><span>Rejoignez un parti pour gagner +${MEMBER_BONUS} % de loyers là où il tient la mairie, et jouer pour l'Hôtel de Ville.</span></button>` : ""}
     <button class="box" data-push="results" style="display:block;width:100%;text-align:left;margin-top:8px">
       <p class="eyebrow">Résultats des arrondissements</p>
       ${hemicycle(seats)}
@@ -212,70 +213,81 @@ async function buildingPage(g) {
   try { bInfo = await rpc("building", { p_card: g }); } catch (e) { bInfo = { lots: [], parts: [], listings: [], sales: [] }; }
   const owners = new Map(bInfo.lots.map(([k, o, ps, m]) => [k, { o, ps, m }]));
   const isP = c.lk === "p"; const myKs = ST.mine.get(g) || []; const myN = ST.mineParts.get(g) || 0;
-  const st = IDX.stats[c.code] || {};
-  const facts = isP ? [["Valeur d'une part", fmtE(c.v)], ["Loyer d'une part", fmtE(c.rent) + " / jour"], ["Parts au total", fmtN(c.lots)], ["Parts possédées", fmtN(bInfo.parts.reduce((a, x) => a + x[2], 0))]]
-    : [[`Valeur d'un ${c.lk === "l" ? "logement" : "local"}`, fmtE(c.v)], ["Loyer", fmtE(c.rent) + " / jour"], ["Surface", (c.s || "?") + " m²"], ["Prix réel de la rue", fmtN(c.pm2) + " €/m²"], [c.lk === "l" ? "Logements" : "Locaux", `${owners.size} pris sur ${c.lots}`], [c.y ? "Construit en" : "Étages", c.y || c.et2]];
-  let pos = "";
+  const sold = bInfo.parts.reduce((a, x) => a + x[2], 0);
+  const free = isP ? c.lots - sold : c.lots - owners.size;
+  const unitW = isP ? "part" : c.lk === "l" ? "logement" : "local";
+  const days = Math.round(c.v / Math.max(1, c.rent));
+  const listed = new Map(bInfo.listings.filter(l => l.k != null).map(l => [l.k, l]));
+  // ce que je possède, avec les actions sur chaque bien
+  let mine = "";
   if (myKs.length || myN) {
     const h = { g, c, ks: myKs, n: myN };
-    pos = `<div class="box" style="margin-top:12px;border-left:6px solid var(--mine)"><p class="eyebrow">Vous possédez</p><b style="font-size:17px">${esc(itemLabel(c, { t: "own", ks: myKs, n: myN }))}</b>
-      <div class="sub num" style="margin:4px 0 0">Valeur ${fmtE(c.v * unitsOf(h))} · loyer de base ${fmtE(baseRent(h))} / jour${fullTitle(h) ? " · immeuble complet ×1,6" : myKs.some(k => fullFloor(c, myKs, k)) ? " · étage complet ×1,25" : ""}</div></div>`;
+    const rows = isP ? "" : myKs.map(k => {
+      const l = listed.get(k), m = ST.mort.get(g + ":" + k);
+      const where = c.lk === "l" ? `${lotName(c, k)} · ${ord(floorOfLot(c, k))} étage` : lotName(c, k);
+      let actions;
+      if (l) actions = `<span class="pill" style="background:var(--sale);color:#fff">En vente ${fmtE(l.price)}</span><button class="btn sm ghost" data-act="unlist" data-id="${l.id}">Retirer</button>`;
+      else if (m) actions = `<span class="pill">Hypothéqué</span><button class="btn sm green" data-act="lift" data-k="${k}" ${liveCash() < liftCost(m) ? "disabled" : ""}>Rembourser ${fmtE(liftCost(m))}</button>`;
+      else if (saleMode === k) actions = `<input class="inp num" id="price" style="height:38px;width:130px" inputmode="numeric" type="number" min="1" step="1000" value="${Math.round(c.v * 1.1 / 1000) * 1000}" aria-label="Prix de vente"><button class="btn sm amber" data-act="list" data-k="${k}">Publier</button><button class="btn sm ghost" data-act="cancelsale">×</button>`;
+      else actions = `<button class="btn sm amber" data-act="sale" data-k="${k}">Vendre</button><button class="btn sm light" data-act="mort" data-k="${k}">Hypothéquer</button>`;
+      return `<div class="myrow"><b>${where}</b><div class="acts">${actions}</div></div>`;
+    }).join("");
+    mine = `<div class="box mine-box"><p class="eyebrow">Vous possédez</p><b style="font-size:18px">${esc(itemLabel(c, { t: "own", ks: myKs, n: myN }))}</b>
+      <div class="sub num" style="margin:4px 0 0">Valeur ${fmtE(c.v * unitsOf(h))} · loyers ${fmtE(baseRent(h))} / jour${fullTitle(h) ? " · immeuble complet : +60 %" : myKs.some(k => fullFloor(c, myKs, k)) ? " · étage complet : +25 %" : ""}</div>
+      ${rows ? `<div class="myrows">${rows}</div><p class="sub" style="margin:8px 0 0;font-size:12.5px">Vendre : votre annonce apparaît au Marché, vous recevez le prix moins 5 %. Hypothéquer : vous touchez tout de suite 50 % de la valeur, mais le logement ne rapporte plus jusqu'au remboursement.</p>` : ""}</div>`;
   }
-  let units = "";
+  // annonces des autres joueurs
+  const offers = bInfo.listings.filter(l => l.seller !== ME);
+  const offersHTML = offers.length ? `<h2 class="h2">À vendre par des joueurs</h2><div class="rows">${offers.map(l => `<div class="lrow" style="grid-template-columns:1fr auto"><div class="t"><b>${l.k != null ? lotName(c, l.k) + (c.lk === "l" ? " · " + ord(floorOfLot(c, l.k)) + " étage" : "") : l.n + " part" + (l.n > 1 ? "s" : "")}</b><span>vendu par ${esc(l.pseudo)}</span></div><div class="v"><b class="num">${fmtE(l.price)}</b><button class="btn sm green" data-act="buyl" data-id="${l.id}" ${liveCash() < l.price ? "disabled" : ""}>Acheter</button></div></div>`).join("")}</div>` : "";
+  // plan de l'immeuble
+  let plan = "";
   if (!isP) {
     const groups = new Map(); for (let k = 0; k < c.lots; k++) { const f = floorOfLot(c, k); if (!groups.has(f)) groups.set(f, []); groups.get(f).push(k); }
-    const listed = new Map(bInfo.listings.filter(l => l.k != null).map(l => [l.k, l]));
-    units = `<h2 class="h2">${c.lk === "l" ? "Les logements" : "Les locaux"}</h2><div class="floors">${[...groups.entries()].sort((a, b) => b[0] - a[0]).map(([f, ks]) => `<div class="floor"><span>${c.lk === "l" ? ord(f) : "RDC"}</span><div>${ks.map(k => { const o = owners.get(k); const cls = o ? (o.o === ME ? "mine" : "theirs") : ""; return `<button class="lot ${cls}${o?.m ? " mort" : ""}${listed.has(k) ? " sale" : ""}" data-k="${k}" aria-pressed="${selLot === k}" aria-label="${lotName(c, k)}, ${o ? (o.o === ME ? "à vous" : "à " + esc(o.ps)) : "libre"}">${k + 1}</button>`; }).join("")}</div></div>`).join("")}</div>
-      <div class="legend-s"><span><i style="background:var(--mine)"></i>À vous</span><span><i style="background:#E2E8F0"></i>Autre joueur</span><span><i style="background:var(--soft);border:1.5px solid var(--line)"></i>Libre</span><span><i style="background:var(--sale)"></i>En vente</span></div>`;
+    plan = `<details class="plan" ${selLot !== null ? "open" : ""}><summary>Voir le plan de l'immeuble, étage par étage</summary>
+      <p class="sub" style="margin:8px 0">Touchez un ${unitW} pour le choisir précisément.</p>
+      <div class="floors">${[...groups.entries()].sort((a, b) => b[0] - a[0]).map(([f, ks]) => `<div class="floor"><span>${c.lk === "l" ? ord(f) : "RDC"}</span><div>${ks.map(k => { const o = owners.get(k); const cls = o ? (o.o === ME ? "mine" : "theirs") : ""; return `<button class="lot ${cls}${o?.m ? " mort" : ""}${listed.has(k) ? " sale" : ""}" data-k="${k}" data-pick="1" aria-pressed="${selLot === k}" aria-label="${lotName(c, k)}, ${o ? (o.o === ME ? "à vous" : "à " + esc(o.ps)) : "libre"}">${k + 1}</button>`; }).join("")}</div></div>`).join("")}</div>
+      <div class="legend-s"><span><i style="background:var(--soft);border:1.5px solid var(--line)"></i>Libre</span><span><i style="background:var(--mine)"></i>À vous</span><span><i style="background:#E2E8F0"></i>Autre joueur</span><span><i style="background:var(--sale)"></i>En vente</span></div></details>`;
   } else {
     const cols = ["#0EA5A0", "#3E7BDC", "#F2A33A", "#E5679A", "#7C8BA1"]; const gd = bInfo.parts[0];
-    units = `<h2 class="h2">Les parts</h2><div class="box"><div class="bar2">${bInfo.parts.slice(0, 5).map(([u, ps, n], i) => `<i style="width:${100 * n / c.lots}%;background:${u === ME ? "var(--mine)" : cols[i + 1]}"></i>`).join("")}</div>
-      <p class="sub" style="margin:10px 0 0">${gd && gd[2] * 4 >= c.lots ? `Gardien du monument : <b>${esc(gd[1])}</b> (+20 % de loyer)` : "Pas encore de Gardien : il faut détenir 25 % des parts (+20 % de loyer)."}</p></div>
+    plan = `<h2 class="h2">Les propriétaires</h2><div class="box"><div class="bar2">${bInfo.parts.slice(0, 5).map(([u, ps, n], i) => `<i style="width:${100 * n / c.lots}%;background:${u === ME ? "var(--mine)" : cols[i + 1]}"></i>`).join("")}</div>
+      <p class="sub" style="margin:10px 0 0">${gd && gd[2] * 4 >= c.lots ? `Gardien du monument : <b>${esc(gd[1])}</b> (+20 % de loyer)` : "Celui qui détient 25 % des parts devient Gardien du monument : +20 % de loyer."}</p></div>
       ${bInfo.parts.slice(0, 5).map(([u, ps, n], i) => `<div class="rank${u === ME ? " me" : ""}"><span class="n">${i + 1}</span><span>${esc(ps)}</span><b class="num">${fmtN(n)} parts</b></div>`).join("")}`;
   }
   const ext = MONS?.[g]; const about = ext?.ext ? `<h2 class="h2">À propos</h2><div class="about">${esc(ext.ext)}</div>` : "";
-  const sales = bInfo.sales.length ? `<h2 class="h2">Ventes entre joueurs</h2><div class="rows">${bInfo.sales.map(s => `<div class="lrow" style="grid-template-columns:1fr auto"><div class="t"><b>${s.k != null ? lotName(c, s.k) : s.n + " parts"}</b><span>${ago(s.at)}</span></div><div class="v num"><b>${fmtE(s.price)}</b></div></div>`).join("")}</div>` : "";
-  const act = isP ? partActions(c, g, myN) : lotActions(c, g, owners);
+  const sales = bInfo.sales.length ? `<h2 class="h2">Dernières ventes entre joueurs</h2><div class="rows">${bInfo.sales.map(s => `<div class="lrow" style="grid-template-columns:1fr auto"><div class="t"><b>${s.k != null ? lotName(c, s.k) : s.n + " parts"}</b><span>${ago(s.at)}</span></div><div class="v num"><b>${fmtE(s.price)}</b></div></div>`).join("")}</div>` : "";
   return `<div class="bhero">${photo(c)}<button class="back" data-back>${ICON.back}Retour</button>${goodPhoto(c) && c.cr ? `<span class="credit">${esc(c.cr)}</span>` : ""}</div>
   <div class="wrap">
-    <div class="btitle"><span class="pill rar" style="background:${RAR[c.r].c}">${RAR[c.r].n}</span><span class="pill">${esc(kindLabel(c))}</span>${ST.state?.event?.arr === c.arr ? `<span class="pill" style="background:#FEF3C7;color:#92400E">Quartier du jour</span>` : ""}${ST.sale.has(g) ? `<span class="pill" style="background:var(--sale);color:#fff">En vente</span>` : ""}</div>
+    <div class="btitle"><span class="pill rar" style="background:${RAR[c.r].c}">${RAR[c.r].n}</span><span class="pill">${esc(kindLabel(c))}</span>${ST.state?.event?.arr === c.arr ? `<span class="pill" style="background:#FEF3C7;color:#92400E">Quartier du jour</span>` : ""}</div>
     <h1 class="h1">${esc(title(c))}</h1><p class="sub">${esc(c.name && c.adr ? c.adr + " · " : "")}${ord(c.arr)} arrondissement · <button style="color:var(--blue2);font-weight:700" data-mapto="${g}">voir sur la carte</button></p>
-    <div class="kv num">${facts.map(([a, b]) => `<div><span>${esc(a)}</span><b>${esc(String(b))}</b></div>`).join("")}</div>
-    ${pos}${units}
+    <div class="bstat num">
+      <div><span>Prix d'un${isP ? "e" : ""} ${unitW}</span><b>${fmtE(c.v)}</b></div>
+      <div><span>Loyer</span><b class="green">+${fmtE(c.rent)}<small>/jour</small></b></div>
+      <div><span>Disponibles</span><b>${isP ? fmtN(free) : free}<small> / ${isP ? fmtN(c.lots) : c.lots}</small></b></div>
+    </div>
+    <p class="sub" style="margin-top:8px">${isP ? `Chaque part rapporte un loyer chaque jour.` : `Un ${unitW} se rembourse en ${days} jours de loyer. Bonus : tout un étage = loyers +25 %, l'immeuble entier = +60 %.`}${c.s && !isP ? ` Surface : ${c.s} m², prix réel de la rue : ${fmtN(c.pm2)} €/m².` : ""}</p>
+    ${mine}${offersHTML}${plan}
     <h2 class="h2">La carte</h2><div style="display:flex;justify-content:center">${cardHTML(c, { w: "250px", item: myKs.length || myN ? { t: "own", ks: myKs, n: myN } : null })}</div>
     ${about}${sales}
-    ${act ? `<div class="actbar" id="actbar">${act}</div>` : ""}
+    <div class="actbar" id="actbar">${buyActions(c, g, owners, free, isP)}</div>
   </div>`;
 }
-function lotActions(c, g, owners) {
-  if (selLot === null) {
-    const coOwner = (ST.mine.get(g) || []).length > 0;
-    return `<div class="what"><b>Touchez un ${c.lk === "l" ? "logement" : "local"} ci-dessus</b><span>${coOwner ? "Les logements libres de cet immeuble peuvent être achetés à la banque." : "Pour acheter ici, il faut d'abord obtenir un logement de cet immeuble (booster ou marché)."}</span></div>`;
+// la barre du bas : acheter (ou agir sur le logement choisi dans le plan)
+function buyActions(c, g, owners, free, isP) {
+  const cash = liveCash();
+  if (selLot !== null && !isP) {
+    const k = selLot, o = owners.get(k), l = bInfo.listings.find(x => x.k === k);
+    const head = `<div class="what"><b>${lotName(c, k)}${c.lk === "l" ? " · " + ord(floorOfLot(c, k)) + " étage" : ""}</b><span class="num">${o ? (o.o === ME ? "À vous" : "À " + esc(o.ps)) : "Libre"} · ${fmtE(c.v)} · +${fmtE(c.rent)}/jour</span></div>`;
+    let btn;
+    if (!o) btn = `<button class="btn block green" data-act="bank" data-k="${k}" ${cash < c.v ? "disabled" : ""}>Acheter ce ${c.lk === "l" ? "logement" : "local"} · ${fmtE(c.v)}</button>`;
+    else if (o.o === ME) btn = `<div class="sub" style="margin:0">Il est à vous : gérez-le dans « Vous possédez » plus haut.</div>`;
+    else btn = l ? `<button class="btn block green" data-act="buyl" data-id="${l.id}" ${cash < l.price ? "disabled" : ""}>Acheter à ${esc(l.pseudo)} · ${fmtE(l.price)}</button>` : `<div class="sub" style="margin:0">Ce logement appartient à ${esc(o.ps)} et n'est pas en vente.</div>`;
+    return head + btn + `<button class="btn sm ghost" data-act="unpick">Annuler la sélection</button>`;
   }
-  const k = selLot, o = owners.get(k), l = bInfo.listings.find(x => x.k === k), m = ST.mort.get(g + ":" + k);
-  const coOwner = (ST.mine.get(g) || []).length > 0;
-  const head = `<div class="what"><b>${lotName(c, k)}${c.lk === "l" ? " · " + ord(floorOfLot(c, k)) + " étage" : ""}${c.s ? " · " + c.s + " m²" : ""}</b><span class="num">${o ? (o.o === ME ? "À vous" : "À " + esc(o.ps)) : "Libre"} · valeur ${fmtE(c.v)} · loyer ${fmtE(c.rent)}/jour</span></div>`;
-  let btn = "";
-  if (!o) btn = coOwner ? `<button class="btn block green" data-act="bank" ${liveCash() < c.v ? "disabled" : ""}>Acheter à la banque · ${fmtE(c.v)}</button>` : `<button class="btn block" data-go="booster">Ouvrir un booster</button>`;
-  else if (o.o === ME) {
-    if (l) btn = `<div class="sub num" style="margin:0">En vente à ${fmtE(l.price)}</div><button class="btn block ghost" data-act="unlist" data-id="${l.id}">Retirer l'annonce</button>`;
-    else if (m) btn = `<div class="sub" style="margin:0">Hypothéqué : ce logement ne rapporte rien tant qu'il n'est pas remboursé.</div><button class="btn block green" data-act="lift" ${liveCash() < liftCost(m) ? "disabled" : ""}>Rembourser · ${fmtE(liftCost(m))}</button>`;
-    else if (saleMode) btn = `<div class="field"><label for="price">Votre prix (estimation : ${fmtE(c.v)})</label><input class="inp num" id="price" inputmode="numeric" type="number" min="1" step="1000" value="${Math.round(c.v * 1.1 / 1000) * 1000}"></div><div class="sub" style="margin:0;font-size:12.5px">Vous recevrez ce prix moins 5 % de commission quand un joueur achètera.</div><div class="row2"><button class="btn ghost" data-act="cancelsale">Annuler</button><button class="btn amber" data-act="list">Publier</button></div>`;
-    else btn = `<div class="row2"><button class="btn amber" data-act="sale">Mettre en vente</button><button class="btn light" data-act="mort">Hypothéquer · +${fmtE(Math.round(c.v / 2))}</button></div>`;
-  } else btn = l ? `<button class="btn block green" data-act="buyl" data-id="${l.id}" ${liveCash() < l.price ? "disabled" : ""}>Acheter à ${esc(l.pseudo)} · ${fmtE(l.price)}</button>` : `<div class="sub" style="margin:0">Ce logement n'est pas à vendre pour l'instant.</div>`;
-  return head + btn;
-}
-function partActions(c, g, myN) {
-  const sold = bInfo.parts.reduce((a, x) => a + x[2], 0); const m = ST.mort.get(g + ":-1");
-  const offers = bInfo.listings.filter(l => l.k == null && l.seller !== ME);
-  const mine = bInfo.listings.filter(l => l.k == null && l.seller === ME);
-  let out = `<div class="what"><b>${myN ? `Vous avez ${fmtN(myN)} part${myN > 1 ? "s" : ""}` : "Aucune part"}</b><span class="num">Une part vaut ${fmtE(c.v)} et rapporte ${fmtE(c.rent)} par jour.</span></div>`;
-  if (offers.length) out += offers.slice(0, 3).map(l => `<button class="btn block green" data-act="buyl" data-id="${l.id}" ${liveCash() < l.price ? "disabled" : ""}>Acheter ${l.n} part${l.n > 1 ? "s" : ""} à ${esc(l.pseudo)} · ${fmtE(l.price)}</button>`).join("");
-  if (!myN) return out + (offers.length ? "" : `<button class="btn block" data-go="booster">Ouvrir un booster</button>`);
-  if (m) return out + `<button class="btn block green" data-act="liftp" ${liveCash() < liftCost(m) ? "disabled" : ""}>Rembourser l'hypothèque · ${fmtE(liftCost(m))}</button>`;
-  if (mine.length) out += mine.map(l => `<button class="btn block ghost" data-act="unlist" data-id="${l.id}">Retirer l'annonce (${l.n} parts à ${fmtE(l.price)})</button>`).join("");
-  if (saleMode) return out + `<div class="row2"><div class="field"><label for="pn">Parts</label><input class="inp num" id="pn" type="number" min="1" max="${myN}" value="1"></div><div class="field"><label for="price">Prix total</label><input class="inp num" id="price" type="number" min="1" step="1000" value="${Math.round(c.v * 1.1 / 1000) * 1000}"></div></div><div class="row2"><button class="btn ghost" data-act="cancelsale">Annuler</button><button class="btn amber" data-act="listp">Publier</button></div>`;
-  return out + `<button class="btn block green" data-act="bankp" ${sold >= c.lots || liveCash() < c.v ? "disabled" : ""}>Acheter 1 part à la banque · ${fmtE(c.v)}</button><div class="row2"><button class="btn amber" data-act="sale">Vendre des parts</button><button class="btn light" data-act="mortp">Hypothéquer · +${fmtE(Math.round(c.v * myN / 2))}</button></div>`;
+  if (free <= 0) return `<div class="what"><b>Tout est déjà pris</b><span>Surveillez le Marché : les propriétaires peuvent mettre leurs biens en vente.</span></div>`;
+  const total = c.v * c.lots, allFree = !isP && owners.size === 0 && c.lots > 1;
+  const miss = cash < c.v ? `<div class="sub" style="margin:0;font-size:13px">Il vous manque ${fmtE(c.v - cash)}. Vos loyers arrivent en continu, ou ouvrez un booster.</div>` : "";
+  return `<button class="btn block green" data-act="bank" ${cash < c.v ? "disabled" : ""}>${isP ? "Acheter 1 part" : `Acheter un ${c.lk === "l" ? "logement" : "local"}`} · ${fmtE(c.v)}</button>
+    ${allFree ? `<button class="btn block light" data-act="bbuild" ${cash < total ? "disabled" : ""}>Acheter tout l'immeuble · ${fmtE(total)} <span class="green" style="font-size:12.5px">+60 % de loyer</span></button>` : ""}${miss}`;
 }
 $("#p-detail").addEventListener("click", async e => {
   const top = stack[stack.length - 1]; if (!top) return;
@@ -283,24 +295,22 @@ $("#p-detail").addEventListener("click", async e => {
   if (top.kind === "party" || top.kind === "profile") return partyClick(e);
   if (top.kind === "shop") { const o = e.target.closest("[data-offer]"); if (o) toast("Le paiement arrive bientôt : la boutique sera ouverte au lancement.", ""); return; }
   if (top.kind !== "b") return;
-  const g = top.arg;
-  const lot = e.target.closest("[data-k]"); if (lot) { selLot = +lot.dataset.k; saleMode = false; return renderDetail(false); }
-  const a = e.target.closest("[data-act]")?.dataset.act; if (!a) return;
-  const btn = e.target.closest("[data-act]"); btn.disabled = true;
-  const id = +btn.dataset.id;
-  if (a === "sale") { saleMode = true; return renderDetail(false); }
+  const g = top.arg; const c = card(g);
+  const pick = e.target.closest("[data-pick]"); if (pick) { selLot = +pick.dataset.k; saleMode = false; return renderDetail(false); }
+  const btn = e.target.closest("[data-act]"); if (!btn) return; const a = btn.dataset.act;
+  const k = btn.dataset.k != null ? +btn.dataset.k : null; const id = +btn.dataset.id;
+  if (a === "sale") { saleMode = k; return renderDetail(false); }
   if (a === "cancelsale") { saleMode = false; return renderDetail(false); }
-  let ok = false;
-  if (a === "bank") ok = await act("bank_buy", { p_card: g, p_k: selLot }, "Logement acheté !");
-  if (a === "bankp") ok = await act("bank_buy", { p_card: g, p_k: 0 }, "Part achetée !");
-  if (a === "list") { const p = +$("#price").value; ok = await act("list_item", { p_card: g, p_k: selLot, p_n: 1, p_price: p }, "Annonce publiée"); saleMode = false; }
-  if (a === "listp") { const p = +$("#price").value, n = +$("#pn").value; ok = await act("list_item", { p_card: g, p_k: null, p_n: n, p_price: p }, "Annonce publiée"); saleMode = false; }
-  if (a === "unlist") ok = await act("unlist", { p_id: id }, "Annonce retirée");
-  if (a === "buyl") ok = await act("buy_listing", { p_id: id }, "Achat conclu !");
-  if (a === "mort") ok = await act("mortgage", { p_card: g, p_k: selLot }, "Hypothèque accordée");
-  if (a === "mortp") ok = await act("mortgage", { p_card: g, p_k: null }, "Hypothèque accordée");
-  if (a === "lift") ok = await act("lift", { p_card: g, p_k: selLot }, "Hypothèque remboursée");
-  if (a === "liftp") ok = await act("lift", { p_card: g, p_k: null }, "Hypothèque remboursée");
+  if (a === "unpick") { selLot = null; return renderDetail(false); }
+  btn.disabled = true;
+  const before = (ST.mine.get(g) || []).length + (ST.mineParts.get(g) || 0);
+  if (a === "bank") { if (await act("bank_buy", { p_card: g, p_k: c.lk === "p" ? null : k }, null)) { celebrate(c); selLot = null; } }
+  if (a === "bbuild") { if (await act("buy_building", { p_card: g }, null)) toast(`Tout l'immeuble est à vous ! Loyers +60 %`, "good"); }
+  if (a === "list") { const p = +$("#price").value; await act("list_item", { p_card: g, p_k: k, p_n: 1, p_price: p }, "Annonce publiée au Marché"); saleMode = false; }
+  if (a === "unlist") await act("unlist", { p_id: id }, "Annonce retirée");
+  if (a === "buyl") await act("buy_listing", { p_id: id }, "Achat conclu !");
+  if (a === "mort") await act("mortgage", { p_card: g, p_k: k }, "Hypothèque accordée : +" + fmtE(Math.round(c.v / 2)));
+  if (a === "lift") await act("lift", { p_card: g, p_k: k }, "Hypothèque remboursée");
   renderDetail(false);
 });
 
@@ -343,26 +353,38 @@ async function profilePage() {
   return dhead("Mon profil") + `<div class="wrap">
     <div class="box" style="display:flex;gap:14px;align-items:center"><span class="avatar" style="width:56px;height:56px;display:grid;place-items:center;font-size:22px;background:${pr?.c || "#94A3B8"}">${esc(p.pseudo[0].toUpperCase())}</span><div><b style="font-size:19px">${esc(p.pseudo)}</b><div class="sub" style="margin:2px 0 0">Membre depuis le ${new Date(p.created_at).toLocaleDateString("fr-FR")}</div></div></div>
     <h2 class="h2">Mon parti</h2>
+    ${!pr ? `<div class="box"><b>Vous n'avez pas encore de parti</b><p class="sub" style="margin:4px 0 0">Rejoignez un camp pour toucher +${MEMBER_BONUS} % de loyers dans les arrondissements qu'il tient, et jouer pour l'Hôtel de Ville.</p></div>` : ""}
     ${pr ? `<div class="box" style="border-left:6px solid ${pr.c};display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center">${emblemSVG(p.party, 56)}<div><b style="color:${pr.c};font-size:17px">${esc(pr.n)}</b> <span class="muted">· ${esc(pr.side)}</span><div class="motto">« ${esc(pr.motto)} »</div><p class="sub" style="margin:6px 0 0">Vous protège de : ${esc(shieldText(p.party))}. Dans les arrondissements tenus par ${esc(pr.n)}, vos loyers sont à +${MEMBER_BONUS} %.</p></div></div>` : ""}
-    <div style="margin-top:10px"><button class="btn block light" data-push="party" ${wait > 0 ? "disabled" : ""}>${wait > 0 ? `Changer de parti possible dans ${hm(wait)}` : "Changer de parti"}</button></div>
+    <div style="margin-top:10px"><button class="btn block ${pr ? "light" : ""}" data-push="party" ${pr && wait > 0 ? "disabled" : ""}>${!pr ? "Choisir mon parti" : wait > 0 ? `Changer de parti possible dans ${hm(wait)}` : "Changer de parti"}</button></div>
     <h2 class="h2">Compte</h2>
     <button class="btn block ghost" id="logout">Se déconnecter</button>
     <p class="sub" style="margin-top:16px;text-align:center"><a href="/terms" target="_blank">Conditions d'utilisation</a> · <a href="/privacy" target="_blank">Confidentialité</a></p>
   </div>`;
 }
 async function partyPage() {
-  return dhead("Choisir un parti") + `<div class="wrap">${partyPickerHTML(ST.state.profile.party)}<div style="margin-top:14px"><button class="btn block" id="party-save">Valider</button></div><p class="sub" style="margin-top:8px">Vous pourrez changer à nouveau dans 48 h.</p></div>`;
+  return dhead("Choisir un parti") + `<div class="wrap">${partyPickerHTML(ST.state.profile.party)}</div>`;
 }
 let pickParty = null;
+// l'éventail politique : 5 blasons sur un axe gauche → droite, le détail s'affiche dessous
 function partyPickerHTML(current) {
-  pickParty = current || null;
-  return `<div class="axis-lbl"><span>Gauche</span><span>Centre</span><span>Droite</span></div><div class="axis-bar" style="margin:6px 0 12px"></div>
-    <div class="plist">${PARTY_ORDER.map(k => { const p = PARTIES[k]; return `<button class="pcard" data-party="${k}" aria-pressed="${current === k}" style="--pc:${p.c}"><div style="display:flex;gap:12px;align-items:center">${emblemSVG(k, 52)}<div><span class="ps">${esc(p.side)}</span><span class="pn" style="display:block">${esc(p.n)}</span><em class="motto">« ${esc(p.motto)} »</em></div></div><p>${esc(p.pitch)}</p><dl><dt>Protège ses membres de</dt><dd>${esc(cap(shieldText(k)))}</dd></dl></button>`; }).join("")}</div>
-    <p class="sub" style="margin-top:10px">Tous les partis ont les mêmes règles : le maire touche ${MAYOR_TAX} % des loyers de son arrondissement, et les membres de son parti y gagnent +${MEMBER_BONUS} %.</p>`;
+  pickParty = current || PARTY_ORDER[2];
+  return `<p class="sub">Chaque arrondissement a pour maire son plus gros propriétaire. Rejoignez un camp : quand un membre devient maire, tous les membres y touchent +${MEMBER_BONUS} % de loyers, et chaque semaine le parti qui a le plus de maires remporte l'Hôtel de Ville.</p>
+    <div class="spectrum"><div class="sp-line"></div>${PARTY_ORDER.map(k => `<button class="sp-node" data-party="${k}" aria-pressed="${pickParty === k}" style="--pc:${PARTIES[k].c}" aria-label="${esc(PARTIES[k].n)}">${emblemSVG(k, 46)}<span>${esc(PARTIES[k].n)}</span></button>`).join("")}</div>
+    <div class="sp-ends"><span>Gauche</span><span>Centre</span><span>Droite</span></div>
+    <div id="pdetail">${partyDetailHTML(pickParty)}</div>`;
+}
+function partyDetailHTML(k) {
+  const p = PARTIES[k]; const cur = ST.state?.profile?.party;
+  return `<div class="pdet" style="--pc:${p.c}">
+    <div class="pdet-h">${emblemSVG(k, 72)}<div><span class="ps">${esc(p.side)}</span><b>${esc(p.n)}</b><em class="motto">« ${esc(p.motto)} »</em></div></div>
+    <p>${esc(p.pitch)}</p>
+    <ul><li><b>Protège ses membres</b> contre : ${esc(shieldText(k))}.</li><li><b>Dans ses arrondissements</b>, ses membres touchent +${MEMBER_BONUS} % de loyers.</li><li><b>Mêmes règles pour tous</b> : seuls l'esprit et la protection changent d'un parti à l'autre.</li></ul>
+    <button class="btn block" id="party-save" style="background:${p.c}" ${cur === k ? "disabled" : ""}>${cur === k ? "C'est déjà votre parti" : `Rejoindre ${esc(p.n)}`}</button>
+    <p class="sub" style="margin:8px 0 0;font-size:12.5px;text-align:center">${cur ? "Vous pourrez changer de nouveau dans 48 h." : "Vous pourrez en changer plus tard (une fois toutes les 48 h)."}</p></div>`;
 }
 async function partyClick(e) {
-  const pc = e.target.closest("[data-party]"); if (pc) { pickParty = pc.dataset.party; $$("#p-detail [data-party]").forEach(b => b.setAttribute("aria-pressed", b === pc)); return; }
-  if (e.target.closest("#party-save")) { if (!pickParty) return toast("Choisissez un parti"); if (await act("set_party", { p_party: pickParty }, "Parti mis à jour")) { back(); } return; }
+  const pc = e.target.closest("[data-party]"); if (pc) { pickParty = pc.dataset.party; $$("#p-detail [data-party]").forEach(b => b.setAttribute("aria-pressed", b === pc)); $("#pdetail").innerHTML = partyDetailHTML(pickParty); return; }
+  if (e.target.closest("#party-save")) { if (await act("set_party", { p_party: pickParty }, `Bienvenue chez ${PARTIES[pickParty].n} !`)) { renderWallet(); back(); } return; }
   if (e.target.closest("#logout")) return signOut();
 }
 function afterDetail(top) { }

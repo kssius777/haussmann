@@ -41,6 +41,21 @@ async function startGame(first) {
       if (cur() === "market" && what === "market") renderMarket();
     } catch (e) { console.warn(e); }
   });
-  if (first) { go("booster"); setTimeout(() => openBooster("welcome"), 350); }
+  if (first) setTimeout(showWelcome, 600); else showHint();
 }
 boot();
+
+// Accueil du nouveau joueur : ce qu'il a, et ce qu'il peut faire
+function showWelcome() {
+  const R = $("#reveal"); R.hidden = false; const p = ST.state.profile;
+  R.innerHTML = `<div class="bstage"><div class="rays"></div><div class="welcome">
+    <p class="eyebrow" style="color:#9FB4D6">Bienvenue à Paris</p>
+    <h2>${esc(p.pseudo)}, voici de quoi démarrer</h2>
+    <div class="wl"><span>💶</span><div><b>${fmtE(p.cash)} sur votre compte</b><p>Touchez n'importe quel immeuble sur la carte : s'il reste des logements libres, vous pouvez en acheter un tout de suite, au vrai prix du quartier.</p></div></div>
+    <div class="wl"><span>🎁</span><div><b>${p.welcome} boosters offerts</b><p>Un booster, c'est une pochette surprise : 4 biens de Paris tirés au hasard (un appartement, parfois un étage ou un immeuble entier, voire un bout de monument) et 1 carte Chance. C'est la façon la moins chère de démarrer.</p></div></div>
+    <div class="wl"><span>🏠</span><div><b>Vos biens rapportent tout seuls</b><p>Chaque bien verse un loyer en continu, même quand vous n'êtes pas là. Réinvestissez-le pour grandir et devenir maire de votre arrondissement.</p></div></div>
+    <div class="bbtns"><button class="btn white block" data-w="open">Ouvrir mon premier booster</button><button class="btn glass block" data-w="map">D'abord, explorer la carte</button></div>
+  </div></div>`;
+  R.onclick = e => { const b = e.target.closest("[data-w]"); if (!b) return; R.onclick = null; R.hidden = true; R.innerHTML = "";
+    if (b.dataset.w === "open") openBooster("welcome"); else { go("map"); showHint(); } };
+}

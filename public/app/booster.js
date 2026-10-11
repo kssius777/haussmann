@@ -12,15 +12,17 @@ function renderBoosterPage() {
   const w = s.profile.welcome || 0, fin = freeIn(), free = fin <= 0, n = w + (free ? 1 : 0);
   const kind = w > 0 ? "welcome" : free ? "free" : null;
   $("#p-booster").innerHTML = `<div class="bstage"><div class="rays"></div>
-    <span class="pill-l">${n ? `${n} À OUVRIR` : "AUCUN BOOSTER EN ATTENTE"}</span>
+    <h1 class="h1" style="color:#fff;margin:0">Boosters</h1>
+    <p class="bnote" style="max-width:420px">Une pochette surprise : <b>4 vrais biens de Paris tirés au hasard + 1 carte Chance</b>. C'est la façon la moins chère d'agrandir votre patrimoine.</p>
+    <span class="pill-l">${w > 0 ? `${w} OFFERT${w > 1 ? "S" : ""} À VOTRE ARRIVÉE` : free ? "1 GRATUIT AUJOURD'HUI" : "AUCUN BOOSTER EN ATTENTE"}</span>
     <button id="packbtn" aria-label="Ouvrir un booster" ${kind ? "" : `data-buyopen="1"`}>${packHTML()}</button>
     ${kind ? `<p class="bnote">Touchez le booster pour l'ouvrir</p>` : `<p class="bnote">Prochain booster gratuit dans <b class="num" id="freein">${hm(fin)}</b></p>`}
     <div class="bbtns">
-      ${kind ? `<button class="btn white block" data-open="${kind}">Ouvrir ${w > 0 ? `· bienvenue (${w})` : "· gratuit"}</button>` : ""}
+      ${kind ? `<button class="btn white block" data-open="${kind}">Ouvrir un booster ${w > 0 ? "offert" : "gratuit"}</button>` : ""}
       <button class="btn glass block" data-open="paid" ${liveCash() < s.price ? "disabled" : ""}>Acheter un booster · ${fmtE(s.price)}</button>
     </div>
     ${oddsHTML()}
-    <p class="bnote" style="font-size:12px;opacity:.8">Chaque booster contient 4 vrais biens parisiens et 1 carte Chance.<br>Le prix d'achat double à chaque booster acheté dans la journée.</p>
+    <p class="bnote" style="font-size:12px;opacity:.8">Un booster gratuit chaque jour. Le prix d'achat double à chaque booster acheté dans la journée.</p>
   </div>`;
 }
 $("#p-booster").addEventListener("click", e => {

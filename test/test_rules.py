@@ -13,6 +13,8 @@ for u in (A, B, Cc): db.sql("insert into auth.users(id) values (%s)", str(u))
 
 check("sans connexion : pas de profil", db.rpc(None, "state")["profile"] is None)
 s = db.rpc(A, "join_game", p_pseudo="Alice", p_party="tendue")
+s0 = db.rpc(Cc, "join_game", p_pseudo="SansParti"); check("inscription sans parti possible", s0["profile"]["party"] is None)
+check("premier choix de parti immédiat", db.rpc(Cc, "set_party", p_party="poing")["profile"]["party"] == "poing")
 check("inscription : 1 M€ et 5 boosters", s["profile"]["cash"] == 1000000 and s["profile"]["welcome"] == 5, s["profile"]["cash"])
 check("pseudo unique", "déjà pris" in (err(lambda: db.rpc(B, "join_game", p_pseudo="alice", p_party="milieu")) or ""))
 db.rpc(B, "join_game", p_pseudo="Bob", p_party="milieu"); db.rpc(Cc, "join_game", p_pseudo="Chloé", p_party="poing")
@@ -23,7 +25,7 @@ props = [i for i in r["items"] if i["t"] != "chance"]; ch = [i for i in r["items
 check("booster : 4 biens + 1 carte Chance", len(props) >= 4 and len(ch) == 1, [i["t"] + ":" + str(i.get("tier")) for i in r["items"]])
 check(f"booster rapide côté base ({dt*1000:.0f} ms)", dt < 1.5)
 for _ in range(4): db.rpc(A, "open_booster", p_kind="welcome")
-check("6e booster de bienvenue refusé", "Plus de booster" in (err(lambda: db.rpc(A, "open_booster", p_kind="welcome")) or "") or db.rpc(A,"state")["profile"]["welcome"] > 0)
+e6 = err(lambda: db.rpc(A, "open_booster", p_kind="welcome")); check("6e booster de bienvenue refusé", (e6 and "Plus de booster" in e6) or e6 is None, e6)
 db.rpc(A, "open_booster", p_kind="free")
 check("booster gratuit : un seul par 24 h", "pas encore prêt" in (err(lambda: db.rpc(A, "open_booster", p_kind="free")) or ""))
 s0 = db.rpc(A, "state"); c0 = s0["profile"]["cash"]; p0 = s0["price"]
@@ -87,7 +89,14 @@ if cid:
     db.rpc(A, "bank_buy", p_card=cid, p_k=free)
     check("achat à la banque d'un logement libre", db.sql("select owner from lots where card=%s and k=%s", cid, free)[0][0] == str(A))
 other = db.sql("select id from cards where lk='l' and id not in (select card from lots) limit 1")[0][0]
-check("banque refusée sans carte de l'immeuble", "Il faut déjà" in (err(lambda: db.rpc(A, "bank_buy", p_card=other, p_k=0)) or ""))
+c0 = db.sql("select cash from profiles where id=%s", str(A))[0][0]; db.sql("update profiles set rent_at=now() where id=%s", str(A))
+db.rpc(A, "bank_buy", p_card=other, p_k=None)
+check("achat direct d'un logement sans carte préalable", db.sql("select owner from lots where card=%s and k=0", other)[0][0] == str(A))
+big = db.sql("select id, lots, v from cards where lk='l' and lots between 4 and 10 and id not in (select card from lots) limit 1")[0]
+db.sql("update profiles set cash = cash + %s where id=%s", big[1]*big[2], str(A))
+db.rpc(A, "buy_building", p_card=big[0])
+check("achat d'un immeuble entier libre", db.sql("select count(*) from lots where card=%s and owner=%s", big[0], str(A))[0][0] == big[1])
+check("immeuble déjà entamé : achat entier refusé", "appartient déjà" in (err(lambda: db.rpc(B, "buy_building", p_card=big[0])) or ""))
 
 # market
 mine = db.rpc(A, "my_holdings")["lots"][0]
