@@ -23,7 +23,7 @@ function initPawnLayers() {
 }
 async function placePawn(fly) {
   const p = pawnPos(); if (p == null || !map) return; await ensureCards([p]);
-  const ll = centerOf(p), pr = ST.state.profile, col = PARTIES[pr.party]?.c || "#0F1B2D";
+  const ll = centerOf(p), pr = ST.state.profile, col = PARTIES[pr.party]?.c || "#2F5BD3";
   if (!pawnMk) { const el = document.createElement("div"); el.className = "pawn"; el.addEventListener("click", e => { e.stopPropagation(); showLand(); }); pawnMk = new maplibregl.Marker({ element: el, anchor: "bottom" }).setLngLat(ll).addTo(map); }
   pawnMk.getElement().innerHTML = `<em>Vous</em><svg class="pz" viewBox="0 0 44 60" width="40" height="55" aria-hidden="true"><defs><linearGradient id="pzg" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".25"/></linearGradient></defs>
     <ellipse cx="22" cy="56" rx="14" ry="3.5" fill="#0F1B2D" opacity=".25"/>
@@ -83,12 +83,12 @@ async function doRoll() {
   await animDice(r.die);
   await ensureCards(r.path);
   const line = smooth(r.path.map(centerOf)), lo = line.map(p => p[0]), la = line.map(p => p[1]);
-  map.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], { padding: { top: 140, bottom: 200, left: 50, right: 70 }, maxZoom: 17, pitch: 45, duration: 700 });
-  await sleep(650);
-  await walk(line, Math.min(3600, 700 + 110 * r.path.length));
+  map.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], { padding: { top: 140, bottom: 200, left: 50, right: 70 }, maxZoom: 17, pitch: 45, duration: 500 });
+  await sleep(450);
+  await walk(line, Math.min(2400, 500 + 80 * r.path.length));
   setState(r.state); moving = false;
   await placePawn(false); renderDice(); renderWallet();
-  map.easeTo({ center: centerOf(r.landing.card), zoom: Math.max(map.getZoom(), 16.6), duration: 600, offset: [0, -150] });
+  map.easeTo({ center: centerOf(r.landing.card), zoom: Math.max(map.getZoom(), 16.6), duration: 600, offset: [0, innerWidth < 700 ? -230 : -150] });
   setTimeout(() => map.getSource("walked")?.setData(FC([])), 2500);
   lastLanding = r.landing; landCredit = null; showLand(r.landing);
   refreshHold().then(refreshMap).then(() => { paintAll(); renderWallet(); if (panelKind === "land") showLand(); }).catch(() => { });
@@ -112,7 +112,7 @@ function walk(line, ms) {   // le pion suit le trajet, la ligne parcourue se des
 // ---- la case où l'on tombe -----------------------------------------------------------
 // L : ce que le serveur a renvoyé à l'arrivée (loyer payé, bonus, Chance) ; sans L, on réaffiche la case actuelle
 function showLand(L) {
-  const g = landPos(); if (g == null) { placePawn(true); return toast("Lancez le dé pour faire avancer votre pion"); }
+  const g = landPos(); if (g == null) { placePawn(true); return toast("Lancez le dé pour avancer"); }
   if (L && L.card !== g) L = null;
   L = L || (lastLanding && lastLanding.card === g ? lastLanding : null);
   const c = card(g); if (!c) return;
@@ -171,7 +171,15 @@ function showBuyRolls() {
 
 // ---- téléportation ------------------------------------------------------------
 function openTeleport() {
-  // téléportation aléatoire sur un de ses biens (de préférence un immeuble où il reste des logements libres)
+  // téléportation aléatoire sur un de ses biens (de préférence un immeuble où il reste des logements libres) ; on prévient d'abord
+  const hs = holdings().filter(h => h.g !== pawnPos()); if (!hs.length) return toast("Vous n'avez pas encore de bien où vous téléporter");
+  if (panelKind === "tp") return setMovebar("");
+  const tp = ST.state?.profile?.tp ?? 0;
+  setMovebar(`<div class="mvh"><span class="pin">✨</span><div><b>Se téléporter ?</b><span>Votre personnage sera envoyé <b>au hasard</b> sur l'un de vos immeubles. Vous pourrez y acheter les logements restés libres.</span></div><button class="x" data-mvclose aria-label="Fermer">×</button></div>
+    <div class="tpb"><button class="btn block" data-tpgo="0">Me téléporter</button><button class="btn light" data-mvclose>Annuler</button></div>
+    <small class="muted" style="text-align:center">Il vous reste ${tp} téléportation${tp > 1 ? "s" : ""} aujourd'hui.</small>`, "tp");
+}
+function teleportRandom() {
   const hs = holdings().filter(h => h.g !== pawnPos()); if (!hs.length) return toast("Vous n'avez pas encore de bien où vous téléporter");
   const pool = hs.filter(h => freeOf(h.g) > 0); const pick = (pool.length ? pool : hs)[Math.floor(Math.random() * (pool.length ? pool : hs).length)];
   doTeleport(pick.g);
@@ -186,18 +194,18 @@ const PIPS = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6 };
 const dieHTML = n => `<div class="die n${n}">${[1, 2, 3, 4, 5, 6].map(f => `<i class="f${f}">${"<b></b>".repeat(f)}</i>`).join("")}</div>`;
 async function animDice(n) {
   const D = $("#dice3d"); D.hidden = false;
-  D.innerHTML = `<div class="dice rolling">${dieHTML(n)}</div>`; await sleep(650);
-  D.querySelector(".dice").classList.remove("rolling"); await sleep(650);
+  D.innerHTML = `<div class="dice rolling">${dieHTML(n)}</div>`; await sleep(380);
+  D.querySelector(".dice").classList.remove("rolling"); await sleep(420);
   D.hidden = true;
 }
 
 function initPawnUI() {
   $("#b-roll").addEventListener("click", doRoll);
   $("#b-tp").addEventListener("click", openTeleport);
-  $("#b-me").addEventListener("click", () => { placePawn(true); showLand(); });
+  $("#minipack").innerHTML = packHTML("mini");
   $("#movebar").addEventListener("click", async e => {
     if (e.target.closest("[data-mvclose]")) return setMovebar("");
-    const tp = e.target.closest("[data-tpgo]"); if (tp) return doTeleport(+tp.dataset.tpgo);
+    const tp = e.target.closest("[data-tpgo]"); if (tp) return teleportRandom();
     if (e.target.closest("[data-buyrolls]")) { if (await act("buy_rolls", {}, "5 lancers en plus !")) { setMovebar(""); renderDice(); } return; }
     const pm = e.target.closest("[data-paymode]"); if (pm) { landCredit = pm.dataset.paymode === "1"; return showLand(); }
     const lb = e.target.closest("[data-lbuy],[data-lbuild]"); if (lb) {
@@ -227,6 +235,6 @@ function pawnOff() {
   el.hidden = false; el.style.left = (cx + dx * k) + "px"; el.style.top = (cy + dy * k) + "px";
   el.querySelector("i").style.transform = `rotate(${Math.atan2(dy, dx) * 180 / Math.PI + 90}deg)`;
   const d = pawnPos() != null ? map.getCenter().distanceTo(pawnMk.getLngLat()) : 0;
-  el.querySelector("span").textContent = "Votre pion · " + fmtDist(d);
+  el.querySelector("span").textContent = "Vous · " + fmtDist(d);
 }
 function hidePreviewOnly() { const pv = $("#preview"); if (pv && !pv.hidden) { pv.hidden = true; sel = null; paintAll(); } }

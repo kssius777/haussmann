@@ -138,15 +138,15 @@ function maquetteSVG(c) {
   const W = 400, H = 300, s = Math.min(W * .62 / bw, H * .68 / bh, 7), ox = W / 2 - (Math.max(...xs) + Math.min(...xs)) / 2 * s, oy = H * .54 - (Math.max(...ys) + Math.min(...ys)) / 2 * s;
   const T = ([x, y]) => `${(ox + x * s).toFixed(1)},${(oy + y * s).toFixed(1)}`;
   const era = eraOf(c), rel = c.u === "rel";
-  const wallC = rel ? "#E9E0CC" : { ancien: "#EBDCC0", hauss: "#EADFCB", brique: "#C47B5E", beton: "#D5D7D8", contemp: "#F1F2F0" }[era];
-  const roofC = rel ? "#7D8C99" : { ancien: "#B5654A", hauss: "#8F9CA7", brique: "#9FA79A", beton: "#B9BCBE", contemp: "#7E8F86" }[era];
-  const winC = era === "contemp" ? "#7FA3B8" : era === "brique" ? "#4F5F6B" : "#5F707D";
+  const wallC = rel ? "#EFE5D0" : { ancien: "#F0DDBB", hauss: "#F2E4CB", brique: "#CB7A5A", beton: "#DADCDC", contemp: "#F4F5F3" }[era];
+  const roofC = rel ? "#7D8C99" : { ancien: "#C06A4C", hauss: "#8A99A8", brique: "#A5AD9E", beton: "#BCC0C2", contemp: "#7E9088" }[era];
+  const winC = era === "contemp" ? "#79A6C2" : era === "brique" ? "#44566A" : "#4F6A82";
   const shade = (hex, f) => { const n = parseInt(hex.slice(1), 16); const ch = i => Math.max(0, Math.min(255, Math.round(((n >> i) & 255) * f))); return `rgb(${ch(16)},${ch(8)},${ch(0)})`; };
-  let out = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect width="${W}" height="${H}" fill="#EAE4D9"/>`;
+  let out = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="mg${g}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D7E6F0"/><stop offset=".45" stop-color="#EDE9E0"/><stop offset="1" stop-color="#E3DCCF"/></linearGradient><radialGradient id="ml${g}" cx=".5" cy=".55" r=".6"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><rect width="${W}" height="${H}" fill="url(#mg${g})"/><rect width="${W}" height="${H}" fill="url(#ml${g})"/>`;
   // le quartier à plat
-  for (const q of nbrs) out += `<polygon points="${q.map(([x, y]) => T(P(x, y, 0))).join(" ")}" fill="#FBF9F5" stroke="#D9D2C5" stroke-width=".8"/>`;
+  for (const q of nbrs) out += `<polygon points="${q.map(([x, y]) => T(P(x, y, 0))).join(" ")}" fill="#FFFDF8" stroke="#D5CDBF" stroke-width=".9"/>`;
   // ombre portée
-  out += `<polygon points="${mine.map(([x, y]) => T(P(x + H0 * .5, y - H0 * .35, 0))).join(" ")}" fill="#0F1B2D" opacity=".13"/>`;
+  out += `<polygon points="${mine.map(([x, y]) => T(P(x + H0 * .5, y - H0 * .35, 0))).join(" ")}" fill="#0F1B2D" opacity=".16"/>`;
   // murs visibles, du plus loin au plus proche
   const walls = [];
   for (let i = 0; i < mine.length; i++) {
@@ -165,10 +165,10 @@ function maquetteSVG(c) {
     if (s * w.L < 14) continue;   // mur trop petit à l'écran : pas de fenêtres
     for (let e = 1; e < fl; e++) for (let k = 0; k < nw; k++) {
       const t0 = (k + .28) / nw, t1 = (k + .72) / nw, z0 = H0 * (e / fl) + .5, z1 = H0 * ((e + .6) / fl);
-      out += `<polygon points="${[pt(t0, z0), pt(t1, z0), pt(t1, z1), pt(t0, z1)].map(T).join(" ")}" fill="${winC}" opacity=".82"/>`;
+      out += `<polygon points="${[pt(t0, z0), pt(t1, z0), pt(t1, z1), pt(t0, z1)].map(T).join(" ")}" fill="${winC}" opacity=".85"/><polygon points="${[pt(t0, z0 + (z1 - z0) * .6), pt(t1, z0 + (z1 - z0) * .6), pt(t1, z1), pt(t0, z1)].map(T).join(" ")}" fill="#fff" opacity=".22"/>`;
     }
   }
-  out += `<polygon points="${mine.map(([x, y]) => T(P(x, y, H0))).join(" ")}" fill="${roofC}" stroke="${shade(roofC, .78)}" stroke-width="1"/>`;
+  out += `<polygon points="${mine.map(([x, y]) => T(P(x, y, H0))).join(" ")}" fill="${roofC}" stroke="${shade(roofC, .72)}" stroke-width="1.2" stroke-linejoin="round"/>`;
   out += "</svg>"; artCache.set(key, out); return out;
 }
 

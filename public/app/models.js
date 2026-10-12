@@ -100,32 +100,53 @@ window.addMonuments=function(map,models){
     const halo=new T.Mesh(new T.RingGeometry(Math.max(m.L,m.W)*.62,Math.max(m.L,m.W)*.7,48),new T.MeshBasicMaterial({color:COL.pink,transparent:true,opacity:.28,side:T.DoubleSide})); halo.rotation.x=-Math.PI/2; halo.position.y=.3; g.add(halo);
     let ang=m.ang; if(m.m!=="sacrecoeur"&&Math.cos(ang)<0) ang+=Math.PI; g.position.set((m.lon-lon0)*kx,0,-(m.lat-lat0)*ky); g.rotation.y=ang; scene.add(g);
   }
-  // la position du joueur : un faisceau de lumière qui monte de l'immeuble où l'on est, avec un anneau qui pulse au sol
+  // le joueur : un petit personnage (couleur de son parti) qui marche dans les rues, avec un anneau au sol
   const pawn=new T.Group(); pawn.visible=false;
-  const beamMat=new T.MeshBasicMaterial({color:0x1C3FA8,transparent:true,opacity:.42,depthWrite:false,side:T.DoubleSide});
-  const beam=new T.Mesh(new T.CylinderGeometry(9,16,110,24,1,true),beamMat); beam.position.y=55; pawn.add(beam);
-  const coreMat=new T.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.55,depthWrite:false});
-  const core=new T.Mesh(new T.CylinderGeometry(3.5,5,110,12,1,true),coreMat); core.position.y=55; pawn.add(core);
-  const orbMat=new T.MeshBasicMaterial({color:0x1C3FA8}); const orb=new T.Mesh(new T.SphereGeometry(9,24,16),orbMat); orb.position.y=114; pawn.add(orb);
-  const orbHalo=new T.Mesh(new T.SphereGeometry(13,24,16),new T.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.35,depthWrite:false})); orbHalo.position.y=114; pawn.add(orbHalo);
-  const ringMat=new T.MeshBasicMaterial({color:0x1C3FA8,transparent:true,opacity:.8,depthWrite:false,side:T.DoubleSide});
-  const ring=new T.Mesh(new T.RingGeometry(18,22,48),ringMat); ring.rotation.x=-Math.PI/2; ring.position.y=.8; pawn.add(ring);
-  const ring2=new T.Mesh(new T.RingGeometry(18,20,48),ringMat.clone()); ring2.rotation.x=-Math.PI/2; ring2.position.y=.9; pawn.add(ring2);
-  const disc=new T.Mesh(new T.CircleGeometry(18,40),new T.MeshBasicMaterial({color:0x1C3FA8,transparent:true,opacity:.18,depthWrite:false})); disc.rotation.x=-Math.PI/2; disc.position.y=.7; pawn.add(disc);
+  const guy=new T.Group(); pawn.add(guy);
+  const bodyMat=new T.MeshStandardMaterial({color:0x1C3FA8,roughness:.6,metalness:0,flatShading:true});
+  const skinMat=new T.MeshStandardMaterial({color:0xF3D2B0,roughness:.7,flatShading:true});
+  const darkMat=new T.MeshStandardMaterial({color:0x2B3140,roughness:.7,flatShading:true});
+  const whiteMat=new T.MeshStandardMaterial({color:0xFFFFFF,roughness:.7,flatShading:true});
+  const part=(geo,mat,x,y,z,parent)=>{ const m=new T.Mesh(geo,mat); m.position.set(x,y,z); (parent||guy).add(m); return m; };
+  // jambes (pivot en haut pour les balancer), buste, bras, tête
+  const legL=new T.Group(), legR=new T.Group(); legL.position.set(-2.2,9,0); legR.position.set(2.2,9,0); guy.add(legL,legR);
+  part(new T.CylinderGeometry(1.9,1.7,9,10),darkMat,0,-4.5,0,legL); part(new T.CylinderGeometry(1.9,1.7,9,10),darkMat,0,-4.5,0,legR);
+  part(new T.BoxGeometry(4,1.6,5.4),darkMat,0,-9,.8,legL); part(new T.BoxGeometry(4,1.6,5.4),darkMat,0,-9,.8,legR);
+  const torso=part(new T.CylinderGeometry(4.6,5.4,11,14),bodyMat,0,14.5,0);
+  part(new T.SphereGeometry(4.6,14,8,0,Math.PI*2,0,Math.PI/2),bodyMat,0,20,0);
+  const armL=new T.Group(), armR=new T.Group(); armL.position.set(-5.6,19.5,0); armR.position.set(5.6,19.5,0); guy.add(armL,armR);
+  part(new T.CylinderGeometry(1.5,1.3,9,10),bodyMat,0,-4.5,0,armL); part(new T.CylinderGeometry(1.5,1.3,9,10),bodyMat,0,-4.5,0,armR);
+  part(new T.SphereGeometry(1.6,10,8),skinMat,0,-9.5,0,armL); part(new T.SphereGeometry(1.6,10,8),skinMat,0,-9.5,0,armR);
+  const head=part(new T.SphereGeometry(5,16,12),skinMat,0,27.5,0);
+  part(new T.SphereGeometry(5.2,16,10,0,Math.PI*2,0,Math.PI*.46),darkMat,0,27.9,-.6);   // cheveux
+  part(new T.SphereGeometry(.7,8,6),darkMat,-1.8,28,4.6); part(new T.SphereGeometry(.7,8,6),darkMat,1.8,28,4.6);   // yeux (le devant = +z)
+  // au sol : disque d'ombre + anneau de la couleur du joueur qui pulse
+  const ringMat=new T.MeshBasicMaterial({color:0x1C3FA8,transparent:true,opacity:.85,depthWrite:false,side:T.DoubleSide});
+  const ring=new T.Mesh(new T.RingGeometry(9,11.5,48),ringMat); ring.rotation.x=-Math.PI/2; ring.position.y=.8; pawn.add(ring);
+  const ring2=new T.Mesh(new T.RingGeometry(9,10.5,48),ringMat.clone()); ring2.rotation.x=-Math.PI/2; ring2.position.y=.9; pawn.add(ring2);
+  const disc=new T.Mesh(new T.CircleGeometry(9,40),new T.MeshBasicMaterial({color:0x0F1B2D,transparent:true,opacity:.22,depthWrite:false})); disc.rotation.x=-Math.PI/2; disc.position.y=.7; pawn.add(disc);
   scene.add(pawn);
+  let lastPos=null, walkUntil=0;
   window.pawn3d={
-    set(lng,lat){ pawn.position.set((lng-lon0)*kx,0,-(lat-lat0)*ky); pawn.visible=true; map.triggerRepaint(); },
-    color(hex){ beamMat.color.set(hex); orbMat.color.set(hex); ringMat.color.set(hex); ring2.material.color.set(hex); disc.material.color.set(hex); map.triggerRepaint(); },
+    set(lng,lat){ const x=(lng-lon0)*kx, z=-(lat-lat0)*ky;
+      if(lastPos){ const dx=x-lastPos[0], dz=z-lastPos[1]; if(Math.hypot(dx,dz)>.05){ guy.rotation.y=Math.atan2(dx,dz); walkUntil=performance.now()+180; } }
+      lastPos=[x,z]; pawn.position.set(x,0,z); pawn.visible=true; map.triggerRepaint(); },
+    color(hex){ bodyMat.color.set(hex); ringMat.color.set(hex); ring2.material.color.set(hex); map.triggerRepaint(); },
     hide(){ pawn.visible=false; map.triggerRepaint(); },
-    k(z){ return Math.max(1,Math.pow(2,(16.2-z)*.75)); },
-    H:118
+    k(z){ return 1.9*Math.max(1,Math.pow(2,(16.2-z)*.8)); },
+    H:34
   };
+  const animPawn=()=>{ const tt=performance.now()/1000, walking=performance.now()<walkUntil;
+    const sw=walking?Math.sin(tt*14)*.75:0; legL.rotation.x=sw; legR.rotation.x=-sw; armL.rotation.x=-sw*.8; armR.rotation.x=sw*.8;
+    armL.rotation.z=.12; armR.rotation.z=-.12;
+    guy.position.y=walking?Math.abs(Math.sin(tt*14))*1.2:Math.sin(tt*2)*.4;
+    const pz=1+1.1*((tt*.7)%1); ring2.scale.set(pz,pz,1); ring2.material.opacity=.85*(1-((tt*.7)%1)); };
   let renderer=null;
   const layer={id:"monuments",type:"custom",renderingMode:"3d",
     onAdd(map,gl){ renderer=new T.WebGLRenderer({canvas:map.getCanvas(),context:gl,antialias:true}); renderer.autoClear=false; },
     render(gl,matrix){
       if(map.getZoom()<12.4) return;
-      if(pawn.visible){ const z=map.getZoom(); const k=window.pawn3d.k(z); pawn.scale.setScalar(k); const tt=performance.now()/1000; const pz=1+0.9*((tt*0.8)%1); ring2.scale.set(pz,pz,1); ring2.material.opacity=.8*(1-((tt*0.8)%1)); orb.position.y=114+Math.sin(tt*2)*4; orbHalo.position.y=orb.position.y; beamMat.opacity=.5+.1*Math.sin(tt*2.5); map.triggerRepaint(); }
+      if(pawn.visible){ const z=map.getZoom(); const k=window.pawn3d.k(z); pawn.scale.setScalar(k); animPawn(); map.triggerRepaint(); }
       const rot=new T.Matrix4().makeRotationAxis(new T.Vector3(1,0,0),Math.PI/2);
       const l=new T.Matrix4().makeTranslation(origin.x,origin.y,origin.z).scale(new T.Vector3(s,-s,s)).multiply(rot);
       camera.projectionMatrix=new T.Matrix4().fromArray(matrix).multiply(l);

@@ -5,8 +5,9 @@
 let map = null, mapReady = false, mode = "all", sel = null;
 const hideSet = new Set(), lastState = new Map(); let painted = new Set();
 // Palette « Paris » : pierre de taille et toits en zinc
-const MC = { mine: "#0EA5A0", mineB: "#8FDDD6", theirs: "#5E6B7D", theirsB: "#CBD3DD", sale: "#F59E0B", saleB: "#F9D58F",
-  sel: "#0F1B2D", selB: "#7DD3FC", mute: "#EEEAE3", muteR: "#DAD5CC", stone: "#F3DFBC", zinc: "#6D83A8" };
+// (les toits sont un gris chaud clair : un Paris beige, pas bleu ; les immeubles des autres joueurs sont en terre cuite)
+const MC = { mine: "#0EA5A0", mineB: "#8FDDD6", theirs: "#B4705C", theirsB: "#E8CFC4", sale: "#F59E0B", saleB: "#F9D58F",
+  sel: "#0F1B2D", selB: "#7DD3FC", mute: "#EEEAE3", muteR: "#DAD5CC", stone: "#F3DFBC", zinc: "#D3CCC0" };
 
 function geoArr(i) {
   const A = ARR[i], feats = []; const ih = FIELDS.indexOf("h"), ir = FIELDS.indexOf("r");
@@ -88,7 +89,7 @@ function updateArrFill() {
 function applyMode() {
   if (!mapReady) return; const e = colorExprs(mode);
   for (let i = 0; i < 20; i++) { if (map.getLayer("rf" + i)) map.setPaintProperty("rf" + i, "fill-extrusion-color", e.roof); if (map.getLayer("bd" + i)) map.setPaintProperty("bd" + i, "fill-extrusion-color", e.body); }
-  map.setPaintProperty("arrfill", "fill-opacity", mode === "all" ? ["interpolate", ["linear"], ["zoom"], 11, .5, 13.5, .28, 15.5, .06] : ["interpolate", ["linear"], ["zoom"], 11, .18, 14, .04]);
+  map.setPaintProperty("arrfill", "fill-opacity", mode === "all" ? ["interpolate", ["linear"], ["zoom"], 11, .5, 12.8, .26, 14, .06, 15, 0] : ["interpolate", ["linear"], ["zoom"], 11, .18, 14, 0]);
   renderTags(); renderMarks();
 }
 
@@ -108,7 +109,7 @@ function buildMap(base) {
       sources: { water: { type: "geojson", data: polysGeo(base.water) }, parks: { type: "geojson", data: polysGeo(base.parks) }, major: { type: "geojson", data: linesGeo(base.major) }, arr: { type: "geojson", data: outline }, mfill: { type: "geojson", data: mfill } },
       layers: [
         { id: "bg", type: "background", paint: { "background-color": "#E7E2D8" } },
-        { id: "arrfill", type: "fill", source: "arr", paint: { "fill-color": partyFill(), "fill-opacity": ["interpolate", ["linear"], ["zoom"], 11, .5, 13.5, .28, 15.5, .06] } },
+        { id: "arrfill", type: "fill", source: "arr", paint: { "fill-color": partyFill(), "fill-opacity": ["interpolate", ["linear"], ["zoom"], 11, .5, 12.8, .26, 14, .06, 15, 0] } },
         { id: "parks", type: "fill", source: "parks", paint: { "fill-color": "#9BD67C", "fill-opacity": .95 } },
         { id: "water", type: "fill", source: "water", paint: { "fill-color": "#55A7EA" } },
         { id: "major-case", type: "line", source: "major", paint: { "line-color": "#D6CFC2", "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "k"], 3, 1.6, .6], 18, ["match", ["get", "k"], 3, 34, 20]] } },
@@ -277,6 +278,6 @@ function initMapUI() {
 }
 
 // petit message d'aide sur la carte, jusqu'au premier achat ou aperçu
-function showHint() { try { if (localStorage.getItem("hm_hint")) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "🎲 Lancez le dé : votre pion marche dans Paris et s'arrête sur un immeuble. S'il est libre, vous pouvez l'acheter !"; $("#p-map").appendChild(h); }
+function showHint() { try { if (localStorage.getItem("hm_hint")) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "🎲 Lancez le dé : votre personnage marche dans Paris et s'arrête sur un immeuble. S'il est libre, vous pouvez l'acheter !"; $("#p-map").appendChild(h); }
 function hideHint() { $("#maphint")?.remove(); try { localStorage.setItem("hm_hint", "1"); } catch (e) { } }
 function celebrate(c) { toast(`Félicitations ! ${title(c)} est à vous. Loyer : +${fmtE(c.rent)}/jour`, "good"); if (window.confetti) confetti("#0EA5A0", 30); }

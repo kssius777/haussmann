@@ -59,7 +59,7 @@ input{font:inherit;color:inherit}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 
 /* ---------- tabs ---------- */
-#tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;height:calc(var(--tab-h) + env(safe-area-inset-bottom,0px));padding:6px 8px env(safe-area-inset-bottom,0px);display:grid;grid-template-columns:repeat(5,1fr);gap:4px;background:#fff;border-top:1px solid var(--line)}
+#tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;height:calc(var(--tab-h) + env(safe-area-inset-bottom,0px));padding:6px 8px env(safe-area-inset-bottom,0px);display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:#fff;border-top:1px solid var(--line)}
 #tabs button{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:14px;color:var(--muted);font-size:11.5px;font-weight:700;transition:background .15s,color .15s}
 #tabs svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 #tabs button[aria-selected="true"]{background:var(--blue);color:#fff}
@@ -917,3 +917,71 @@ input{font:inherit;color:inherit}
   .agh strong{font-size:13px} .agh small,.agv small{font-size:11px}
   .agv b{font-size:13px}
 }
+
+/* =====================================================================
+   v4 (12/10) : personnage à la place du pion, boosters à côté du dé,
+   téléphone allégé, grande carte quand on tombe sur une case, cartes plus belles
+   ===================================================================== */
+/* la barre du dé : téléport · dé · boosters */
+.dside{width:66px;padding:7px 4px 6px;border-radius:18px;gap:2px;position:relative;overflow:visible}
+.dside.pk .ic{display:block;height:44px;width:30px;position:relative;margin-bottom:2px}
+.dside.pk .pack.mini{--pw:30px;position:absolute;inset:0;border-radius:5px;animation:none;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,.25),0 0 0 1px rgba(255,255,255,.25) inset;transform:rotate(-6deg);transition:transform .15s}
+.dside.pk:active .pack.mini{transform:rotate(-6deg) scale(.95)}
+.dside.pk .pack.mini .holo,.dside.pk .pack.mini .shine,.dside.pk .pack.mini .tear,.dside.pk .pack.mini .lbl{display:none}
+.dside.pk .pack.mini::before,.dside.pk .pack.mini::after{height:2px}
+.dside.pk .pack.mini .pin{inset:4px 3px;border-radius:3px;padding:3px 2px;justify-content:center;gap:2px;box-shadow:inset 0 0 0 1px rgba(255,214,120,.6)}
+.dside.pk .pack.mini .plaq{font-size:3.6px;padding:1.5px 2px;border-width:.5px;outline-width:.5px;border-radius:1.5px;letter-spacing:.06em}
+.dside.pk .pack.mini .facade{width:80%}
+.dside .badge{position:absolute;top:-7px;right:-6px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--gold);color:#3B2A00;font:900 12px/22px var(--f);border:2px solid #fff;box-shadow:var(--shadow)}
+.dside .badge[hidden]{display:none}
+.tpb{display:grid;grid-template-columns:1fr auto;gap:8px}
+#movebar.k-tp .mvh span b{color:var(--ink)}
+/* la flèche quand le personnage est hors écran */
+#pawnoff{background:var(--blue)}
+#pawnoff i{background:#fff;color:var(--blue)}
+/* étiquette au-dessus du personnage : plus discrète */
+.pawn.is3d em{background:rgba(15,27,45,.85);font-size:11px;padding:2px 8px;box-shadow:none}
+
+/* téléphone : on voit surtout la carte */
+@media (max-width:699px){
+  #score{display:none}
+  .maptop{justify-content:flex-end}
+  .mbtn{width:38px;height:38px;border-radius:11px}
+  .mapside{bottom:118px}
+  .dicebar{gap:14px}
+  .dside{width:60px}
+  /* quand on tombe sur une case : la carte apparaît en grand, l'action juste dessous */
+  #movebar.k-land{padding:12px 14px 14px;max-height:min(74vh,600px);border-radius:24px 24px 18px 18px;bottom:calc(var(--tab-h) + env(safe-area-inset-bottom,0px) + 100px)}
+  .land{grid-template-columns:1fr;gap:8px;justify-items:center}
+  .land .lc{width:156px;animation:cardPop .42s cubic-bezier(.2,1.2,.3,1)}
+  .land .lc .hc{--w:156px}
+  .land .lr{width:100%;padding-right:0;gap:6px;justify-items:center;text-align:center}
+  .land .lh{font-size:18px}
+  .land .linfo{font-size:13px}
+  #movebar .land .ln{padding:5px 10px;font-size:12.5px;border-radius:999px;display:inline-block}
+  .land .lb{width:100%;gap:6px}
+  .land .lb .btn{min-height:46px;font-size:15px}
+  .land .lb .btn small{font-size:11.5px}
+  .land>.x{top:-4px;right:-6px}
+}
+@keyframes cardPop{from{transform:scale(.5) translateY(40px);opacity:0}}
+
+/* ---- cartes : cadre plus riche, chiffres plus présents ---- */
+.hc .fr{padding:3cqw;border-radius:7cqw;box-shadow:0 1cqw 0 rgba(0,0,0,.08) inset,0 5cqw 12cqw rgba(20,40,70,.26),0 0 0 .6cqw rgba(255,255,255,.35) inset}
+.hc .fr::before{content:"";position:absolute;inset:1.4cqw;border-radius:5.8cqw;border:.5cqw solid rgba(255,255,255,.55);pointer-events:none;z-index:2}
+.hc .in{border-radius:4.6cqw;background:linear-gradient(180deg,#FFFFFF,#F7F4EE)}
+.hc .plq{margin:3.4cqw 3.4cqw 2.6cqw;box-shadow:0 1.2cqw 2.4cqw rgba(0,0,0,.18),inset 0 -1cqw 0 rgba(0,0,0,.18)}
+.hc .ph{height:70cqw;box-shadow:inset 0 0 0 .8cqw rgba(255,255,255,.7),inset 0 2cqw 4cqw rgba(0,0,0,.08)}
+.hc .ph::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(255,255,255,.18),transparent 30%,transparent 70%,rgba(20,40,70,.12))}
+.hc .rb{z-index:2;border-radius:50%;width:12cqw;height:12cqw;font-size:6cqw}
+.hc .cnt{z-index:2}
+.hc .bd{padding:3.6cqw 5cqw 4.2cqw}
+.hc .kd{font-size:4.4cqw;color:var(--ink)}
+.hc .kd .yr{color:var(--muted);font-weight:600}
+.hc .nums{margin-top:2.2cqw;padding-top:2.2cqw;border-top:.4cqw solid #EAE4D8}
+.hc .nums span{font-size:3.4cqw;letter-spacing:.09em;color:#9AA3AF}
+.hc .nums b{font-size:8cqw;letter-spacing:-.01em}
+.hc .rn{margin-top:3cqw;font-size:3.6cqw}
+.hc.tC{--rc:linear-gradient(160deg,#9AA1AB,#6E7681 60%,#8F97A2);--rt:#6B7280}
+.hc.tU{--rc:linear-gradient(160deg,#3FB47F,#23805A 60%,#3AA876);--rt:#23805A}
+.hc.tR{--rc:linear-gradient(160deg,#4A82F0,#1F55C9 60%,#3F76E6);--rt:#1F55C9}
