@@ -141,7 +141,7 @@ function showLand(L) {
     } else {
       btns = cr
         ? `<button class="btn block blue2" data-lbuy="${g}"><span>Acheter ${unit} à crédit</span><small>apport ${fmtE(down(c.v))} · +${fmtE(c.rent)} / jour</small></button>
-           <p class="crx">Vous payez <b>30 %</b> maintenant. La banque avance le reste (${fmtE(c.v - down(c.v))}), qui se rembourse <b>tout seul</b> avec la moitié du loyer de ce bien.</p>`
+           <p class="crx">30 % maintenant, le reste (${fmtE(c.v - down(c.v))}) se rembourse <b>tout seul</b> avec la moitié du loyer.</p>`
         : `<button class="btn block green" data-lbuy="${g}"><span>Acheter ${unit} · ${fmtE(c.v)}</span><small>+${fmtE(c.rent)} / jour</small></button>`;
       const links = [];
       if (cr && cashOK) links.push(`<button data-paymode="0">ou payer comptant</button>`);

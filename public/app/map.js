@@ -158,7 +158,7 @@ function renderMarks() {
     const s = document.getElementById("am" + i); if (s) s.innerHTML = m ? `${emblemSVG(m.party, 15)}${esc(m.pseudo)}` : "Siège libre";
   });
   for (const m of monMarks) {
-    const show = z >= (m.r === "M" ? 11.4 : 15.6); m.el.classList.toggle("far", z < 14); if (show && !m.on) { m.mk.addTo(map); m.on = true; } else if (!show && m.on) { m.mk.remove(); m.on = false; }
+    const show = z >= (m.r === "M" ? 11.4 : 15.6); m.el.classList.toggle("far", z < (innerWidth < 700 ? 17 : 14)); if (show && !m.on) { m.mk.addTo(map); m.on = true; } else if (!show && m.on) { m.mk.remove(); m.on = false; }
     if (show && !m.ph) { const c = card(m.g); if (c) { m.ph = true; if (c.ph) m.el.querySelector("i").setAttribute("style", phStyle(c)); } }
   }
 }
@@ -248,6 +248,9 @@ function initMapUI() {
   });
   $("#t-home").addEventListener("click", () => map.flyTo({ center: [2.3420, 48.8580], zoom: 11.9, pitch: 30, bearing: 0, duration: 1200 }));
   $("#t-north").addEventListener("click", () => map.easeTo({ bearing: 0, duration: 600 }));
+  // sur téléphone, les filtres sont rangés derrière un bouton
+  $("#t-filter").addEventListener("click", e => { e.stopPropagation(); $("#filter").classList.toggle("open"); });
+  $("#filter").addEventListener("click", () => setTimeout(() => $("#filter").classList.remove("open"), 150));
   $("#t-search").addEventListener("click", e => { e.stopPropagation(); const s = $("#search"); s.hidden = !s.hidden; if (!s.hidden) $("#q").focus(); });
   document.addEventListener("pointerdown", e => { if (!$("#search").hidden && !e.target.closest("#search,#t-search")) closeSearch(); });
   $("#q").addEventListener("input", () => {

@@ -752,3 +752,31 @@ input{font:inherit;color:inherit}
   .land .lb .btn{min-height:54px;font-size:16px}
 }
 .lstreet{font-size:13px;justify-self:start}@media (min-width:900px){.lstreet{justify-self:center}}
+/* téléphone : interface allégée */
+#t-filter{display:none}
+@media (max-width:699px){
+  #t-filter{display:grid}
+  #filter{display:none;top:62px;left:auto;right:10px;flex-direction:column;align-items:stretch;border-radius:16px;padding:5px}
+  #filter.open{display:flex}
+  #filter button{justify-content:flex-start}
+  .mapbtns{display:flex;gap:8px}
+  .score{width:auto;max-width:210px;padding:6px 10px}
+  .score .t{font-size:12px} .score .t b{font-size:12px}
+  .mmark.far{padding:2px}
+  .mmark.far>:not(i){display:none}
+  .mmark.far{font-size:0;gap:0}
+  .mmark.far i{width:24px;height:24px}
+  .amark span{display:none}
+  .dicebar{gap:12px}
+  .dmain{width:72px;height:72px}
+  .dmain .dface{width:26px;height:26px}
+  .dmain .dface i{width:5px;height:5px}
+  .dmain .dface i:nth-child(1){left:4px;top:4px}.dmain .dface i:nth-child(2){right:4px;top:4px}.dmain .dface i:nth-child(3){left:10.5px;top:10.5px}.dmain .dface i:nth-child(4){left:4px;bottom:4px}.dmain .dface i:nth-child(5){right:4px;bottom:4px}
+  .dmain b{font-size:11px}
+  .dside{width:54px;padding:6px 2px;border-radius:14px}
+  .dside .ic{font-size:17px}
+  .dside small{font-size:10px}
+  .mapside{bottom:112px}
+  .pawn em{font-size:10px;padding:1px 6px}
+  #movebar.k-land{bottom:calc(var(--tab-h) + env(safe-area-inset-bottom,0px) + 96px)}
+}
