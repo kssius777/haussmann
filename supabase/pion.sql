@@ -78,23 +78,29 @@ create or replace function _square(u uuid, t int) returns jsonb language sql sta
     'mine', (select count(*) from lots where card = t and owner = u) + coalesce((select sum(n) from parts where card = t and owner = u), 0))
   from cards c where c.id = t $$;
 
--- Le pion marche tout seul : il garde à peu près sa direction et tourne au hasard aux carrefours.
+-- Le pion marche tout seul : il garde à peu près sa direction, s'éloigne de son point de départ
+-- (pour ne pas tourner en rond, par exemple autour de Notre-Dame) et s'arrête à au moins 60 m.
 create or replace function _walk(u uuid, start int, n int) returns int[] language plpgsql as $$
 #variable_conflict use_column
-declare cur int := start; path int[] := array[start]; hd float8; x0 int; y0 int; nx int; best record; i int;
+declare cur int := start; path int[] := array[start]; hd float8; x0 int; y0 int; sx int; sy int; best record; i int; d float8;
 begin
-  select coalesce(heading, random() * 2 * pi()) into hd from profiles where id = u;
-  for i in 1..n loop
+  select coalesce(heading, random() * 2 * pi()) + (random() - 0.5) * 1.2 into hd from profiles where id = u;
+  select cx, cy into sx, sy from cards where id = start;
+  for i in 1..n + 15 loop
     select cx, cy into x0, y0 from cards where id = cur;
-    select e.b node, atan2((c.cy - y0) * 1.10574, (c.cx - x0) * 0.7324) brg into best
+    select e.b node, atan2((c.cy - y0) * 1.10574, (c.cx - x0) * 0.7324) brg,
+           sqrt(power((c.cx - sx) * 0.7324, 2) + power((c.cy - sy) * 1.10574, 2)) dist into best
       from edges e join cards c on c.id = e.b
       where e.a = cur
-      order by (e.b = any(path)),                                                     -- pas de retour en arrière si possible
-               abs(mod((atan2((c.cy - y0) * 1.10574, (c.cx - x0) * 0.7324) - hd + 3 * pi())::numeric, (2 * pi())::numeric) - pi()) + random() * 0.6
+      order by (e.b = any(path)),                                                     -- jamais deux fois la même case si possible
+               abs(mod((atan2((c.cy - y0) * 1.10574, (c.cx - x0) * 0.7324) - hd + 3 * pi())::numeric, (2 * pi())::numeric) - pi())
+               - 0.012 * sqrt(power((c.cx - sx) * 0.7324, 2) + power((c.cy - sy) * 1.10574, 2))   -- s'éloigner du départ
+               + random() * 0.5
       limit 1;
     exit when best.node is null;
     hd := hd + 0.5 * (mod((best.brg - hd + 3 * pi())::numeric, (2 * pi())::numeric) - pi());
-    cur := best.node; path := path || cur;
+    cur := best.node; path := path || cur; d := best.dist;
+    exit when i >= n and d >= 60;
   end loop;
   update profiles set heading = hd where id = u;
   return path;

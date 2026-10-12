@@ -25,7 +25,10 @@ async function placePawn(fly) {
   const p = pawnPos(); if (p == null || !map) return; await ensureCards([p]);
   const ll = centerOf(p), pr = ST.state.profile, col = PARTIES[pr.party]?.c || "#0F1B2D";
   if (!pawnMk) { const el = document.createElement("div"); el.className = "pawn"; el.addEventListener("click", e => { e.stopPropagation(); showLand(); }); pawnMk = new maplibregl.Marker({ element: el, anchor: "bottom" }).setLngLat(ll).addTo(map); }
-  pawnMk.getElement().innerHTML = `<em>Vous</em><i style="--pc:${col}"><svg viewBox="0 0 24 24" width="24" height="24" fill="#fff"><circle cx="12" cy="5.6" r="3.4"/><path d="M8.6 10.2h6.8l-1 2.2 1.9 5.6H7.7l1.9-5.6z"/><rect x="5.5" y="18.4" width="13" height="3.2" rx="1.6"/></svg></i><b></b><s></s>`;
+  pawnMk.getElement().innerHTML = `<em>Vous</em><svg class="pz" viewBox="0 0 44 60" width="40" height="55" aria-hidden="true"><defs><linearGradient id="pzg" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".25"/></linearGradient></defs>
+    <ellipse cx="22" cy="56" rx="14" ry="3.5" fill="#0F1B2D" opacity=".25"/>
+    <g stroke="#fff" stroke-width="2.4" stroke-linejoin="round"><path d="M9 52h26l-2.5-7h-21z" fill="${col}"/><path d="M14.5 45l3-15h9l3 15z" fill="${col}"/><path d="M13 30.5h18" stroke-linecap="round"/><circle cx="22" cy="17" r="9.5" fill="${col}"/></g>
+    <g fill="url(#pzg)"><path d="M9 52h26l-2.5-7h-21z"/><path d="M14.5 45l3-15h9l3 15z"/><circle cx="22" cy="17" r="9.5"/></g></svg><s></s>`;
   pawnMk.setLngLat(ll); paintTargets();
   if (fly) map.flyTo({ center: ll, zoom: Math.max(map.getZoom(), 16.2), pitch: 50, duration: 900, offset: [0, -90] });
 }
@@ -51,6 +54,7 @@ function mineOf(g) { return (ST.mine.get(g)?.length || 0) + (ST.mineParts.get(g)
 // ---- panneau du bas ------------------------------------------------------------
 function setMovebar(html, kind) {
   const m = $("#movebar"); panelKind = html ? kind || "" : "";
+  m.className = panelKind ? "k-" + panelKind : "";
   if (!html) { m.hidden = true; m.innerHTML = ""; } else { m.hidden = false; m.innerHTML = html; }
   $("#dicebar").classList.toggle("off", moving);
 }
@@ -58,9 +62,9 @@ function renderDice() {
   const p = ST.state?.profile; if (!p) return;
   const r = $("#b-roll"), left = p.rolls ?? 0;
   const wait = Math.max(0, (ST.state.roll_in || 0) - (performance.now() - ST.stAt) / 1000);
-  $("#rolls").textContent = left > 0 ? `${left} lancer${left > 1 ? "s" : ""} dispo` : `prochain dans ${hm(wait)}`;
+  $("#rolls").textContent = left > 0 ? `${left} lancer${left > 1 ? "s" : ""}` : `dans ${hm(wait)}`;
   r.disabled = left <= 0 || moving;
-  $("#tps").textContent = `${p.tp ?? 0} restant${p.tp > 1 ? "s" : ""}`; $("#b-tp").disabled = !(p.tp > 0);
+  $("#tps").textContent = p.tp ?? 0; $("#b-tp").disabled = !(p.tp > 0);
   $("#dicebar").classList.toggle("off", moving);
 }
 
@@ -84,7 +88,7 @@ async function doRoll() {
   await placePawn(false); renderDice(); renderWallet();
   map.easeTo({ center: centerOf(r.landing.card), zoom: Math.max(map.getZoom(), 16.6), duration: 600, offset: [0, -150] });
   setTimeout(() => map.getSource("walked")?.setData(FC([])), 2500);
-  lastLanding = r.landing; showLand(r.landing);
+  lastLanding = r.landing; landCredit = null; showLand(r.landing);
   refreshHold().then(refreshMap).then(() => { paintAll(); renderWallet(); if (panelKind === "land") showLand(); }).catch(() => { });
 }
 function walk(line, ms) {   // le pion suit le trajet, la ligne parcourue se dessine derrière lui
@@ -122,21 +126,27 @@ function showLand(L) {
   if (L?.toll > 0) lines.push(`<span class="ln bad">Vous lui payez son loyer : <b>${fmtE(L.toll)}</b></span>`);
   if (L?.bonus > 0) lines.push(`<span class="ln good">Bonus : une journée de loyer offerte, <b>+${fmtE(L.bonus)}</b></span>`);
   if (L?.chance) { const ch = L.chance; const [nm] = CHANCE[ch.k] || ["Chance"]; lines.push(`<span class="ln ${BAD.has(ch.k) ? "bad" : "good"}">🃏 Case Chance : <b>${esc(nm)}</b> ${esc(chanceText(ch))}</span>`); }
-  let btns = "";
   const word = n => lotWord(c, n), tot = c.lots;
   const info = isP ? `${fmtN(free)} parts libres` : tot > 1 ? `Immeuble de ${tot} ${word(tot)} · <b>${free} libre${free > 1 ? "s" : ""}</b>` : "";
+  let btns = "";
   if (free > 0) {
     const unit = isP ? "1 part" : tot > 1 ? `1 ${word(1)}` : c.lk === "l" ? "le logement" : "le local", allFree = !isP && free === tot && tot > 1, total = c.v * tot;
-    btns += `<button class="btn block green" data-lbuy="${g}" ${cash < c.v ? "disabled" : ""}><span>Acheter ${unit} · ${fmtE(c.v)}</span><small>+${fmtE(c.rent)} / jour</small></button>`;
-    if (allFree) btns += `<button class="btn block light" data-lbuild="${g}" ${cash < total ? "disabled" : ""}><span>Acheter les ${tot} · ${fmtE(total)}</span><small>tout l'immeuble : +60 % de loyer</small></button>`;
-    if (cash < c.v) btns += `<small class="muted">Il vous manque ${fmtE(c.v - cash)}.</small>`;
-    btns += `<button class="btn block ghost" data-mvclose>Passer</button>`;
-  } else btns = `<button class="btn block" data-mvclose>OK</button>`;
-  setMovebar(`<div class="land"><div class="lc" data-lopen="${g}">${cardHTML(c, { w: "128px" })}</div>
+    const credits = ST.state?.credits || 0, canCredit = credits < CREDIT_MAX;
+    const down = p => Math.ceil(p * CREDIT_DOWN), cr = canCredit && (landCredit === null ? cash < c.v && cash >= down(c.v) : landCredit);
+    const need = p => cr ? down(p) : p;
+    btns += `<div class="pay" role="tablist"><button data-paymode="0" aria-selected="${!cr}">Comptant</button><button data-paymode="1" aria-selected="${cr}" ${canCredit ? "" : "disabled"}>À crédit${canCredit ? "" : " (3/3)"}</button></div>`;
+    btns += `<button class="btn block green" data-lbuy="${g}" ${cash < need(c.v) ? "disabled" : ""}><span>${cr ? `Acheter ${unit} · apport ${fmtE(down(c.v))}` : `Acheter ${unit} · ${fmtE(c.v)}`}</span><small>+${fmtE(c.rent)} / jour${cr ? " (moitié pour vous pendant le crédit)" : ""}</small></button>`;
+    if (allFree) btns += `<button class="btn block light" data-lbuild="${g}" ${cash < need(total) ? "disabled" : ""}><span>${cr ? `Les ${tot} · apport ${fmtE(down(total))}` : `Acheter les ${tot} · ${fmtE(total)}`}</span><small>tout l'immeuble : +60 % de loyer</small></button>`;
+    if (cr) btns += `<p class="crx">Vous payez <b>30 %</b> maintenant. La banque avance le reste (<b>${fmtE(c.v - down(c.v))}</b>) : il se rembourse <b>tout seul</b> avec la moitié du loyer de ce bien. Remboursable en avance, 3 crédits max.</p>`;
+    else if (cash < c.v) btns += `<small class="muted">Il vous manque ${fmtE(c.v - cash)}.${canCredit && cash >= down(c.v) ? " Essayez « À crédit » !" : ""}</small>`;
+  }
+  setMovebar(`<div class="land"><div class="grab"></div><div class="lc" data-lopen="${g}">${cardHTML(c)}</div>
     <div class="lr"><b class="lh ${cls}">${head}</b>${info ? `<span class="linfo">${info}</span>` : ""}${lines.join("")}<div class="lb">${btns}</div></div>
     <button class="x" data-mvclose aria-label="Fermer">×</button></div>`, "land");
   if (L?.chance && window.confetti && !BAD.has(L.chance.k)) confetti("#A855F7", 24);
 }
+let landCredit = null;   // null = choix automatique (crédit si l'on n'a pas assez pour payer comptant)
+const CREDIT_DOWN = 0.3, CREDIT_MAX = 3;
 
 // ---- téléportation ------------------------------------------------------------
 function openTeleport() {
@@ -167,9 +177,10 @@ function initPawnUI() {
   $("#movebar").addEventListener("click", async e => {
     if (e.target.closest("[data-mvclose]")) return setMovebar("");
     const tp = e.target.closest("[data-tpgo]"); if (tp) return doTeleport(+tp.dataset.tpgo);
+    const pm = e.target.closest("[data-paymode]"); if (pm) { landCredit = pm.dataset.paymode === "1"; return showLand(); }
     const lb = e.target.closest("[data-lbuy],[data-lbuild]"); if (lb) {
-      const g = +(lb.dataset.lbuy || lb.dataset.lbuild), whole = !!lb.dataset.lbuild; lb.disabled = true; lb.textContent = "Achat…";
-      if (await act(whole ? "buy_building" : "bank_buy", whole ? { p_card: g } : { p_card: g, p_k: null }, null)) celebrate(card(g));
+      const g = +(lb.dataset.lbuy || lb.dataset.lbuild), whole = !!lb.dataset.lbuild, credit = landCredit; lb.disabled = true; lb.textContent = "Achat…";
+      if (await act(whole ? "buy_building" : "bank_buy", Object.assign(whole ? { p_card: g } : { p_card: g, p_k: null }, credit ? { p_credit: true } : {}), null)) { celebrate(card(g)); if (credit) toast("Acheté à crédit : il se rembourse tout seul avec la moitié du loyer.", "good"); }
       return showLand();
     }
     const lo = e.target.closest("[data-lopen]"); if (lo) return push("b", +lo.dataset.lopen);

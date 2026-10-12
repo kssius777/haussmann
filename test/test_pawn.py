@@ -12,7 +12,8 @@ far = db.sql("select id from cards where lk='l' and id not in (select card from 
 check("avant de lancer : pas d'achat à la banque", "tomber dessus" in (err(lambda: db.rpc(A, "bank_buy", p_card=far, p_k=None)) or ""))
 t = time.time(); r = db.rpc(A, "roll"); dt = time.time() - t
 path, L = r["path"], r["landing"]
-check(f"lancer ({dt*1000:.0f} ms) : dé {r['die']} → {len(path)-1} pas", 1 <= r["die"] <= 6 and len(path) - 1 == r["die"] * 4)
+check(f"lancer ({dt*1000:.0f} ms) : dé {r['die']} → {len(path)-1} pas", 1 <= r["die"] <= 6 and r["die"] * 4 <= len(path) - 1 <= r["die"] * 4 + 15)
+check("on ne retombe jamais sur sa case de départ (≥ 60 m)", db.sql("select _dist(%s,%s)", path[0], path[-1])[0][0] >= 59)
 check("le pion marche d'immeuble voisin en immeuble voisin", path[0] == 300658 and all(db.sql("select 1 from edges where a=%s and b=%s", a, b) for a, b in zip(path, path[1:])))
 st = db.rpc(A, "state")["profile"]
 check("le pion s'arrête sur la dernière case, achetable", st["pos"] == path[-1] == L["card"] and st["land"] == L["card"] and st["rolls"] == 9)
@@ -47,6 +48,13 @@ db.sql("update profiles set rolls=0, rolls_at=now() where id=%s", str(A))
 check("plus de lancers : message avec le délai", "prochain arrive" in (err(lambda: db.rpc(A, "roll")) or ""))
 db.sql("update profiles set rolls_at=now() - interval '75 minutes' where id=%s", str(A))
 check("les lancers se rechargent (1 toutes les 30 min)", db.rpc(A, "state")["profile"]["rolls"] == 2)
+# autour de Notre-Dame : 15 lancers, le pion doit quitter l'île au lieu de tourner en rond
+C = uuid.uuid4(); db.sql("insert into auth.users(id) values (%s)", str(C)); db.rpc(C, "join_game", p_pseudo="Ile" + str(C)[:4], p_party=None)
+far_ = 0; same = 0; prev = 300658
+for _ in range(15):
+    db.sql("update profiles set rolls=10 where id=%s", str(C)); x = db.rpc(C, "roll"); t2 = x["landing"]["card"]
+    same += (t2 == prev); prev = t2; far_ = max(far_, db.sql("select _dist(300658,%s)", t2)[0][0])
+check("autour de Notre-Dame : le pion s'éloigne (pas de boucle)", far_ > 400 and same == 0, f"{far_:.0f} m au plus loin")
 nch = db.sql("select count(*) from (select id from cards order by id limit 1200) x where _is_chance(id)")[0][0]
 check("cases Chance réparties sur la carte (≈ 1 sur 8)", 100 < nch < 210, nch)
 print(f"\n{sum(R)}/{len(R)} OK")

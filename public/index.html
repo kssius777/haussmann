@@ -38,11 +38,10 @@
       <div id="results"></div>
     </div>
     <div class="mapside">
-      <button class="mbtn" id="t-tilt" aria-label="Vue 3D ou à plat"><b>3D</b></button>
-      <button class="mbtn" id="t-north" aria-label="Revenir au nord">
-        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 3l4 9h-8z" fill="#D32F2F"/><path d="M12 21l-4-9h8z" fill="#9AA6B2"/></svg></button>
-      <button class="mbtn" id="t-home" aria-label="Voir tout Paris">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+      <button class="mbtn" id="t-north" aria-label="Remettre le nord en haut" hidden>
+        <svg viewBox="0 0 24 24" width="22" height="22" id="needle"><path d="M12 3l4 9h-8z" fill="#D32F2F"/><path d="M12 21l-4-9h8z" fill="#9AA6B2"/></svg></button>
+      <button class="mbtn" id="t-home" aria-label="Voir tout Paris" title="Voir tout Paris">
+        <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
     </div>
     <div class="filter" id="filter" role="tablist">
       <button data-m="all" aria-selected="true">Tout</button>
@@ -53,9 +52,9 @@
       <div id="movebar" hidden></div>
       <div id="preview" hidden></div>
       <div class="dicebar" id="dicebar">
-        <button class="dbtn" id="b-roll"><span class="dic">🎲</span><span><b>Lancer le dé</b><small id="rolls">10/10</small></span></button>
-        <button class="dbtn tp" id="b-tp" aria-label="Se téléporter sur un de ses biens"><span class="dic">✨</span><span><b>Téléport</b><small id="tps">3/3</small></span></button>
-        <button class="dbtn me" id="b-me" aria-label="Mon pion"><span class="dic">📍</span><small>Mon pion</small></button>
+        <button class="dside" id="b-tp" aria-label="Se téléporter sur un de ses biens"><span class="ic">✨</span><small>Téléport · <b id="tps">3</b></small></button>
+        <button class="dmain" id="b-roll" aria-label="Lancer le dé"><span class="dface"><i></i><i></i><i></i><i></i><i></i></span><b>Lancer</b><small id="rolls">10</small></button>
+        <button class="dside" id="b-me" aria-label="Revenir à mon pion"><span class="ic">📍</span><small>Mon pion</small></button>
       </div>
     </div>
     <div id="dice3d" hidden></div>

@@ -536,3 +536,80 @@ input{font:inherit;color:inherit}
 .land .linfo{font-size:13.5px;color:var(--ink2)}
 .land .lb .btn{display:grid;gap:1px}
 .land .lb .btn small{font-size:11.5px;font-weight:700;opacity:.85}
+
+/* =====================================================================
+   v3 (12/10) : couleurs plus vives, dé au milieu, carte de la case en panneau
+   ===================================================================== */
+:root{
+  --bg:#EEF2FA; --line:#DDE4F0; --soft:#F2F5FB; --soft2:#E4EAF5;
+  --blue:#1C3FA8; --blue2:#2F5BD3; --accent:#2F5BD3; --money:#0FA968; --mine:#0BB3A6; --sale:#F59E0B; --danger:#E5383B;
+  --gold:#FFC23D;
+  --shadow:0 2px 10px rgba(16,32,72,.08); --shadow-l:0 14px 36px rgba(16,32,72,.2);
+}
+/* boutons plus compacts, plus « jeu » */
+.btn{min-height:42px;padding:0 16px;border-radius:12px;font-size:14.5px;box-shadow:0 3px 0 rgba(0,0,0,.14)}
+.btn.sm{min-height:34px;padding:0 12px;font-size:13px;border-radius:10px}
+.btn.light{box-shadow:0 2px 0 var(--line),var(--shadow)}
+.btn.ghost{box-shadow:none}
+.btn:disabled{box-shadow:none}
+.btn.block{width:100%}
+.h1{font-size:24px}
+
+/* le dé au milieu */
+.dicebar{display:flex;align-items:flex-end;justify-content:center;gap:18px;width:auto;pointer-events:none}
+.dicebar>*{pointer-events:auto}
+.dicebar.off{display:flex;visibility:hidden}
+.dmain{position:relative;width:86px;height:86px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#4E7BEA,var(--blue) 70%);color:#fff;display:grid;place-items:center;align-content:center;gap:0;box-shadow:0 6px 0 #122C78,0 14px 30px rgba(28,63,168,.45);border:3px solid #fff;transition:transform .12s}
+.dmain:active:not(:disabled){transform:translateY(3px);box-shadow:0 3px 0 #122C78,0 8px 20px rgba(28,63,168,.4)}
+.dmain:disabled{filter:grayscale(.6) brightness(1.15);opacity:.8}
+.dmain:not(:disabled){animation:dmPulse 2.2s ease-in-out infinite}
+@keyframes dmPulse{50%{box-shadow:0 6px 0 #122C78,0 14px 30px rgba(28,63,168,.45),0 0 0 9px rgba(47,91,211,.18)}}
+.dmain .dface{width:30px;height:30px;border-radius:8px;background:#fff;position:relative;display:block;box-shadow:inset 0 -2px 0 #D5DCEA}
+.dmain .dface i{position:absolute;width:6px;height:6px;border-radius:50%;background:var(--blue)}
+.dmain .dface i:nth-child(1){left:5px;top:5px}.dmain .dface i:nth-child(2){right:5px;top:5px}.dmain .dface i:nth-child(3){left:12px;top:12px}.dmain .dface i:nth-child(4){left:5px;bottom:5px}.dmain .dface i:nth-child(5){right:5px;bottom:5px}
+.dmain b{font-size:12.5px;font-weight:900;letter-spacing:.02em;margin-top:3px;line-height:1}
+.dmain small{position:absolute;bottom:-12px;left:50%;transform:translateX(-50%);white-space:nowrap;background:var(--gold);color:#3B2A00;font-size:11px;font-weight:900;padding:3px 8px;border-radius:999px;border:2px solid #fff;box-shadow:var(--shadow)}
+.dside{width:64px;display:grid;justify-items:center;gap:3px;padding:8px 4px;border-radius:16px;background:#fff;box-shadow:0 3px 0 var(--line),var(--shadow);font-size:11px;font-weight:800;color:var(--ink2);margin-bottom:6px}
+.dside .ic{font-size:20px;line-height:1}
+.dside small{font-size:11px;font-weight:800;white-space:nowrap}
+.dside:disabled{opacity:.5}
+.mapside{bottom:130px}
+
+/* le pion */
+.pawn{width:48px;height:84px;display:grid;justify-items:center;align-content:end;position:relative;cursor:pointer;filter:drop-shadow(0 6px 8px rgba(15,27,45,.35))}
+.pawn i,.pawn b{display:none}
+.pawn .pz{display:block;animation:pawnBob 1.6s ease-in-out infinite}
+.pawn em{font-style:normal;font-size:11px;font-weight:900;color:#fff;background:#0F1B2D;padding:2px 8px;border-radius:999px;margin-bottom:2px}
+.pawn s{bottom:-6px}
+
+/* la carte de la case : feuille du bas (téléphone) / panneau à droite (ordinateur) */
+#movebar.k-land{position:fixed;left:0;right:0;bottom:calc(var(--tab-h) + env(safe-area-inset-bottom,0px) + 112px);width:auto;margin:0 8px;max-height:62vh;overflow:auto;padding:10px 14px 14px;border-radius:22px;background:#fff;box-shadow:0 -6px 30px rgba(16,32,72,.22);animation:sheetUp .28s cubic-bezier(.2,.9,.2,1);z-index:8;pointer-events:auto}
+@keyframes sheetUp{from{transform:translateY(40px);opacity:0}}
+.land{grid-template-columns:118px minmax(0,1fr);gap:12px}
+.land .grab{display:none}
+.land .lc .hc{--w:118px}
+.land .lr{gap:6px}
+.land .lh{font-size:18px}
+.pay{display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:3px;border-radius:11px;background:var(--soft2)}
+.pay button{height:30px;border-radius:9px;font-size:12.5px;font-weight:800;color:var(--ink2)}
+.pay button[aria-selected="true"]{background:#fff;color:var(--blue);box-shadow:var(--shadow)}
+.pay button:disabled{opacity:.45}
+.crx{margin:0;font-size:12px;line-height:1.35;color:var(--ink2);background:#EEF3FF;border-radius:10px;padding:7px 9px}
+.land .lb .btn{min-height:44px}
+@media (min-width:900px){
+  #movebar.k-land{left:auto;right:16px;top:calc(var(--bar-h) + 76px);bottom:auto;width:340px;margin:0;max-height:calc(100vh - var(--bar-h) - var(--tab-h) - 100px);padding:16px;animation:panelIn .3s cubic-bezier(.2,.9,.2,1)}
+  @keyframes panelIn{from{transform:translateX(30px);opacity:0}}
+  .land{grid-template-columns:1fr}
+  .land .lc{width:210px;justify-self:center}
+  .land .lc .hc{--w:210px}
+  .land .lr{padding-right:0}
+  .land .lh{text-align:center}
+  .land .linfo{text-align:center}
+}
+/* monuments lisibles quand on dézoome */
+.mmark{font-size:13px;padding:3px 11px 3px 3px}
+.mmark.far{font-size:12px;padding:2px 9px 2px 2px;border-width:2px}
+.mmark.far i{width:20px;height:20px}
+/* arrondissements écrits plus gros */
+.amark b{font-size:17px;padding:7px 11px;border-radius:11px}
+.amark span{font-size:12px}

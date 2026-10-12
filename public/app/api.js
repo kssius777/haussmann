@@ -8,6 +8,7 @@ const ST = {
   mine: new Map(),                      // card -> [k...]
   mineParts: new Map(),                 // card -> n
   mort: new Map(),                      // "card:k" -> {a, t} hypothéqués (k=-1 parts)
+  loan: new Map(),                      // card -> reste à rembourser du crédit immobilier
   fx: [],
   own: new Map(),                       // card -> {owners:[], n}
   sale: new Set(),                      // cards with a listing
@@ -109,14 +110,17 @@ function setState(s) { if (s) { ST.state = s; ST.stAt = performance.now(); } ret
 const P = () => ST.state?.profile;
 function liveCash() {
   const s = ST.state; if (!s?.profile) return 0;
-  return s.profile.cash + (s.rate || 0) * (performance.now() - ST.stAt) / 864e5;
+  return s.profile.cash + netRate() * (performance.now() - ST.stAt) / 864e5;
+}
+// loyers qui arrivent vraiment dans la trésorerie (après la part qui rembourse les crédits)
+function netRate() { const s = ST.state; return Math.max(0, (s?.rate || 0) - (s?.loan_rate || 0));
 }
 async function refreshState() { return setState(await rpc("state")); }
 async function refreshHold() {
   const h = await rpc("my_holdings");
-  ST.mine = new Map(); ST.mineParts = new Map(); ST.mort = new Map();
-  for (const [c, k, m, t] of h.lots) { if (!ST.mine.has(c)) ST.mine.set(c, []); ST.mine.get(c).push(k); if (m) ST.mort.set(c + ":" + k, { a: +m, t }); }
-  for (const [c, n, m, t] of h.parts) { ST.mineParts.set(c, n); if (m) ST.mort.set(c + ":-1", { a: +m, t }); }
+  ST.mine = new Map(); ST.mineParts = new Map(); ST.mort = new Map(); ST.loan = new Map();
+  for (const [c, k, m, t, ln] of h.lots) { if (!ST.mine.has(c)) ST.mine.set(c, []); ST.mine.get(c).push(k); if (m) ST.mort.set(c + ":" + k, { a: +m, t }); if (ln) ST.loan.set(c, (ST.loan.get(c) || 0) + +ln); }
+  for (const [c, n, m, t, ln] of h.parts) { ST.mineParts.set(c, n); if (m) ST.mort.set(c + ":-1", { a: +m, t }); if (ln) ST.loan.set(c, (ST.loan.get(c) || 0) + +ln); }
   for (const ks of ST.mine.values()) ks.sort((a, b) => a - b);
   ST.fx = h.fx || [];
   await ensureCards([...ST.mine.keys(), ...ST.mineParts.keys()]);

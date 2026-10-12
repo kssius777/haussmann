@@ -55,7 +55,7 @@ document.addEventListener("click", e => {
 function renderWallet() {
   const s = ST.state; if (!s?.profile) return;
   $("#cash").textContent = fmtE(liveCash());
-  $("#rate").textContent = s.rate ? `+${fmtE(s.rate)}/j` : "";
+  $("#rate").textContent = netRate() ? `+${fmtE(netRate())}/j` : "";
   const pr = PARTIES[s.profile.party]; const av = $("#avatar");
   av.textContent = (s.profile.pseudo || "?")[0].toUpperCase(); av.style.background = pr ? pr.c : "#94A3B8";
   const n = packsReady(); const b = $("#packbadge"); b.hidden = !n; b.textContent = n;

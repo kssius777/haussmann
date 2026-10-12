@@ -6,7 +6,7 @@ let map = null, mapReady = false, mode = "all", sel = null;
 const hideSet = new Set(), lastState = new Map(); let painted = new Set();
 // Palette « Paris » : pierre de taille et toits en zinc
 const MC = { mine: "#0EA5A0", mineB: "#8FDDD6", theirs: "#5E6B7D", theirsB: "#CBD3DD", sale: "#F59E0B", saleB: "#F9D58F",
-  sel: "#0F1B2D", selB: "#7DD3FC", mute: "#EEEAE3", muteR: "#DAD5CC", stone: "#F2E7D3", zinc: "#7F90A2" };
+  sel: "#0F1B2D", selB: "#7DD3FC", mute: "#EEEAE3", muteR: "#DAD5CC", stone: "#F3DFBC", zinc: "#6D83A8" };
 
 function geoArr(i) {
   const A = ARR[i], feats = []; const ih = FIELDS.indexOf("h"), ir = FIELDS.indexOf("r");
@@ -100,7 +100,7 @@ function buildMap(base) {
     return { type: "Feature", id: m.g, properties: {}, geometry: { type: "Polygon", coordinates: [pts] } }; }) };
   const ev = ST.state?.event;
   map = new maplibregl.Map({
-    container: "map", attributionControl: false, center: [2.3440, 48.8566], zoom: 14.2, pitch: 55, bearing: -20, maxPitch: 75, minZoom: 10.8,
+    container: "map", attributionControl: false, center: [2.3440, 48.8566], zoom: 14.2, pitch: 55, bearing: 0, maxPitch: 75, minZoom: 10.8,
     maxBounds: [[2.10, 48.74], [2.60, 48.98]], fadeDuration: 0, dragRotate: true, touchPitch: true, pitchWithRotate: true,
     style: { version: 8,
       light: { anchor: "viewport", color: "#FFF6E8", intensity: .45, position: [1.15, 210, 40] },
@@ -109,8 +109,8 @@ function buildMap(base) {
       layers: [
         { id: "bg", type: "background", paint: { "background-color": "#E7E2D8" } },
         { id: "arrfill", type: "fill", source: "arr", paint: { "fill-color": partyFill(), "fill-opacity": ["interpolate", ["linear"], ["zoom"], 11, .5, 13.5, .28, 15.5, .06] } },
-        { id: "parks", type: "fill", source: "parks", paint: { "fill-color": "#AED79B", "fill-opacity": .95 } },
-        { id: "water", type: "fill", source: "water", paint: { "fill-color": "#6FB3E0" } },
+        { id: "parks", type: "fill", source: "parks", paint: { "fill-color": "#9BD67C", "fill-opacity": .95 } },
+        { id: "water", type: "fill", source: "water", paint: { "fill-color": "#55A7EA" } },
         { id: "major-case", type: "line", source: "major", paint: { "line-color": "#D6CFC2", "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "k"], 3, 1.6, .6], 18, ["match", ["get", "k"], 3, 34, 20]] } },
         { id: "major", type: "line", source: "major", paint: { "line-color": "#FFFFFF", "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "k"], 3, 1.2, .4], 18, ["match", ["get", "k"], 3, 30, 17]] } },
         { id: "mfill", type: "fill", source: "mfill", paint: { "fill-color": "#C9921A", "fill-opacity": ["interpolate", ["linear"], ["zoom"], 12, .2, 16, .06] } },
@@ -133,6 +133,8 @@ function buildMap(base) {
     });
     buildMonMarkers();
     map.on("zoom", renderMarks); map.on("moveend", renderTags);
+    // la boussole n'apparaît que si la carte a été tournée ; elle remet le nord en haut
+    map.on("rotate", () => { const b = map.getBearing(); $("#t-north").hidden = Math.abs(b) < 2; $("#needle").style.transform = `rotate(${-b}deg)`; });
     ARR.forEach((A, i) => { if (A?.cards) addArrToMap(i); });   // arrondissements chargés avant la carte (ex. celui du pion)
     updateArrFill(); applyMode(); paintAll(); initPawnLayers();
     loadAllProgressive();
@@ -156,7 +158,7 @@ function renderMarks() {
     const s = document.getElementById("am" + i); if (s) s.innerHTML = m ? `${emblemSVG(m.party, 15)}${esc(m.pseudo)}` : "Siège libre";
   });
   for (const m of monMarks) {
-    const show = z >= (m.r === "M" ? 13.2 : 16.3); if (show && !m.on) { m.mk.addTo(map); m.on = true; } else if (!show && m.on) { m.mk.remove(); m.on = false; }
+    const show = z >= (m.r === "M" ? 11.4 : 15.6); m.el.classList.toggle("far", z < 14); if (show && !m.on) { m.mk.addTo(map); m.on = true; } else if (!show && m.on) { m.mk.remove(); m.on = false; }
     if (show && !m.ph) { const c = card(m.g); if (c) { m.ph = true; if (c.ph) m.el.querySelector("i").setAttribute("style", phStyle(c)); } }
   }
 }
@@ -209,7 +211,7 @@ function showOnMap(g) { go("map"); setTimeout(() => { flyTo(g); previewBuilding(
 
 async function previewBuilding(g) {
   await ensureCards([g]); const c = card(g); if (!c) return; sel = g; paintAll(); closeSearch();
-  if (!moving && panelKind !== "" && panelKind !== "land") setMovebar("");
+  if (!moving && panelKind !== "") setMovebar("");
   const ks = ST.mine.get(g), np = ST.mineParts.get(g); const o = ST.own.get(g);
   const isP = c.lk === "p"; const taken = isP ? (o?.parts || 0) : (o?.n || 0); const free = c.lots - taken;
   const mine = ks ? itemLabel(c, { t: "own", ks, n: 0 }) : np ? itemLabel(c, { t: "own", ks: [], n: np }) : null;
@@ -244,9 +246,8 @@ function initMapUI() {
     $$("#filter button").forEach(x => x.setAttribute("aria-selected", x === b)); hidePreview(); applyMode();
     if (mode === "mine") { const hs = holdings(); if (hs.length) { const pts = hs.map(h => centerOf(h.g)); const lo = pts.map(p => p[0]), la = pts.map(p => p[1]); map.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], { padding: 90, maxZoom: 15.5, pitch: 45, duration: 1100 }); } else toast("Vous n'avez encore aucun bien : ouvrez un booster !"); }
   });
-  $("#t-home").addEventListener("click", () => map.flyTo({ center: [2.3420, 48.8580], zoom: 11.9, pitch: 30, bearing: -14, duration: 1200 }));
+  $("#t-home").addEventListener("click", () => map.flyTo({ center: [2.3420, 48.8580], zoom: 11.9, pitch: 30, bearing: 0, duration: 1200 }));
   $("#t-north").addEventListener("click", () => map.easeTo({ bearing: 0, duration: 600 }));
-  $("#t-tilt").addEventListener("click", () => map.easeTo({ pitch: map.getPitch() > 20 ? 0 : 58, duration: 700 }));
   $("#t-search").addEventListener("click", e => { e.stopPropagation(); const s = $("#search"); s.hidden = !s.hidden; if (!s.hidden) $("#q").focus(); });
   document.addEventListener("pointerdown", e => { if (!$("#search").hidden && !e.target.closest("#search,#t-search")) closeSearch(); });
   $("#q").addEventListener("input", () => {

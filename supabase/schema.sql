@@ -55,6 +55,7 @@ create table if not exists lots (
   at      timestamptz not null default now(),
   primary key (card, k)
 );
+alter table lots add column if not exists loan bigint;     -- crédit immobilier : reste à rembourser
 create index if not exists lots_owner on lots(owner);
 
 -- Parts de monuments
@@ -66,6 +67,7 @@ create table if not exists parts (
   mort_at timestamptz,
   primary key (card, owner)
 );
+alter table parts add column if not exists loan bigint;    -- crédit immobilier : reste à rembourser
 create index if not exists parts_owner on parts(owner);
 
 -- Valeur détenue par joueur et par arrondissement (sert à élire les maires)
@@ -175,7 +177,7 @@ end $$;
 -- =====================================================================
 create or replace function cfg() returns jsonb language sql immutable as $$ select '{
   "start":1000000, "welcome":5, "pack":150000, "freeH":24,
-  "fee":0.05, "mortRate":0.5, "mortDaily":0.005,
+  "fee":0.05, "mortRate":0.5, "mortDaily":0.005, "creditDown":0.3, "creditShare":0.5, "creditMax":3,
   "floorBonus":1.25, "titleBonus":1.6, "gardien":1.2, "cityShare":0.01,
   "tax":0.08
 }'::jsonb $$;
@@ -343,7 +345,18 @@ begin
   end loop;
   w := _week();
   if w.party is not null and w.party = pr.party then net := net + w.bonus * secs / 86400; end if;
-  update profiles set cash = cash + floor(net)::bigint, rent_at = now() where id=p;
+  -- crédit immobilier : la moitié du loyer de base de chaque bien à crédit part à la banque, jusqu'au remboursement
+  with r as (select l.card, l.k, least(l.loan, floor(c.rent * (cfg()->>'creditShare')::float8 * secs / 86400))::bigint amt
+             from lots l join cards c on c.id = l.card where l.owner = p and l.loan > 0 and l.mort is null),
+       u1 as (update lots set loan = nullif(lots.loan - r.amt, 0) from r where lots.card = r.card and lots.k = r.k returning r.amt)
+  select coalesce(sum(amt), 0) into t from u1;
+  net := net - t;
+  with r as (select x.card, least(x.loan, floor(c.rent * x.n * (cfg()->>'creditShare')::float8 * secs / 86400))::bigint amt
+             from parts x join cards c on c.id = x.card where x.owner = p and x.loan > 0 and x.mort is null),
+       u2 as (update parts set loan = nullif(parts.loan - r.amt, 0) from r where parts.card = r.card and parts.owner = p returning r.amt)
+  select coalesce(sum(amt), 0) into t from u2;
+  net := net - t;
+  update profiles set cash = greatest(0, cash + floor(net)::bigint), rent_at = now() where id=p;
 end $$;
 
 -- =====================================================================
@@ -426,23 +439,29 @@ create or replace function _square(u uuid, t int) returns jsonb language sql sta
     'mine', (select count(*) from lots where card = t and owner = u) + coalesce((select sum(n) from parts where card = t and owner = u), 0))
   from cards c where c.id = t $$;
 
--- Le pion marche tout seul : il garde à peu près sa direction et tourne au hasard aux carrefours.
+-- Le pion marche tout seul : il garde à peu près sa direction, s'éloigne de son point de départ
+-- (pour ne pas tourner en rond, par exemple autour de Notre-Dame) et s'arrête à au moins 60 m.
 create or replace function _walk(u uuid, start int, n int) returns int[] language plpgsql as $$
 #variable_conflict use_column
-declare cur int := start; path int[] := array[start]; hd float8; x0 int; y0 int; nx int; best record; i int;
+declare cur int := start; path int[] := array[start]; hd float8; x0 int; y0 int; sx int; sy int; best record; i int; d float8;
 begin
-  select coalesce(heading, random() * 2 * pi()) into hd from profiles where id = u;
-  for i in 1..n loop
+  select coalesce(heading, random() * 2 * pi()) + (random() - 0.5) * 1.2 into hd from profiles where id = u;
+  select cx, cy into sx, sy from cards where id = start;
+  for i in 1..n + 15 loop
     select cx, cy into x0, y0 from cards where id = cur;
-    select e.b node, atan2((c.cy - y0) * 1.10574, (c.cx - x0) * 0.7324) brg into best
+    select e.b node, atan2((c.cy - y0) * 1.10574, (c.cx - x0) * 0.7324) brg,
+           sqrt(power((c.cx - sx) * 0.7324, 2) + power((c.cy - sy) * 1.10574, 2)) dist into best
       from edges e join cards c on c.id = e.b
       where e.a = cur
-      order by (e.b = any(path)),                                                     -- pas de retour en arrière si possible
-               abs(mod((atan2((c.cy - y0) * 1.10574, (c.cx - x0) * 0.7324) - hd + 3 * pi())::numeric, (2 * pi())::numeric) - pi()) + random() * 0.6
+      order by (e.b = any(path)),                                                     -- jamais deux fois la même case si possible
+               abs(mod((atan2((c.cy - y0) * 1.10574, (c.cx - x0) * 0.7324) - hd + 3 * pi())::numeric, (2 * pi())::numeric) - pi())
+               - 0.012 * sqrt(power((c.cx - sx) * 0.7324, 2) + power((c.cy - sy) * 1.10574, 2))   -- s'éloigner du départ
+               + random() * 0.5
       limit 1;
     exit when best.node is null;
     hd := hd + 0.5 * (mod((best.brg - hd + 3 * pi())::numeric, (2 * pi())::numeric) - pi());
-    cur := best.node; path := path || cur;
+    cur := best.node; path := path || cur; d := best.dist;
+    exit when i >= n and d >= 60;
   end loop;
   update profiles set heading = hd where id = u;
   return path;
@@ -595,6 +614,10 @@ begin
     'price', price, 'week', row_to_json(w), 'event', row_to_json(ev),
     'value', coalesce((select sum(v) from arr_value where owner=u),0),
     'debt',  coalesce((select sum(mort) from lots where owner=u),0) + coalesce((select sum(mort) from parts where owner=u),0),
+    'loans', coalesce((select sum(loan) from lots where owner=u),0) + coalesce((select sum(loan) from parts where owner=u),0),
+    'credits', _credits(u),
+    'loan_rate', coalesce((select sum(c.rent) from lots l join cards c on c.id=l.card where l.owner=u and l.loan > 0 and l.mort is null),0) * (cfg()->>'creditShare')::float8
+               + coalesce((select sum(c.rent * x.n) from parts x join cards c on c.id=x.card where x.owner=u and x.loan > 0 and x.mort is null),0) * (cfg()->>'creditShare')::float8,
     'roll_in', case when pr.rolls >= (pawn_cfg()->>'maxRolls')::int then 0 else greatest(0, extract(epoch from (pr.rolls_at + ((pawn_cfg()->>'rollEveryMin') || ' minutes')::interval - now())))::int end,
     'now', now());
 end $$;
@@ -790,46 +813,69 @@ end $$;
 -- Banque, marché, hypothèque
 -- ---------------------------------------------------------------------
 -- Acheter un logement libre d'un immeuble où l'on possède déjà un lot (ou 1 part de plus)
-create or replace function bank_buy(p_card int, p_k int default null) returns json
+-- nombre de crédits en cours (un crédit = un immeuble acheté à crédit)
+create or replace function _credits(u uuid) returns int language sql stable as $$
+  select count(distinct card)::int from (select card from lots where owner=u and loan > 0 union select card from parts where owner=u and loan > 0) x $$;
+-- prix comptant ou apport ; renvoie le montant emprunté
+create or replace function _pay_or_borrow(u uuid, price bigint, credit boolean) returns bigint language plpgsql as $$
+declare have bigint; down bigint;
+begin
+  select p.cash into have from profiles p where id=u for update;
+  if not coalesce(credit, false) then
+    if have < price then raise exception 'Trésorerie insuffisante'; end if;
+    update profiles set cash = cash - price where id=u; return 0;
+  end if;
+  if _credits(u) >= (cfg()->>'creditMax')::int then raise exception 'Vous avez déjà % crédits en cours : remboursez-en un d''abord', (cfg()->>'creditMax')::int; end if;
+  down := ceil(price * (cfg()->>'creditDown')::numeric);
+  if have < down then raise exception 'Apport insuffisant : il faut % € (30 %% du prix)', down; end if;
+  update profiles set cash = cash - down where id=u;
+  return price - down;
+end $$;
+
+drop function if exists bank_buy(int,int);
+create or replace function bank_buy(p_card int, p_k int default null, p_credit boolean default false) returns json
 language plpgsql security definer set search_path = public as $$
 #variable_conflict use_column
--- Achat direct d'un logement libre (p_k null = le premier libre) ou d'une part de monument
-declare u uuid := _need_me(); c cards; sold int; vk int;
+-- Achat direct d'un logement libre (p_k null = le premier libre) ou d'une part de monument, comptant ou à crédit
+declare u uuid := _need_me(); c cards; sold int; vk int; loan bigint;
 begin
   perform _sync(u);
   select * into c from cards where id=p_card;
   if not found then raise exception 'Bien inconnu'; end if;
   perform 1 from profiles where id=u for update;
-  if (select cash from profiles where id=u) < c.v then raise exception 'Trésorerie insuffisante'; end if;
+  if not coalesce(p_credit, false) and (select cash from profiles where id=u) < c.v then raise exception 'Trésorerie insuffisante'; end if;
   perform _near_or_fail(u, c.id);
   if c.lk = 'p' then
     perform 1 from cards where id=c.id for update;
     select coalesce(sum(n),0) into sold from parts where card=c.id;
     if sold >= c.lots then raise exception 'Plus de parts disponibles'; end if;
-    insert into parts(card,owner,n) values (c.id,u,1) on conflict (card,owner) do update set n = parts.n + 1;
+    loan := _pay_or_borrow(u, c.v, p_credit);
+    insert into parts(card,owner,n,loan) values (c.id,u,1,nullif(loan,0)) on conflict (card,owner) do update set n = parts.n + 1, loan = nullif(coalesce(parts.loan,0) + excluded.loan, 0);
   else
     if p_k is null then
       select g into vk from generate_series(0, c.lots-1) g where not exists (select 1 from lots where card=c.id and k=g) order by g limit 1;
       if vk is null then raise exception 'Plus aucun logement libre dans cet immeuble'; end if;
     else vk := p_k; end if;
     if vk < 0 or vk >= c.lots then raise exception 'Lot inconnu'; end if;
-    insert into lots(card,k,owner) values (c.id,vk,u) on conflict do nothing;
+    if exists (select 1 from lots where card=c.id and k=vk) then raise exception 'Ce logement vient d''être pris'; end if;
+    loan := _pay_or_borrow(u, c.v, p_credit);
+    insert into lots(card,k,owner,loan) values (c.id,vk,u,nullif(loan,0)) on conflict do nothing;
     if not found then raise exception 'Ce logement vient d''être pris'; end if;
     if (select count(*) from lots where card=c.id and owner=u) = c.lots and c.lots > 1 then
       insert into news(kind, arr, card, actor) values ('title', c.arr, c.id, u);
     end if;
   end if;
-  update profiles set cash = cash - c.v where id=u;
   perform _add_value(u, c.arr, c.v);
   perform _refresh_mayors(array[c.arr::int]);
   return state();
 end $$;
 
 -- Acheter un immeuble entier d'un coup (s'il est entièrement libre)
-create or replace function buy_building(p_card int) returns json
+drop function if exists buy_building(int);
+create or replace function buy_building(p_card int, p_credit boolean default false) returns json
 language plpgsql security definer set search_path = public as $$
 #variable_conflict use_column
-declare u uuid := _need_me(); c cards; total bigint;
+declare u uuid := _need_me(); c cards; total bigint; loan bigint;
 begin
   perform _sync(u);
   select * into c from cards where id=p_card;
@@ -837,12 +883,12 @@ begin
   if exists (select 1 from lots where card=c.id) then raise exception 'Une partie de cet immeuble appartient déjà à quelqu''un'; end if;
   perform _near_or_fail(u, c.id);
   total := c.v * c.lots;
-  perform 1 from profiles where id=u for update;
-  if (select cash from profiles where id=u) < total then raise exception 'Trésorerie insuffisante'; end if;
+  loan := _pay_or_borrow(u, total, p_credit);
   begin
-    insert into lots(card,k,owner) select c.id, g, u from generate_series(0,c.lots-1) g;
+    -- le crédit est réparti sur les logements de l'immeuble
+    insert into lots(card,k,owner,loan) select c.id, g, u, nullif(floor(loan / c.lots) + case when g = 0 then loan - floor(loan / c.lots) * c.lots else 0 end, 0)
+      from generate_series(0,c.lots-1) g;
   exception when unique_violation then raise exception 'Un logement vient d''être pris, réessayez'; end;
-  update profiles set cash = cash - total where id=u;
   perform _add_value(u, c.arr, total);
   perform _refresh_mayors(array[c.arr::int]);
   if c.lots > 1 then insert into news(kind, arr, card, actor) values ('title', c.arr, c.id, u); end if;
@@ -857,12 +903,14 @@ begin
   select * into c from cards where id=p_card;
   if p_price is null or p_price <= 0 then raise exception 'Indiquez un prix'; end if;
   if c.lk = 'p' then
+    if exists (select 1 from parts where card=p_card and owner=u and loan > 0) then raise exception 'Remboursez d''abord le crédit de ce bien pour le vendre'; end if;
     select n into have from parts where card=p_card and owner=u and mort is null;
     select coalesce(sum(n),0) into listed from listings where card=p_card and seller=u;
     if coalesce(have,0) - listed < greatest(1,p_n) then raise exception 'Pas assez de parts disponibles'; end if;
     insert into listings(seller,card,k,n,price) values (u,p_card,null,greatest(1,p_n),p_price);
   else
     if not exists (select 1 from lots where card=p_card and k=p_k and owner=u and mort is null) then raise exception 'Ce logement n''est pas à vous ou est hypothéqué'; end if;
+    if exists (select 1 from lots where card=p_card and k=p_k and loan > 0) then raise exception 'Remboursez d''abord le crédit de ce logement pour le vendre'; end if;
     insert into listings(seller,card,k,n,price) values (u,p_card,p_k,1,p_price);
   end if;
   return state();
@@ -919,6 +967,7 @@ begin
   perform _sync(u);
   select * into c from cards where id=p_card;
   if p_k is null then
+    if exists (select 1 from parts where card=p_card and owner=u and loan > 0) then raise exception 'Ce bien est déjà à crédit : impossible de l''hypothéquer'; end if;
     select x.n into n from parts x where card=p_card and owner=u and mort is null;
     if n is null then raise exception 'Rien à hypothéquer'; end if;
     delete from listings where card=p_card and seller=u;
@@ -926,11 +975,29 @@ begin
     update parts set mort=a, mort_at=now() where card=p_card and owner=u;
   else
     a := floor(c.v*(cfg()->>'mortRate')::numeric);
+    if exists (select 1 from lots where card=p_card and k=p_k and loan > 0) then raise exception 'Ce logement est déjà à crédit : impossible de l''hypothéquer'; end if;
     update lots set mort=a, mort_at=now() where card=p_card and k=p_k and owner=u and mort is null;
     if not found then raise exception 'Rien à hypothéquer'; end if;
     delete from listings where card=p_card and k=p_k;
   end if;
   update profiles set cash = cash + a where id=u;
+  return state();
+end $$;
+
+-- Rembourser en avance le crédit d'un bien (tout l'immeuble d'un coup)
+create or replace function repay(p_card int) returns json
+language plpgsql security definer set search_path = public as $$
+#variable_conflict use_column
+declare u uuid := _need_me(); due bigint;
+begin
+  perform _sync(u);
+  select coalesce((select sum(loan) from lots where card=p_card and owner=u), 0) + coalesce((select sum(loan) from parts where card=p_card and owner=u), 0) into due;
+  if due <= 0 then raise exception 'Pas de crédit sur ce bien'; end if;
+  perform 1 from profiles where id=u for update;
+  if (select cash from profiles where id=u) < due then raise exception 'Trésorerie insuffisante : il faut %', due; end if;
+  update profiles set cash = cash - due where id=u;
+  update lots set loan = null where card=p_card and owner=u;
+  update parts set loan = null where card=p_card and owner=u;
   return state();
 end $$;
 
@@ -969,8 +1036,8 @@ $$;
 -- Tout ce que je possède
 create or replace function my_holdings() returns json language sql stable security definer set search_path = public as $$
   select json_build_object(
-    'lots',  coalesce((select json_agg(json_build_array(card, k, mort, mort_at)) from lots where owner = auth.uid()), '[]'),
-    'parts', coalesce((select json_agg(json_build_array(card, n, mort, mort_at)) from parts where owner = auth.uid()), '[]'),
+    'lots',  coalesce((select json_agg(json_build_array(card, k, mort, mort_at, loan)) from lots where owner = auth.uid()), '[]'),
+    'parts', coalesce((select json_agg(json_build_array(card, n, mort, mort_at, loan)) from parts where owner = auth.uid()), '[]'),
     'fx',    coalesce((select json_agg(row_to_json(f)) from fx f where owner = auth.uid() and until > now()), '[]'))
 $$;
 
@@ -1024,7 +1091,7 @@ $$;
 revoke all on all functions in schema public from public, anon, authenticated;
 alter default privileges in schema public revoke execute on functions from public, anon, authenticated;
 do $$ declare f text; begin
-  foreach f in array array['join_game(text,text)','set_party(text)','state()','open_booster(text)','bank_buy(int,int)','buy_building(int)','roll()','move(int)','teleport(int)',
+  foreach f in array array['join_game(text,text)','set_party(text)','state()','open_booster(text)','bank_buy(int,int,boolean)','buy_building(int,boolean)','repay(int)','roll()','teleport(int)',
     'list_item(int,int,int,bigint)','unlist(bigint)','buy_listing(bigint)','mortgage(int,int)','lift(int,int)',
     'map_state()','my_holdings()','building(int)','market()','feed()','leaderboard()','arr_info(int)'] loop
     execute format('grant execute on function %s to anon, authenticated', f);

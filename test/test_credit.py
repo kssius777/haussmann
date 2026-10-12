@@ -1,0 +1,41 @@
+import sys, uuid; sys.path.insert(0, 'test'); import db
+R = []
+def check(n, ok, info=""): R.append(ok); print(("PASS " if ok else "FAIL ") + n + (f"  · {info}" if info != "" else ""), flush=True)
+def err(f):
+    try: f(); return None
+    except Exception as e: return str(e).split("\n")[0]
+A = uuid.uuid4(); db.sql("insert into auth.users(id) values (%s)", str(A)); db.rpc(A, "join_game", p_pseudo="Credit" + str(A)[:4], p_party=None)
+cash = lambda: db.sql("select cash from profiles where id=%s", str(A))[0][0]
+free = lambda lo, hi: db.sql("select id, v from cards where lk='l' and lots between 2 and 6 and v between %s and %s and id not in (select card from lots) limit 1", lo, hi)[0]
+g, v = free(2_000_000, 3_000_000)
+db.sql("update profiles set cash=1000000, land=%s where id=%s", g, str(A))
+check("comptant impossible au-dessus de la trésorerie", "insuffisante" in (err(lambda: db.rpc(A, "bank_buy", p_card=g, p_k=None)) or ""))
+db.rpc(A, "bank_buy", p_card=g, p_k=None, p_credit=True)
+loan = db.sql("select loan from lots where card=%s and owner=%s", g, str(A))[0][0]
+check("achat à crédit : apport de 30 %, la banque prête le reste", abs(cash() - (1000000 - round(v * .3))) <= 1 and abs(loan - (v - round(v * .3))) <= 1, (cash(), loan))
+st = db.rpc(A, "state"); check("l'état indique les crédits en cours", st["credits"] == 1 and st["loans"] == loan and st["loan_rate"] > 0, (st["credits"], st["loans"], st["loan_rate"]))
+# un jour passe : la moitié du loyer de base rembourse
+rent = db.sql("select rent from cards where id=%s", g)[0][0]
+db.sql("update profiles set rent_at = now() - interval '1 day' where id=%s", str(A)); c0 = cash()
+db.rpc(A, "state"); loan2 = db.sql("select loan from lots where card=%s and owner=%s", g, str(A))[0][0]
+check("chaque jour, la moitié du loyer rembourse le crédit", abs((loan - loan2) - rent / 2) <= 2, (loan - loan2, rent / 2))
+check("l'autre moitié (et les bonus) arrive dans la trésorerie", rent / 2 * 0.95 <= cash() - c0 <= rent * 2, cash() - c0)
+check("impossible de vendre un bien à crédit", "Remboursez" in (err(lambda: db.rpc(A, "list_item", p_card=g, p_k=0, p_n=1, p_price=123)) or ""))
+check("impossible d'hypothéquer un bien à crédit", "crédit" in (err(lambda: db.rpc(A, "mortgage", p_card=g, p_k=0)) or ""))
+# 3 crédits max
+for i in range(2):
+    g2, v2 = free(200_000, 400_000); db.sql("update profiles set land=%s where id=%s", g2, str(A)); db.rpc(A, "bank_buy", p_card=g2, p_k=None, p_credit=True)
+g3, v3 = free(200_000, 400_000); db.sql("update profiles set land=%s where id=%s", g3, str(A))
+check("3 crédits en même temps au maximum", "3 crédits" in (err(lambda: db.rpc(A, "bank_buy", p_card=g3, p_k=None, p_credit=True)) or ""))
+# remboursement anticipé
+db.sql("update profiles set cash=cash+5000000 where id=%s", str(A)); c0 = cash()
+db.rpc(A, "repay", p_card=g)
+check("remboursement anticipé : le crédit disparaît", db.sql("select loan from lots where card=%s and owner=%s", g, str(A))[0][0] is None and abs((c0 - cash()) - loan2) <= rent, c0 - cash())
+db.rpc(A, "bank_buy", p_card=g3, p_k=None, p_credit=True); check("après remboursement, on peut reprendre un crédit", db.rpc(A, "state")["credits"] == 3)
+# immeuble entier à crédit
+gb = db.sql("select id, v*lots from cards where lk='l' and lots between 3 and 5 and v*lots < 4000000 and id not in (select card from lots) limit 1")[0]
+B = uuid.uuid4(); db.sql("insert into auth.users(id) values (%s)", str(B)); db.rpc(B, "join_game", p_pseudo="Bati" + str(B)[:4], p_party=None)
+db.sql("update profiles set cash=2000000, land=%s where id=%s", gb[0], str(B)); db.rpc(B, "buy_building", p_card=gb[0], p_credit=True)
+tl = db.sql("select sum(loan), count(*) from lots where card=%s and owner=%s", gb[0], str(B))[0]
+check("immeuble entier à crédit : crédit réparti sur les logements", abs(tl[0] - (gb[1] - round(gb[1] * .3))) <= 2, tl)
+print(f"\n{sum(R)}/{len(R)} OK")
