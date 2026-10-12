@@ -100,46 +100,45 @@ window.addMonuments=function(map,models){
     const halo=new T.Mesh(new T.RingGeometry(Math.max(m.L,m.W)*.62,Math.max(m.L,m.W)*.7,48),new T.MeshBasicMaterial({color:COL.pink,transparent:true,opacity:.28,side:T.DoubleSide})); halo.rotation.x=-Math.PI/2; halo.position.y=.3; g.add(halo);
     let ang=m.ang; if(m.m!=="sacrecoeur"&&Math.cos(ang)<0) ang+=Math.PI; g.position.set((m.lon-lon0)*kx,0,-(m.lat-lat0)*ky); g.rotation.y=ang; scene.add(g);
   }
-  // le joueur : un petit personnage (couleur de son parti) qui marche dans les rues, avec un anneau au sol
+  // le joueur : une montgolfière (née à Paris en 1783) aux couleurs de son parti, qui survole les toits ;
+  // au sol, un anneau qui pulse marque l'immeuble où elle est posée
   const pawn=new T.Group(); pawn.visible=false;
-  const guy=new T.Group(); pawn.add(guy);
-  const bodyMat=new T.MeshStandardMaterial({color:0x1C3FA8,roughness:.6,metalness:0,flatShading:true});
-  const skinMat=new T.MeshStandardMaterial({color:0xF3D2B0,roughness:.7,flatShading:true});
-  const darkMat=new T.MeshStandardMaterial({color:0x2B3140,roughness:.7,flatShading:true});
-  const whiteMat=new T.MeshStandardMaterial({color:0xFFFFFF,roughness:.7,flatShading:true});
-  const part=(geo,mat,x,y,z,parent)=>{ const m=new T.Mesh(geo,mat); m.position.set(x,y,z); (parent||guy).add(m); return m; };
-  // jambes (pivot en haut pour les balancer), buste, bras, tête
-  const legL=new T.Group(), legR=new T.Group(); legL.position.set(-2.2,9,0); legR.position.set(2.2,9,0); guy.add(legL,legR);
-  part(new T.CylinderGeometry(1.9,1.7,9,10),darkMat,0,-4.5,0,legL); part(new T.CylinderGeometry(1.9,1.7,9,10),darkMat,0,-4.5,0,legR);
-  part(new T.BoxGeometry(4,1.6,5.4),darkMat,0,-9,.8,legL); part(new T.BoxGeometry(4,1.6,5.4),darkMat,0,-9,.8,legR);
-  const torso=part(new T.CylinderGeometry(4.6,5.4,11,14),bodyMat,0,14.5,0);
-  part(new T.SphereGeometry(4.6,14,8,0,Math.PI*2,0,Math.PI/2),bodyMat,0,20,0);
-  const armL=new T.Group(), armR=new T.Group(); armL.position.set(-5.6,19.5,0); armR.position.set(5.6,19.5,0); guy.add(armL,armR);
-  part(new T.CylinderGeometry(1.5,1.3,9,10),bodyMat,0,-4.5,0,armL); part(new T.CylinderGeometry(1.5,1.3,9,10),bodyMat,0,-4.5,0,armR);
-  part(new T.SphereGeometry(1.6,10,8),skinMat,0,-9.5,0,armL); part(new T.SphereGeometry(1.6,10,8),skinMat,0,-9.5,0,armR);
-  const head=part(new T.SphereGeometry(5,16,12),skinMat,0,27.5,0);
-  part(new T.SphereGeometry(5.2,16,10,0,Math.PI*2,0,Math.PI*.46),darkMat,0,27.9,-.6);   // cheveux
-  part(new T.SphereGeometry(.7,8,6),darkMat,-1.8,28,4.6); part(new T.SphereGeometry(.7,8,6),darkMat,1.8,28,4.6);   // yeux (le devant = +z)
-  // au sol : disque d'ombre + anneau de la couleur du joueur qui pulse
+  const bal=new T.Group(); pawn.add(bal);
+  const SM=c=>new T.MeshStandardMaterial({color:c,roughness:.55,metalness:0,flatShading:false,side:T.DoubleSide});
+  const colMat=SM(0x1C3FA8), whiteMat=SM(0xFFFFFF), goldMat=new T.MeshStandardMaterial({color:0xF2C14E,roughness:.4,metalness:.3});
+  const wickerMat=new T.MeshStandardMaterial({color:0x9A6A3C,roughness:.9,flatShading:true}), ropeMat=new T.LineBasicMaterial({color:0x5B4630});
+  // enveloppe en forme de goutte, en 12 fuseaux alternés couleur / blanc
+  const prof=[]; for(let i=0;i<=24;i++){ const t=i/24, a=-Math.PI/2+t*Math.PI; const r=t<.32? 4+ (14-4)*Math.sin(t/.32*Math.PI/2): 14*Math.cos((t-.32)/.68*Math.PI/2*.98)+.01; prof.push(new T.Vector2(Math.max(.01,r), (t<.32? t/.32*16 : 16+Math.sin((t-.32)/.68*Math.PI/2)*15))); }
+  const ENV_Y=46, N=12;
+  for(let i=0;i<N;i++){ const m=new T.Mesh(new T.LatheGeometry(prof,6,i*Math.PI*2/N,Math.PI*2/N),i%2?whiteMat:colMat); m.position.y=ENV_Y; bal.add(m); }
+  const band=new T.Mesh(new T.TorusGeometry(10.6,.55,8,40),goldMat); band.rotation.x=Math.PI/2; band.position.y=ENV_Y+6; bal.add(band);
+  const top=new T.Mesh(new T.SphereGeometry(2.2,12,8),goldMat); top.position.y=ENV_Y+31; bal.add(top);
+  // nacelle et cordes
+  const basket=new T.Mesh(new T.BoxGeometry(6,4.5,6),wickerMat); basket.position.y=ENV_Y-9.5; bal.add(basket);
+  const rim=new T.Mesh(new T.BoxGeometry(6.6,.8,6.6),new T.MeshStandardMaterial({color:0x6B4527,roughness:.9})); rim.position.y=ENV_Y-7.1; bal.add(rim);
+  for(const [x,z] of [[3,3],[3,-3],[-3,3],[-3,-3]]){ const g=new T.BufferGeometry().setFromPoints([new T.Vector3(x,ENV_Y-7,z),new T.Vector3(x*1.3,ENV_Y+.5,z*1.3)]); bal.add(new T.Line(g,ropeMat)); }
+  const flame=new T.Mesh(new T.ConeGeometry(1,3,8),new T.MeshBasicMaterial({color:0xFFB020,transparent:true,opacity:.9})); flame.position.y=ENV_Y-4.5; bal.add(flame);
+  // fil vertical discret jusqu'au sol + ombre + anneau
+  const tether=new T.Mesh(new T.CylinderGeometry(.18,.18,ENV_Y-12,6),new T.MeshBasicMaterial({color:0x0F1B2D,transparent:true,opacity:.25,depthWrite:false})); tether.position.y=(ENV_Y-12)/2; pawn.add(tether);
   const ringMat=new T.MeshBasicMaterial({color:0x1C3FA8,transparent:true,opacity:.85,depthWrite:false,side:T.DoubleSide});
   const ring=new T.Mesh(new T.RingGeometry(9,11.5,48),ringMat); ring.rotation.x=-Math.PI/2; ring.position.y=.8; pawn.add(ring);
   const ring2=new T.Mesh(new T.RingGeometry(9,10.5,48),ringMat.clone()); ring2.rotation.x=-Math.PI/2; ring2.position.y=.9; pawn.add(ring2);
-  const disc=new T.Mesh(new T.CircleGeometry(9,40),new T.MeshBasicMaterial({color:0x0F1B2D,transparent:true,opacity:.22,depthWrite:false})); disc.rotation.x=-Math.PI/2; disc.position.y=.7; pawn.add(disc);
+  const disc=new T.Mesh(new T.CircleGeometry(9,40),new T.MeshBasicMaterial({color:0x0F1B2D,transparent:true,opacity:.2,depthWrite:false})); disc.rotation.x=-Math.PI/2; disc.position.y=.7; pawn.add(disc);
   scene.add(pawn);
-  let lastPos=null, walkUntil=0;
+  let lastPos=null, moveUntil=0, vx=0, vz=0;
   window.pawn3d={
     set(lng,lat){ const x=(lng-lon0)*kx, z=-(lat-lat0)*ky;
-      if(lastPos){ const dx=x-lastPos[0], dz=z-lastPos[1]; if(Math.hypot(dx,dz)>.05){ guy.rotation.y=Math.atan2(dx,dz); walkUntil=performance.now()+180; } }
+      if(lastPos){ const dx=x-lastPos[0], dz=z-lastPos[1]; if(Math.hypot(dx,dz)>.05){ vx=dx; vz=dz; moveUntil=performance.now()+220; } }
       lastPos=[x,z]; pawn.position.set(x,0,z); pawn.visible=true; map.triggerRepaint(); },
-    color(hex){ bodyMat.color.set(hex); ringMat.color.set(hex); ring2.material.color.set(hex); map.triggerRepaint(); },
+    color(hex){ colMat.color.set(hex); ringMat.color.set(hex); ring2.material.color.set(hex); map.triggerRepaint(); },
     hide(){ pawn.visible=false; map.triggerRepaint(); },
-    k(z){ return 1.9*Math.max(1,Math.pow(2,(16.2-z)*.8)); },
-    H:34
+    k(z){ return Math.max(1,Math.pow(2,(16.2-z)*.8)); },
+    H:80
   };
-  const animPawn=()=>{ const tt=performance.now()/1000, walking=performance.now()<walkUntil;
-    const sw=walking?Math.sin(tt*14)*.75:0; legL.rotation.x=sw; legR.rotation.x=-sw; armL.rotation.x=-sw*.8; armR.rotation.x=sw*.8;
-    armL.rotation.z=.12; armR.rotation.z=-.12;
-    guy.position.y=walking?Math.abs(Math.sin(tt*14))*1.2:Math.sin(tt*2)*.4;
+  const animPawn=()=>{ const tt=performance.now()/1000, mv=performance.now()<moveUntil;
+    bal.position.y=Math.sin(tt*1.6)*1.4; bal.rotation.y=tt*.25;
+    const L=Math.hypot(vx,vz)||1, tilt=mv?.12:0; bal.rotation.x=tilt*(vz/L); bal.rotation.z=-tilt*(vx/L);
+    flame.scale.y=.8+.4*Math.abs(Math.sin(tt*9)); flame.material.opacity=mv?.95:.6;
     const pz=1+1.1*((tt*.7)%1); ring2.scale.set(pz,pz,1); ring2.material.opacity=.85*(1-((tt*.7)%1)); };
   let renderer=null;
   const layer={id:"monuments",type:"custom",renderingMode:"3d",

@@ -48,5 +48,8 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
 - Sons (`sfx()` dans core.js, sans fichier audio) : coupés par défaut, activables dans le profil (localStorage `hm_sound`).
 - Achat à la banque : le crédit est proposé en premier (c'est ce que tout le monde choisit) ; « payer comptant » en lien dessous.
 - Cartes : image = maquette 3D de la vraie forme de l'immeuble (`maquetteSVG` dans cards.js), couleurs selon l'époque.
-- Le joueur est un petit personnage 3D (`models.js`, `pawn3d`) couleur de son parti, qui marche sur le trajet du dé. Barre du bas : Téléport (avec confirmation) · Lancer · Boosters (mini paquet, badge) — il n'y a plus d'onglet Boosters.
+- Le joueur est une montgolfière 3D (`models.js`, `pawn3d`) aux couleurs de son parti, qui survole les toits sur le trajet du dé. Barre du bas : Téléport (avec confirmation) · Lancer · Boosters (mini paquet, badge) — il n'y a plus d'onglet Boosters.
 - Sur téléphone : pas de bandeau des maires sur la carte (il est dans l'onglet Paris) ; quand on tombe sur une case, la carte s'affiche en grand.
+- Thème : crème « Paris », polices Plus Jakarta Sans (texte) + Fraunces (titres). Cartes : cadre, ciel, bandeau étoilé et reflets selon la rareté ; époque en étiquette sur la maquette.
+- Case : plan des logements (à vous / à d'autres / libres), choix « À crédit / Comptant » avec le loyer de chaque option.
+- Patrimoine : « Où sont vos biens » (barres par arrondissement, clic = filtre), collection triable et paginée.

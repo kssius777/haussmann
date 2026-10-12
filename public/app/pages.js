@@ -62,26 +62,29 @@ function renderWallet() {
 }
 
 // ---------------- PATRIMOINE ----------------
-let assetF = "all", assetView = "arr";
+let assetF = "all", assetArr = 0, assetSort = "v", assetN = 30, distAll = false;
 function worthNow() { const s = ST.state; return liveCash() + (+s.value || 0) - (+s.debt || 0) - (+s.loans || 0); }
 function logWorth() {
   try { const d = new Date().toISOString().slice(0, 10); const h = JSON.parse(localStorage.getItem("hm_hist") || "{}"); h[d] = Math.round(worthNow());
     const keys = Object.keys(h).sort().slice(-30); const o = {}; keys.forEach(k => o[k] = h[k]); localStorage.setItem("hm_hist", JSON.stringify(o)); return o; } catch (e) { return {}; }
 }
-function sparkSVG(vals) {
-  if (vals.length < 2) return "";
-  const W = 320, H = 70, mn = Math.min(...vals), mx = Math.max(...vals), sp = mx - mn || 1;
-  const pts = vals.map((v, i) => [i * W / (vals.length - 1), H - 6 - (v - mn) / sp * (H - 12)]);
-  const d = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join("");
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${d}L${W} ${H}L0 ${H}Z" fill="rgba(14,165,160,.12)"/><path d="${d}" fill="none" stroke="#0EA5A0" stroke-width="2.5" stroke-linejoin="round"/></svg>`;
-}
 async function renderAssets() {
   const s = ST.state; if (!s?.profile) return;
-  const hs = holdings().sort((a, b) => b.c.v * unitsOf(b) - a.c.v * unitsOf(a));
+  const val = h => h.c.v * unitsOf(h);
+  const hs = holdings();
   const counts = { C: 0, U: 0, R: 0, L: 0, M: 0 }; for (const h of hs) counts[h.c.r]++;
   const onLoan = h => ST.loan.has(h.g), mortd = h => h.ks.some(k => ST.mort.has(h.g + ":" + k)) || ST.mort.has(h.g + ":-1");
   const nLoan = hs.filter(onLoan).length, nMort = hs.filter(mortd).length;
-  const list = assetF === "all" ? hs : assetF === "loan" ? hs.filter(onLoan) : assetF === "mort" ? hs.filter(mortd) : hs.filter(h => h.c.r === assetF);
+  // répartition par arrondissement : une ligne par arrondissement, barre proportionnelle à la valeur
+  const by = new Map(); for (const h of hs) { const a = h.c.arr; const o = by.get(a) || { a, v: 0, rent: 0, n: 0 }; o.v += val(h); o.rent += baseRent(h); o.n++; by.set(a, o); }
+  const dist = [...by.values()].sort((x, y) => y.v - x.v), vmax = dist[0]?.v || 1, vtot = dist.reduce((t, d) => t + d.v, 0) || 1;
+  const distRow = d => { const m = ST.mayors[d.a - 1], pc = m ? PARTIES[m.party]?.c : null;
+    return `<button class="drow" data-aa="${d.a}" aria-pressed="${assetArr === d.a}" style="--pc:${pc || "#2D55C8"}"><b>${ord(d.a)}</b><span class="bar"><small>${m?.mayor === ME ? "👑 Vous êtes le maire · " : ""}${d.n} bien${d.n > 1 ? "s" : ""} · ${Math.round(d.v / vtot * 100)} %</small><i style="width:${Math.max(3, d.v / vmax * 100)}%"></i></span><span class="v num"><b>${fmtE(d.v)}</b><small>+${fmtE(d.rent)}/j</small></span></button>`; };
+  // la collection : filtres, tri, et pagination pour rester lisible avec des centaines de cartes
+  let list = assetF === "all" ? hs : assetF === "loan" ? hs.filter(onLoan) : assetF === "mort" ? hs.filter(mortd) : hs.filter(h => h.c.r === assetF);
+  if (assetArr) list = list.filter(h => h.c.arr === assetArr);
+  const SORT = { v: (a, b) => val(b) - val(a), rent: (a, b) => baseRent(b) - baseRent(a), r: (a, b) => ORDER.indexOf(a.c.r) - ORDER.indexOf(b.c.r) || val(b) - val(a), arr: (a, b) => a.c.arr - b.c.arr || val(b) - val(a) };
+  list = list.slice().sort(SORT[assetSort] || SORT.v);
   const hist = logWorth(); const hv = Object.values(hist);
   const nLots = hs.reduce((a, h) => a + h.ks.length, 0);
   const rank = ST.board ? ST.board.findIndex(x => x.id === ME) + 1 : 0;
@@ -97,23 +100,29 @@ async function renderAssets() {
       <div class="kpi"><span>Valeur des biens</span><b class="num">${fmtE(+s.value || 0)}</b><small class="muted">${nLots} logement${nLots > 1 ? "s" : ""}</small></div>
       <div class="kpi ${loans || debt ? "warn" : ""}"><span>Dettes</span><b class="num">${fmtE(loans + debt)}</b><small class="muted">${loans ? `crédits ${s.credits || 0}/3` : "aucun crédit"}${debt ? ` · hypothèques ${fmtE(debt)}` : ""}</small></div>
     </div>
-    <div class="colh"><h2 class="h2">Ma collection</h2><div class="seg mini" role="tablist"><button data-av="arr" aria-selected="${assetView === "arr"}">Par arrondissement</button><button data-av="all" aria-selected="${assetView === "all"}">Toutes les cartes</button></div></div>
-    <div class="chips"><button class="chip plain" data-af="all" aria-pressed="${assetF === "all"}">Tout · ${hs.length}</button>
-      ${ORDER.split("").reverse().map(r => `<button class="chip" data-af="${r}" aria-pressed="${assetF === r}">${rarSq(r)}${counts[r]}</button>`).join("")}
+    ${dist.length ? `<h2 class="h2">Où sont vos biens</h2><div class="dist">${(distAll ? dist : dist.slice(0, 5)).map(distRow).join("")}${dist.length > 5 ? `<button class="dmore" data-dall>${distAll ? "Réduire" : `Voir les ${dist.length} arrondissements`}</button>` : ""}</div>` : ""}
+    <h2 class="h2">Ma collection <span class="muted" style="font:700 14px var(--f)">${hs.length} carte${hs.length > 1 ? "s" : ""}</span></h2>
+    <div class="chips"><button class="chip plain" data-af="all" aria-pressed="${assetF === "all"}">Tout</button>
+      ${ORDER.split("").reverse().map(r => counts[r] ? `<button class="chip" data-af="${r}" aria-pressed="${assetF === r}">${rarSq(r)}${counts[r]}</button>` : "").join("")}
       ${nLoan ? `<button class="chip plain" data-af="loan" aria-pressed="${assetF === "loan"}">🏦 À crédit · ${nLoan}</button>` : ""}
       ${nMort ? `<button class="chip plain" data-af="mort" aria-pressed="${assetF === "mort"}">🔒 Hypothéqués · ${nMort}</button>` : ""}</div>
-    ${assetF === "loan" ? `<div class="crx" style="margin:10px 0 0">Chaque bien à crédit se rembourse tout seul avec 70 % de son loyer. Vous pouvez aussi le rembourser en avance depuis sa fiche.</div>` : ""}
+    <div class="ctools">${assetArr ? `<span class="afilter">${ord(assetArr)} arrondissement<button data-aa="0" aria-label="Retirer le filtre">×</button></span>` : `<span class="muted" style="font-size:13px;font-weight:700">${list.length} affichée${list.length > 1 ? "s" : ""}</span>`}
+      <select id="asort" aria-label="Trier">${[["v", "Les plus chères"], ["rent", "Les meilleurs loyers"], ["r", "Les plus rares"], ["arr", "Par arrondissement"]].map(([k, l]) => `<option value="${k}" ${assetSort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+    ${assetF === "loan" ? `<div class="crx" style="margin:0 0 10px">Chaque bien à crédit se rembourse tout seul avec 70 % de son loyer. Vous pouvez aussi le rembourser en avance depuis sa fiche.</div>` : ""}
     ${!hs.length ? `<div class="empty">Vous n'avez encore aucun bien.<br><br><button class="btn" data-go="booster">Ouvrir un booster</button></div>`
       : !list.length ? `<div class="empty">Rien dans cette catégorie.</div>`
-      : assetView === "all" ? `<div class="grid-cards">${list.map(cardBtn).join("")}</div>`
-      : (() => { const by = new Map(); for (const h of list) { const a = h.c.arr; if (!by.has(a)) by.set(a, []); by.get(a).push(h); }
-          return [...by.entries()].sort((x, y) => x[0] - y[0]).map(([arr, L]) => { const m = ST.mayors[arr - 1], pc = m ? PARTIES[m.party] : null, v = L.reduce((t, h) => t + h.c.v * unitsOf(h), 0), rent = L.reduce((t, h) => t + baseRent(h), 0), n = L.reduce((t, h) => t + h.ks.length + (h.n ? 1 : 0), 0);
-            return `<section class="agrp"><button class="agh" data-push="arr" data-arg="${arr - 1}" style="--pc:${pc ? pc.c : "#CBD5E1"}"><b>${ord(arr)}</b><span><strong>${ord(arr)} arrondissement</strong><small>${m?.mayor === ME ? "👑 Vous êtes le maire" : m ? `Maire : ${esc(m.pseudo)}` : "Siège libre"}</small></span><span class="agv num"><b>${fmtE(v)}</b><small>${n} bien${n > 1 ? "s" : ""} · +${fmtE(rent)}/j</small></span></button><div class="grid-cards">${L.map(cardBtn).join("")}</div></section>`; }).join(""); })()}
+      : `<div class="grid-cards">${list.slice(0, assetN).map(cardBtn).join("")}</div>${list.length > assetN ? `<button class="btn light gmore" data-gmore>Afficher plus (${list.length - assetN})</button>` : ""}`}
   </div>`;
-  function cardBtn(h) { return `<button data-push="b" data-arg="${h.g}" class="cw">${cardHTML(h.c, { w: "100%", item: { t: "own", ks: h.ks, n: h.n } })}${onLoan(h) ? `<span class="tagc loan">🏦 crédit ${fmtE(ST.loan.get(h.g))}</span>` : mortd(h) ? `<span class="tagc mort">🔒 hypothéqué</span>` : ""}</button>`; }
+  function cardBtn(h) { return `<button data-push="b" data-arg="${h.g}" class="cw">${cardHTML(h.c, { w: "100%", item: { t: "own", ks: h.ks, n: h.n } })}${onLoan(h) ? `<span class="tagc loan">🏦 crédit</span>` : mortd(h) ? `<span class="tagc mort">🔒 hypothéqué</span>` : ""}</button>`; }
   if (!ST.board) rpc("leaderboard").then(b => { ST.board = b; if (cur() === "assets") renderAssets(); }).catch(() => { });
 }
-$("#p-assets").addEventListener("click", e => { const f = e.target.closest("[data-af]"); if (f) { assetF = f.dataset.af; renderAssets(); } const v = e.target.closest("[data-av]"); if (v) { assetView = v.dataset.av; renderAssets(); } });
+$("#p-assets").addEventListener("click", e => {
+  const f = e.target.closest("[data-af]"); if (f) { assetF = f.dataset.af; assetN = 30; return renderAssets(); }
+  const a = e.target.closest("[data-aa]"); if (a) { const v = +a.dataset.aa; assetArr = assetArr === v ? 0 : v; assetN = 30; renderAssets(); if (assetArr) setTimeout(() => $("#p-assets .chips")?.scrollIntoView({ behavior: "smooth", block: "start" }), 30); return; }
+  if (e.target.closest("[data-dall]")) { distAll = !distAll; return renderAssets(); }
+  if (e.target.closest("[data-gmore]")) { assetN += 60; return renderAssets(); }
+});
+$("#p-assets").addEventListener("change", e => { if (e.target.id === "asort") { assetSort = e.target.value; renderAssets(); } });
 
 // ---------------- MARCHÉ ----------------
 let marketTab = "all";

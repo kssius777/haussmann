@@ -6,7 +6,7 @@ let map = null, mapReady = false, mode = "all", sel = null;
 const hideSet = new Set(), lastState = new Map(); let painted = new Set();
 // Palette « Paris » : pierre de taille et toits en zinc
 // (les toits sont un gris chaud clair : un Paris beige, pas bleu ; les immeubles des autres joueurs sont en terre cuite)
-const MC = { mine: "#0EA5A0", mineB: "#8FDDD6", theirs: "#B4705C", theirsB: "#E8CFC4", sale: "#F59E0B", saleB: "#F9D58F",
+const MC = { mine: "#0EA5A0", mineB: "#8FDDD6", theirs: "#C59383", theirsB: "#EEDDD3", sale: "#F59E0B", saleB: "#F9D58F",
   sel: "#0F1B2D", selB: "#7DD3FC", mute: "#EEEAE3", muteR: "#DAD5CC", stone: "#F3DFBC", zinc: "#D3CCC0" };
 
 function geoArr(i) {

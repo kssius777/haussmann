@@ -142,9 +142,12 @@ function maquetteSVG(c) {
   const roofC = rel ? "#7D8C99" : { ancien: "#C06A4C", hauss: "#8A99A8", brique: "#A5AD9E", beton: "#BCC0C2", contemp: "#7E9088" }[era];
   const winC = era === "contemp" ? "#79A6C2" : era === "brique" ? "#44566A" : "#4F6A82";
   const shade = (hex, f) => { const n = parseInt(hex.slice(1), 16); const ch = i => Math.max(0, Math.min(255, Math.round(((n >> i) & 255) * f))); return `rgb(${ch(16)},${ch(8)},${ch(0)})`; };
-  let out = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="mg${g}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D7E6F0"/><stop offset=".45" stop-color="#EDE9E0"/><stop offset="1" stop-color="#E3DCCF"/></linearGradient><radialGradient id="ml${g}" cx=".5" cy=".55" r=".6"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><rect width="${W}" height="${H}" fill="url(#mg${g})"/><rect width="${W}" height="${H}" fill="url(#ml${g})"/>`;
+  let out = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="mg${g}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D7E6F0"/><stop offset=".45" stop-color="#EDE9E0"/><stop offset="1" stop-color="#E3DCCF"/></linearGradient><radialGradient id="ml${g}" cx=".5" cy=".55" r=".6"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><rect width="${W}" height="${H}" fill="url(#ml${g})"/>`;   // le ciel vient de la carte (couleur de la rareté)
   // le quartier à plat
   for (const q of nbrs) out += `<polygon points="${q.map(([x, y]) => T(P(x, y, 0))).join(" ")}" fill="#FFFDF8" stroke="#D5CDBF" stroke-width=".9"/>`;
+  // quelques arbres dans le quartier
+  { const rr = rng("tr" + g); for (let t = 0; t < 7; t++) { const ang2 = rr() * 6.283, d = 26 + rr() * 45, x = Math.cos(ang2) * d, y = Math.sin(ang2) * d, rad = Math.min(2.6 + rr() * 1.6, (6 + rr() * 4) / s); const [px, py] = P(x, y, 0);
+    out += `<ellipse cx="${(ox + px * s + rad * s * .5).toFixed(1)}" cy="${(oy + py * s + rad * s * .2).toFixed(1)}" rx="${(rad * s).toFixed(1)}" ry="${(rad * s * .55).toFixed(1)}" fill="#0F1B2D" opacity=".1"/><circle cx="${(ox + px * s).toFixed(1)}" cy="${(oy + py * s - rad * s * .6).toFixed(1)}" r="${(rad * s).toFixed(1)}" fill="#7DBE6A"/><circle cx="${(ox + px * s - rad * s * .3).toFixed(1)}" cy="${(oy + py * s - rad * s * .9).toFixed(1)}" r="${(rad * s * .5).toFixed(1)}" fill="#A6D98E"/>`; } }
   // ombre portée
   out += `<polygon points="${mine.map(([x, y]) => T(P(x + H0 * .5, y - H0 * .35, 0))).join(" ")}" fill="#0F1B2D" opacity=".16"/>`;
   // murs visibles, du plus loin au plus proche
@@ -192,6 +195,8 @@ function rarSq(r, size) { return `<span class="sq" style="background:${RAR[r].c}
 
 // --- la carte « plaque de rue » ---------------------------------------------
 function plaqueTitle(c) { return c.name ? cap(c.name) : (c.adr || "Immeuble"); }
+const STARS = { C: 1, U: 2, R: 3, L: 4, M: 5 };
+const ERA_N = { ancien: "Ancien Paris", hauss: "Haussmannien", brique: "Années folles", beton: "Trente Glorieuses", contemp: "Contemporain" };
 function cardHTML(c, { w, item, tier, count } = {}) {
   const r = tier || c.r, n = item ? Math.max(1, itemUnits(item)) : 1;
   const t = plaqueTitle(c), long = t.length > 22;
@@ -199,10 +204,10 @@ function cardHTML(c, { w, item, tier, count } = {}) {
   const per = !item && c.lots > 1 ? (c.lk === "p" ? "/ PART" : c.lk === "l" ? "/ LOGT" : "/ LOCAL") : "";
   return `<div class="hc t${r}" style="${w ? `--w:${w}` : ""}"><div class="fr"><div class="in">
     <div class="plq"><small>${c.arr === 1 ? "1<sup>er</sup>" : c.arr + "<sup>e</sup>"} Arr<sup>t</sup></small><b class="${long ? "long" : ""}">${esc(t)}</b></div>
-    <div class="ph">${photo(c)}<span class="rb">${RAR[r].l}</span>${count ? `<span class="cnt">${esc(count)}</span>` : ""}</div>
-    <div class="bd"><div class="kd">${esc(itemLabel(c, item) || kindLabel(c))}${c.y && c.lk !== "p" ? `<span class="yr"> · vers ${esc(c.y)}</span>` : ""}</div>
+    <div class="ph">${photo(c)}<i class="foil"></i>${c.lk !== "p" && c.u !== "rel" && !goodPhoto(c) ? `<span class="era e-${eraOf(c)}">${ERA_N[eraOf(c)]}${c.y ? ` · ${esc(c.y)}` : ""}</span>` : ""}<span class="rb">${RAR[r].l}</span>${count ? `<span class="cnt">${esc(count)}</span>` : ""}</div>
+    <div class="bd"><div class="kd">${esc(itemLabel(c, item) || kindLabel(c))}</div>
       <div class="nums num"><div><span>${per ? "LOYER " + per : "LOYER / JOUR"}</span><b class="g">${fmtE(c.rent * n)}</b></div><div class="r"><span>${per ? "PRIX " + per : "VALEUR"}</span><b>${fmtE(c.v * n)}</b></div></div>
-      <div class="rn"><span>${RAR[r].n.toUpperCase()}</span><em>N° ${String(c.arr).padStart(2, "0")}-${String(li(c.g)).padStart(5, "0")}</em></div></div>
+      <div class="rn"><span><i class="stars">${"★".repeat(STARS[r])}</i>${RAR[r].n.toUpperCase()}</span><em>N° ${String(c.arr).padStart(2, "0")}-${String(li(c.g)).padStart(5, "0")}</em></div></div>
   </div></div></div>`;
 }
 function chanceText(it) {
@@ -227,11 +232,13 @@ function itemFace(it, w) {
   return cardHTML(c, { w, item: { t: it.t, ks: it.ks, n: it.n }, tier: it.tier });
 }
 // petit visuel d'enveloppe de booster
+let packN = 0;
 function packHTML(cls = "") {
+  const gid = "pkgold" + (++packN);
   return `<div class="pack ${cls}" role="img" aria-label="Booster Haussmann"><div class="tear"></div><div class="holo"></div><div class="pin">
     <span class="plaq">HAUSSMANN</span>
-    <svg class="facade" viewBox="0 0 120 84" fill="none" stroke="url(#pkgold)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">
-      <defs><linearGradient id="pkgold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFE7A3"/><stop offset=".5" stop-color="#E9B949"/><stop offset="1" stop-color="#FFF1C4"/></linearGradient></defs>
+    <svg class="facade" viewBox="0 0 120 84" fill="none" stroke="url(#${gid})" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">
+      <defs><linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFE7A3"/><stop offset=".5" stop-color="#E9B949"/><stop offset="1" stop-color="#FFF1C4"/></linearGradient></defs>
       <path d="M6 32h108M14 32l7-13h78l7 13M10 82V32M110 82V32M3 82h114"/><path d="M30 19v-7h8v7M82 19v-7h8v7"/>
       ${[0, 1, 2, 3, 4].map(i => `<path d="M${17 + i * 19} 50v-10a4.5 4.5 0 019 0v10z"/><rect x="${17 + i * 19}" y="58" width="9" height="13"/>`).join("")}
       <path d="M12 53h96M12 74h96"/></svg>

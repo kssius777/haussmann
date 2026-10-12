@@ -119,43 +119,47 @@ function showLand(L) {
   hidePreviewOnly();
   const free = freeOf(g), mine = mineOf(g), cash = liveCash(), isP = c.lk === "p";
   const owners = (ST.own.get(g)?.owners || []).filter(o => o !== ME);
+  const taken = isP ? (ST.own.get(g)?.parts || 0) : (ST.own.get(g)?.n || 0), others = Math.max(0, taken - mine), tot = c.lots;
+  const word = n => lotWord(c, n);
   let head, cls;
-  if (L?.toll > 0) { head = `💸 Chez ${L.payees.map(p => esc(p.pseudo)).join(", ")}`; cls = "bad"; }
-  else if (mine > 0) { head = "🏠 Vous êtes chez vous"; cls = "home"; }
-  else if (free > 0) { head = "🔑 Libre ! À vendre"; cls = "free"; }
-  else { head = owners.length ? "Déjà pris" : "Tout est vendu ici"; cls = ""; }
+  if (L?.toll > 0) { head = `Chez ${L.payees.map(p => esc(p.pseudo)).join(", ")}`; cls = "bad"; }
+  else if (mine > 0 && free > 0) { head = "Vous êtes chez vous"; cls = "home"; }
+  else if (mine > 0) { head = "Tout l'immeuble est à vous"; cls = "home"; }
+  else if (free > 0) { head = "Libre, à vendre !"; cls = "free"; }
+  else { head = "Tout est déjà pris"; cls = ""; }
+  // ce qui s'est passé à l'arrivée (on n'affiche que ce qui compte : loyer payé, bonus, Chance)
   const lines = [];
-  if (L?.toll > 0) lines.push(`<span class="ln bad">Vous lui payez son loyer : <b>${fmtE(L.toll)}</b></span>`);
-  if (L?.bonus > 0) lines.push(`<span class="ln good">Bonus : une journée de loyer offerte, <b>+${fmtE(L.bonus)}</b></span>`);
-  if (L?.salary > 0) lines.push(`<span class="ln good">💼 Salaire du tour <b>+${fmtE(L.salary)}</b></span>`);
-  if (L?.chance) { const ch = L.chance; const [nm] = CHANCE[ch.k] || ["Chance"]; lines.push(`<span class="ln ${BAD.has(ch.k) ? "bad" : "good"}">🃏 <b>${esc(nm)}</b> · ${esc(chanceText(ch))}</span>`); }
-  const word = n => lotWord(c, n), tot = c.lots;
-  const info = isP ? `${fmtN(free)} parts libres` : tot > 1 ? `Immeuble de ${tot} ${word(tot)} · <b>${free} libre${free > 1 ? "s" : ""}</b>` : "";
+  if (L?.toll > 0) lines.push(`<span class="ln bad">Vous payez son loyer · <b>−${fmtE(L.toll)}</b></span>`);
+  if (L?.bonus > 0) lines.push(`<span class="ln good">Bonus chez vous · <b>+${fmtE(L.bonus)}</b></span>`);
+  if (L?.chance) { const ch = L.chance; const [nm] = CHANCE[ch.k] || ["Chance"]; lines.push(`<span class="ln ${BAD.has(ch.k) ? "bad" : "good"}">🃏 ${esc(nm)} · <b>${esc(chanceText(ch))}</b></span>`); }
+  // le plan de l'immeuble : une case par logement (à vous / à d'autres / libre)
+  let occ = "";
+  if (tot > 1) {
+    const leg = [mine ? `<span class="o-me">${isP ? fmtN(mine) + " parts" : mine} à vous</span>` : "", others ? `<span class="o-th">${isP ? fmtN(others) + " parts" : others} à d'autres</span>` : "", free ? `<span class="o-fr">${isP ? fmtN(free) + " parts" : free} libre${free > 1 ? "s" : ""}</span>` : ""].filter(Boolean).join("");
+    const viz = !isP && tot <= 40 ? `<div class="oc">${"<i class='me'></i>".repeat(mine)}${"<i class='th'></i>".repeat(others)}${"<i></i>".repeat(Math.max(0, free))}</div>`
+      : `<div class="obar"><i class="me" style="width:${mine / tot * 100}%"></i><i class="th" style="width:${others / tot * 100}%"></i></div>`;
+    occ = `<div class="occ"><div class="ot">${isP ? `Monument en ${fmtN(tot)} parts` : `Immeuble de ${tot} ${word(tot)}`}</div>${viz}<div class="ol">${leg}</div></div>`;
+  }
   let btns = "";
   if (free > 0) {
     const unit = isP ? "1 part" : tot > 1 ? `1 ${word(1)}` : c.lk === "l" ? "le logement" : "le local", allFree = !isP && free === tot && tot > 1, total = c.v * tot;
     const cap = ST.state?.loan_cap ?? 1e12, down = p => Math.ceil(p * CREDIT_DOWN);
     const cashOK = cash >= c.v, creditOK = cash >= down(c.v) && c.v - down(c.v) <= cap;
-    const cr = creditOK && (landCredit === null ? true : landCredit);   // à crédit par défaut : c'est ce que tout le monde choisit
+    const cr = creditOK && (landCredit === null ? true : landCredit) || (!cashOK && creditOK);
     if (!cashOK && !creditOK) {
       const need = cash >= down(c.v) ? 0 : down(c.v) - cash, rate = netRate(), days = rate > 0 ? Math.ceil(need / rate) : 0;
-      btns = `<div class="nomoney"><b>Pas assez pour celui-ci</b><span>${cash < down(c.v) ? `Il manque ${fmtE(need)} pour l'apport de 10 %${days ? `, vos loyers les apportent dans ${days} jour${days > 1 ? "s" : ""}` : ""}.` : `Votre capacité d'emprunt est atteinte (il reste ${fmtE(cap)}). Elle remonte à mesure que vos crédits se remboursent.`}</span></div>`;
+      btns = `<div class="nomoney"><b>Pas assez pour celui-ci</b><span>${cash < down(c.v) ? `Il manque ${fmtE(need)} pour l'apport${days ? ` · vos loyers l'apportent dans ${days} jour${days > 1 ? "s" : ""}` : ""}.` : `Capacité d'emprunt atteinte. Elle remonte à mesure que vos crédits se remboursent.`}</span></div>`;
     } else {
-      btns = cr
-        ? `<button class="btn block blue2" data-lbuy="${g}"><span>Acheter ${unit} à crédit</span><small>${fmtE(down(c.v))} maintenant · +${fmtE(Math.round(c.rent * .3))} / jour pour vous</small></button>
-           <p class="crx">Le reste (${fmtE(c.v - down(c.v))}) se rembourse <b>tout seul</b> avec 70 % du loyer.</p>`
-        : `<button class="btn block green" data-lbuy="${g}"><span>Acheter ${unit} · ${fmtE(c.v)}</span><small>+${fmtE(c.rent)} / jour</small></button>`;
-      const links = [];
-      if (cr && cashOK) links.push(`<button data-paymode="0">ou payer comptant · ${fmtE(c.v)}</button>`);
-      if (!cr && creditOK) links.push(`<button data-paymode="1">ou à crédit : ${fmtE(down(c.v))} maintenant</button>`);
-      if (allFree && (cr ? cash >= down(total) && total - down(total) <= cap : cash >= total)) links.push(`<button data-lbuild="${g}">${cr ? `tout l'immeuble à crédit · ${fmtE(down(total))} maintenant` : `tout l'immeuble · ${fmtE(total)}`} (+60 % de loyer)</button>`);
-      if (links.length) btns += `<div class="llinks">${links.join("")}</div>`;
+      const seg = creditOK && cashOK ? `<div class="pay"><button data-paymode="1" aria-selected="${cr}"><b>À crédit</b><small>${fmtE(down(c.v))} · <em>+${fmtE(Math.round(c.rent * .3))}/j</em></small></button><button data-paymode="0" aria-selected="${!cr}"><b>Comptant</b><small>${fmtE(c.v)} · <em>+${fmtE(c.rent)}/j</em></small></button></div>` : "";
+      btns = `${seg}<button class="btn block ${cr ? "blue2" : "green"} buy" data-lbuy="${g}"><span>Acheter ${unit} · ${fmtE(cr ? down(c.v) : c.v)}</span><small>${cr ? "Le reste est prêté par la banque et se rembourse tout seul avec le loyer" : "Tout le loyer est pour vous, et le bien peut être revendu"}</small></button>`;
+      if (allFree && (cr ? cash >= down(total) && total - down(total) <= cap : cash >= total)) btns += `<button class="btn block light" data-lbuild="${g}">Tout l'immeuble · ${fmtE(cr ? down(total) : total)} <small class="muted">(+60 % de loyer)</small></button>`;
     }
     landCreditNow = cr;
   }
   setMovebar(`<div class="land"><div class="grab"></div><div class="lc" data-lopen="${g}">${cardHTML(c)}</div>
-    <div class="lr"><b class="lh ${cls}">${head}</b>${info ? `<span class="linfo">${info}</span>` : ""}${lines.join("")}<div class="lb">${btns}</div></div>
+    <div class="lr"><b class="lh ${cls}">${head}</b>${lines.length ? `<div class="lns">${lines.join("")}</div>` : ""}${occ}<div class="lb">${btns}</div></div>
     <button class="x" data-mvclose aria-label="Fermer">×</button></div>`, "land");
+  $("#movebar").classList.add("r" + c.r);
   if (L?.chance && window.confetti && !BAD.has(L.chance.k)) confetti("#A855F7", 24);
 }
 let landCredit = null, landCreditNow = false;   // null = choix automatique (crédit si l'on n'a pas assez pour payer comptant)
