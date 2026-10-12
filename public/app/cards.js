@@ -231,18 +231,14 @@ function itemFace(it, w) {
   const c = card(it.card); if (!c) return "";
   return cardHTML(c, { w, item: { t: it.t, ks: it.ks, n: it.n }, tier: it.tier });
 }
-// petit visuel d'enveloppe de booster
-let packN = 0;
-function packHTML(cls = "") {
-  const gid = "pkgold" + (++packN);
-  return `<div class="pack ${cls}" role="img" aria-label="Booster Haussmann"><div class="tear"></div><div class="holo"></div><div class="pin">
-    <span class="plaq">HAUSSMANN</span>
-    <svg class="facade" viewBox="0 0 120 84" fill="none" stroke="url(#${gid})" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">
-      <defs><linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFE7A3"/><stop offset=".5" stop-color="#E9B949"/><stop offset="1" stop-color="#FFF1C4"/></linearGradient></defs>
-      <path d="M6 32h108M14 32l7-13h78l7 13M10 82V32M110 82V32M3 82h114"/><path d="M30 19v-7h8v7M82 19v-7h8v7"/>
-      ${[0, 1, 2, 3, 4].map(i => `<path d="M${17 + i * 19} 50v-10a4.5 4.5 0 019 0v10z"/><rect x="${17 + i * 19}" y="58" width="9" height="13"/>`).join("")}
-      <path d="M12 53h96M12 74h96"/></svg>
-    <span class="lbl">BOOSTER<small>4 biens · 1 Chance</small></span></div><div class="shine"></div></div>`;
+// le booster : un sachet métallisé (bleu, argent, or…), bords sertis, cercles en relief, gros « 75 »
+const PACK_COL = { welcome: "blue", free: "silver", paid: "gold" };
+function packHTML(cls = "", col = "blue") {
+  return `<div class="sachet s-${col} ${cls}" role="img" aria-label="Booster Haussmann"><div class="tear"></div>
+    <svg class="rings" viewBox="0 0 100 100" aria-hidden="true">${[46, 38, 30, 22, 14].map((r, i) => `<circle cx="62" cy="44" r="${r}" fill="none" stroke="rgba(255,255,255,${.1 + i * .04})" stroke-width="${i === 2 ? 1.6 : .7}"/>`).join("")}</svg>
+    <span class="brand">HAUSSMANN</span>
+    <span class="sub">Booster · Paris<small>4 biens · 1 Chance</small></span><span class="big">75</span>
+    <i class="sheen"></i><div class="crimp b"></div></div>`;
 }
 
 // phrase claire pour « ce que je possède » dans un immeuble

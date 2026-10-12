@@ -14,7 +14,7 @@ function renderBoosterPage() {
   $("#p-booster").innerHTML = `<div class="bstage"><div class="rays"></div>
     <h1 class="h1" style="color:#fff;margin:0">Booster</h1>
     <p class="bnote">4 vrais biens de Paris + 1 carte Chance</p>
-    <button id="packbtn" aria-label="Ouvrir un booster">${packHTML(kind ? "ready" : "")}${n ? `<span class="pcount">${n}</span>` : ""}</button>
+    <button id="packbtn" aria-label="Ouvrir un booster">${packHTML(kind ? "ready" : "", PACK_COL[kind || "paid"])}${n ? `<span class="pcount">${n}</span>` : ""}</button>
     <div class="bbtns">
       ${kind ? `<button class="btn white block big" data-open="${kind}">Ouvrir${n > 1 ? ` (${n})` : ""}</button>`
              : `<button class="btn gold block big" data-open="paid" ${liveCash() < s.price ? "disabled" : ""}>Acheter · ${fmtE(s.price)}</button>
@@ -32,9 +32,9 @@ async function openBooster(kind) {
   if (opening) return; opening = true;
   const R = $("#reveal"); R.hidden = false;
   R.innerHTML = `<div class="bstage"><div class="rays"></div><button class="close" data-rclose aria-label="Fermer">×</button>
-    <div class="rv"><div class="slot" id="slot"></div><div id="rpack">${packHTML("shake")}</div></div>
+    <div class="rv"><div class="slot" id="slot"></div><div id="rpack">${packHTML("shake", PACK_COL[kind] || "blue")}</div></div>
     <p class="bnote" id="rhint">Ouverture…</p></div>`;
-  const pack = R.querySelector(".pack");
+  const pack = R.querySelector(".sachet");
   const t0 = performance.now();
   let res;
   try { res = await rpc("open_booster", { p_kind: kind }); }
