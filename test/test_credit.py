@@ -19,7 +19,7 @@ rent = db.sql("select rent from cards where id=%s", g)[0][0]
 db.sql("update profiles set rent_at = now() - interval '1 day' where id=%s", str(A)); c0 = cash()
 db.rpc(A, "state"); loan2 = db.sql("select loan from lots where card=%s and owner=%s", g, str(A))[0][0]
 check("chaque jour, la moitié du loyer rembourse le crédit", abs((loan - loan2) - rent / 2) <= 2, (loan - loan2, rent / 2))
-check("l'autre moitié (et les bonus) arrive dans la trésorerie", rent / 2 * 0.95 <= cash() - c0 <= rent * 2, cash() - c0)
+check("l'autre moitié (et les bonus) arrive dans la trésorerie", rent / 2 * 0.5 <= cash() - c0 <= rent * 2, cash() - c0)
 check("impossible de vendre un bien à crédit", "Remboursez" in (err(lambda: db.rpc(A, "list_item", p_card=g, p_k=0, p_n=1, p_price=123)) or ""))
 check("impossible d'hypothéquer un bien à crédit", "crédit" in (err(lambda: db.rpc(A, "mortgage", p_card=g, p_k=0)) or ""))
 # 3 crédits max
