@@ -18,6 +18,7 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
    sh test/up.sh                 # démarre Postgres + le serveur local (port 8780)
    python3 test/test_rules.py    # règles du jeu (42 tests)
    python3 test/test_pawn.py     # pion et dé
+   python3 test/test_credit.py   # crédit immobilier
    python3 test/e2e.py           # parcours complet dans un vrai navigateur, captures dans test/shots/
    ```
    Ne pousser que si tout est vert.
@@ -38,4 +39,7 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
   Libre → on peut l'acheter à la banque (c'est le seul endroit où l'on achète à la banque). À un autre joueur → on lui paie
   une journée de ses loyers ici (max 20 % de sa trésorerie). À soi → une journée de loyer en bonus. 1 case sur 8 environ : carte Chance.
   10 lancers max, +1 toutes les 30 min. 3 téléportations par jour vers ses propres biens (on peut y acheter les logements libres).
+- **Crédit immobilier** (achat à la banque) : apport 30 %, la banque prête le reste ; la moitié du loyer de base du bien
+  rembourse le crédit automatiquement (impossible d'être en défaut) ; 3 crédits max ; remboursement anticipé (`repay`) ;
+  un bien à crédit ne peut être ni vendu ni hypothéqué. Le patrimoine et le classement retirent crédits et hypothèques.
 - Cartes : image = maquette 3D de la vraie forme de l'immeuble (`maquetteSVG` dans cards.js), couleurs selon l'époque.

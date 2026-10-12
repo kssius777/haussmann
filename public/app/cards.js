@@ -228,11 +228,12 @@ function itemFace(it, w) {
 }
 // petit visuel d'enveloppe de booster
 function packHTML(cls = "") {
-  return `<div class="pack ${cls}" role="img" aria-label="Booster Haussmann"><div class="tear"></div><div class="pin">
+  return `<div class="pack ${cls}" role="img" aria-label="Booster Haussmann"><div class="tear"></div><div class="holo"></div><div class="pin">
     <span class="plaq">HAUSSMANN</span>
-    <svg class="facade" viewBox="0 0 120 80" fill="none" stroke="#9FB4D6" stroke-width="2" stroke-linejoin="round">
-      <path d="M6 30h108M14 30l6-12h80l6 12M10 78V30M110 78V30M4 78h112"/><path d="M30 18v-6h8v6M82 18v-6h8v6"/>
-      ${[0, 1, 2, 3, 4].map(i => `<rect x="${17 + i * 19}" y="36" width="9" height="12"/><rect x="${17 + i * 19}" y="54" width="9" height="12"/>`).join("")}
-      <path d="M12 51h96M12 69h96" stroke-dasharray="2 3"/></svg>
-    <span class="lbl">BOOSTER<small>4 biens · 1 Chance</small></span></div></div>`;
+    <svg class="facade" viewBox="0 0 120 84" fill="none" stroke="url(#pkgold)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">
+      <defs><linearGradient id="pkgold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFE7A3"/><stop offset=".5" stop-color="#E9B949"/><stop offset="1" stop-color="#FFF1C4"/></linearGradient></defs>
+      <path d="M6 32h108M14 32l7-13h78l7 13M10 82V32M110 82V32M3 82h114"/><path d="M30 19v-7h8v7M82 19v-7h8v7"/>
+      ${[0, 1, 2, 3, 4].map(i => `<path d="M${17 + i * 19} 50v-10a4.5 4.5 0 019 0v10z"/><rect x="${17 + i * 19}" y="58" width="9" height="13"/>`).join("")}
+      <path d="M12 53h96M12 74h96"/></svg>
+    <span class="lbl">BOOSTER<small>4 biens · 1 Chance</small></span></div><div class="shine"></div></div>`;
 }

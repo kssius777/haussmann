@@ -247,6 +247,18 @@ begin
   return path;
 end $$;
 
+create or replace function leaderboard() returns json language sql stable security definer set search_path = public as $$
+  select coalesce(json_agg(x), '[]') from (
+    select p.id, p.pseudo, p.party,
+           p.cash + coalesce((select sum(v) from arr_value a where a.owner=p.id),0)
+                  - coalesce((select sum(mort) from lots l where l.owner=p.id),0)
+                  - coalesce((select sum(mort) from parts t where t.owner=p.id),0)
+                  - coalesce((select sum(loan) from lots l where l.owner=p.id),0)
+                  - coalesce((select sum(loan) from parts t where t.owner=p.id),0) as worth,
+           (select count(*) from arr_state s where s.mayor=p.id) as mayorships
+    from profiles p order by worth desc limit 50) x
+$$;
+
 revoke all on function _credits(uuid), _pay_or_borrow(uuid,bigint,boolean), _walk(uuid,int,int), _sync(uuid), cfg() from public, anon, authenticated;
-grant execute on function bank_buy(int,int,boolean), buy_building(int,boolean), repay(int), list_item(int,int,int,bigint), mortgage(int,int), my_holdings(), state() to anon, authenticated;
+grant execute on function bank_buy(int,int,boolean), buy_building(int,boolean), repay(int), list_item(int,int,int,bigint), mortgage(int,int), my_holdings(), state(), leaderboard() to anon, authenticated;
 notify pgrst, 'reload schema';

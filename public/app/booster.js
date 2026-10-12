@@ -12,22 +12,20 @@ function renderBoosterPage() {
   const w = s.profile.welcome || 0, fin = freeIn(), free = fin <= 0, n = w + (free ? 1 : 0);
   const kind = w > 0 ? "welcome" : free ? "free" : null;
   $("#p-booster").innerHTML = `<div class="bstage"><div class="rays"></div>
-    <h1 class="h1" style="color:#fff;margin:0">Boosters</h1>
-    <p class="bnote" style="max-width:420px">Une pochette surprise : <b>4 vrais biens de Paris tirés au hasard + 1 carte Chance</b>. C'est la façon la moins chère d'agrandir votre patrimoine.</p>
-    <span class="pill-l">${w > 0 ? `${w} OFFERT${w > 1 ? "S" : ""} À VOTRE ARRIVÉE` : free ? "1 GRATUIT AUJOURD'HUI" : "AUCUN BOOSTER EN ATTENTE"}</span>
-    <button id="packbtn" aria-label="Ouvrir un booster" ${kind ? "" : `data-buyopen="1"`}>${packHTML()}</button>
-    ${kind ? `<p class="bnote">Touchez le booster pour l'ouvrir</p>` : `<p class="bnote">Prochain booster gratuit dans <b class="num" id="freein">${hm(fin)}</b></p>`}
+    <h1 class="h1" style="color:#fff;margin:0">Booster</h1>
+    <p class="bnote">4 vrais biens de Paris + 1 carte Chance</p>
+    <button id="packbtn" aria-label="Ouvrir un booster">${packHTML(kind ? "ready" : "")}${n ? `<span class="pcount">${n}</span>` : ""}</button>
     <div class="bbtns">
-      ${kind ? `<button class="btn white block" data-open="${kind}">Ouvrir un booster ${w > 0 ? "offert" : "gratuit"}</button>` : ""}
-      <button class="btn glass block" data-open="paid" ${liveCash() < s.price ? "disabled" : ""}>Acheter un booster · ${fmtE(s.price)}</button>
+      ${kind ? `<button class="btn white block big" data-open="${kind}">Ouvrir${n > 1 ? ` · ${n} à ouvrir` : ""}</button>`
+             : `<button class="btn gold block big" data-open="paid" ${liveCash() < s.price ? "disabled" : ""}>Acheter · ${fmtE(s.price)}</button>
+                <p class="bnote">Prochain booster gratuit dans <b class="num" id="freein">${hm(fin)}</b></p>`}
     </div>
-    ${oddsHTML()}
-    <p class="bnote" style="font-size:12px;opacity:.8">Un booster gratuit chaque jour. Le prix d'achat double à chaque booster acheté dans la journée.</p>
+    <details class="oddsbox"><summary>Chances de tirage</summary>${oddsHTML()}<p class="bnote" style="font-size:12px;margin-top:8px">Un booster gratuit chaque jour. Acheté, son prix double à chaque fois dans la journée.</p></details>
   </div>`;
 }
 $("#p-booster").addEventListener("click", e => {
   const b = e.target.closest("[data-open]"); if (b) return openBooster(b.dataset.open);
-  if (e.target.closest("#packbtn")) { const s = ST.state.profile; if (s.welcome > 0) return openBooster("welcome"); if (freeIn() <= 0) return openBooster("free"); toast(`Prochain booster gratuit dans ${hm(freeIn())}`); }
+  if (e.target.closest("#packbtn")) { const s = ST.state.profile; if (s.welcome > 0) return openBooster("welcome"); if (freeIn() <= 0) return openBooster("free"); toast(`Prochain booster gratuit dans ${hm(freeIn())} — ou achetez-en un.`); }
 });
 
 async function openBooster(kind) {

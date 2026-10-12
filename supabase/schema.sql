@@ -1072,7 +1072,9 @@ create or replace function leaderboard() returns json language sql stable securi
     select p.id, p.pseudo, p.party,
            p.cash + coalesce((select sum(v) from arr_value a where a.owner=p.id),0)
                   - coalesce((select sum(mort) from lots l where l.owner=p.id),0)
-                  - coalesce((select sum(mort) from parts t where t.owner=p.id),0) as worth,
+                  - coalesce((select sum(mort) from parts t where t.owner=p.id),0)
+                  - coalesce((select sum(loan) from lots l where l.owner=p.id),0)
+                  - coalesce((select sum(loan) from parts t where t.owner=p.id),0) as worth,
            (select count(*) from arr_state s where s.mayor=p.id) as mayorships
     from profiles p order by worth desc limit 50) x
 $$;
