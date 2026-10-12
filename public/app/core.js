@@ -20,11 +20,11 @@ const USE = { res: "Résidentiel", ind: "Immeuble", com: "Commerces & services",
 // le maire touche 8 % des loyers de son arrondissement, les membres du parti du maire y gagnent +10 %,
 // et chaque parti protège ses membres contre quelques cartes malus (risques équivalents).
 const PARTIES = {
-  poing:   { n: "Poing Levé",       side: "Gauche radicale",  c: "#D32F2F", motto: "Le toit est un droit.", pitch: "Le logement n'est pas une marchandise.", shield: ["greve", "amende"] },
+  poing:   { n: "Poing Levé",       side: "Extrême gauche",  c: "#D32F2F", motto: "Le toit est un droit.", pitch: "Le logement n'est pas une marchandise.", shield: ["greve", "amende"] },
   tendue:  { n: "Gauche Unie",      side: "Gauche",           c: "#E5679A", motto: "Ensemble, chez nous.", pitch: "Solidarité et services publics.",        shield: ["notaire", "ravalement"] },
   milieu:  { n: "Juste Milieu",     side: "Centre",           c: "#F2A33A", motto: "En toute mesure.", pitch: "Entreprendre, réformer, rassembler.",    shield: ["fonciere", "degat"] },
   valeurs: { n: "Droite Libre",     side: "Droite",           c: "#3E7BDC", motto: "Libre d'entreprendre.", pitch: "Propriété, mérite et tradition.",        shield: ["fisc", "termites", "ascenseur"] },
-  rempart: { n: "Rempart National", side: "Droite nationale", c: "#1E2B5E", motto: "Tenir la ville.", pitch: "Sécurité, ordre et souveraineté.",       shield: ["cambriolage", "squat"] }
+  rempart: { n: "Rempart National", side: "Extrême droite", c: "#1E2B5E", motto: "Tenir la ville.", pitch: "Sécurité, ordre et souveraineté.",       shield: ["cambriolage", "squat"] }
 };
 const PARTY_ORDER = ["poing", "tendue", "milieu", "valeurs", "rempart"];
 const MAYOR_TAX = 8, MEMBER_BONUS = 10;
@@ -131,7 +131,7 @@ function streetURL(g) { try { const [x, y] = centerOf(g); return `https://www.go
 let _ac = null;
 function sfx(kind) {
   try {
-    if (localStorage.getItem("hm_mute") === "1") return;
+    if (localStorage.getItem("hm_sound") !== "1") return;   // coupés par défaut (on joue souvent au bureau)
     _ac = _ac || new (window.AudioContext || window.webkitAudioContext)(); const ac = _ac, t = ac.currentTime;
     const tone = (f, t0, d, type = "sine", g = .08) => { const o = ac.createOscillator(), v = ac.createGain(); o.type = type; o.frequency.setValueAtTime(f, t0); v.gain.setValueAtTime(0, t0); v.gain.linearRampToValueAtTime(g, t0 + .01); v.gain.exponentialRampToValueAtTime(.0001, t0 + d); o.connect(v).connect(ac.destination); o.start(t0); o.stop(t0 + d); };
     if (kind === "dice") for (let i = 0; i < 6; i++) tone(180 + Math.random() * 120, t + i * .07, .06, "square", .03);

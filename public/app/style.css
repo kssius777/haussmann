@@ -816,3 +816,67 @@ input{font:inherit;color:inherit}
 .mmark.far{padding:2px;font-size:0;gap:0;border-width:2px}
 .mmark.far>:not(i){display:none}
 .mmark.far i{width:26px;height:26px}
+/* dé en 3D dans le bouton */
+.cube{display:block;width:30px;height:30px;position:relative;transform-style:preserve-3d;transform:rotateX(-28deg) rotateY(38deg);animation:cubeIdle 7s ease-in-out infinite}
+.cube i{position:absolute;inset:0;background:#fff;border-radius:6px;box-shadow:inset 0 0 0 1.5px #D5DCEA;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:4px;gap:0}
+.cube i b{width:5px;height:5px;border-radius:50%;background:var(--blue);align-self:center;justify-self:center}
+.cube .f1{transform:translateZ(15px)} .cube .f2{transform:rotateY(90deg) translateZ(15px)} .cube .f3{transform:rotateY(180deg) translateZ(15px)}
+.cube .f4{transform:rotateY(-90deg) translateZ(15px)} .cube .f5{transform:rotateX(90deg) translateZ(15px)} .cube .f6{transform:rotateX(-90deg) translateZ(15px)}
+.cube .f1 b{grid-area:2/2}
+.cube .f2 b:nth-child(1){grid-area:1/1}.cube .f2 b:nth-child(2){grid-area:3/3}
+.cube .f3 b:nth-child(1){grid-area:1/1}.cube .f3 b:nth-child(2){grid-area:2/2}.cube .f3 b:nth-child(3){grid-area:3/3}
+.cube .f4 b:nth-child(1){grid-area:1/1}.cube .f4 b:nth-child(2){grid-area:1/3}.cube .f4 b:nth-child(3){grid-area:3/1}.cube .f4 b:nth-child(4){grid-area:3/3}
+.cube .f5 b:nth-child(1){grid-area:1/1}.cube .f5 b:nth-child(2){grid-area:1/3}.cube .f5 b:nth-child(3){grid-area:2/2}.cube .f5 b:nth-child(4){grid-area:3/1}.cube .f5 b:nth-child(5){grid-area:3/3}
+.cube .f6 b:nth-child(1){grid-area:1/1}.cube .f6 b:nth-child(2){grid-area:1/3}.cube .f6 b:nth-child(3){grid-area:2/1}.cube .f6 b:nth-child(4){grid-area:2/3}.cube .f6 b:nth-child(5){grid-area:3/1}.cube .f6 b:nth-child(6){grid-area:3/3}
+@keyframes cubeIdle{0%,100%{transform:rotateX(-28deg) rotateY(38deg)}50%{transform:rotateX(-22deg) rotateY(58deg)}}
+.dmain:disabled .cube{animation:none}
+.dmain{perspective:160px}
+.dmain .dface{display:none}
+/* grand dé 3D au centre pendant le lancer */
+.dice .die{width:84px;height:84px;position:relative;transform-style:preserve-3d;background:none;box-shadow:none;padding:0;display:block;border-radius:0}
+.dice .die>i{position:absolute;inset:0;background:#fff;border-radius:16px;box-shadow:inset 0 0 0 2px #D5DCEA;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:11px}
+.dice .die>i>b{width:13px;height:13px;border-radius:50%;background:#0F1B2D;align-self:center;justify-self:center}
+.dice .die .f1{transform:translateZ(42px)} .dice .die .f2{transform:rotateY(90deg) translateZ(42px)} .dice .die .f3{transform:rotateY(180deg) translateZ(42px)}
+.dice .die .f4{transform:rotateY(-90deg) translateZ(42px)} .dice .die .f5{transform:rotateX(90deg) translateZ(42px)} .dice .die .f6{transform:rotateX(-90deg) translateZ(42px)}
+.dice .die .f1 b{grid-area:2/2}
+.dice .die .f2 b:nth-child(1){grid-area:1/1}.dice .die .f2 b:nth-child(2){grid-area:3/3}
+.dice .die .f3 b:nth-child(1){grid-area:1/1}.dice .die .f3 b:nth-child(2){grid-area:2/2}.dice .die .f3 b:nth-child(3){grid-area:3/3}
+.dice .die .f4 b:nth-child(1){grid-area:1/1}.dice .die .f4 b:nth-child(2){grid-area:1/3}.dice .die .f4 b:nth-child(3){grid-area:3/1}.dice .die .f4 b:nth-child(4){grid-area:3/3}
+.dice .die .f5 b:nth-child(1){grid-area:1/1}.dice .die .f5 b:nth-child(2){grid-area:1/3}.dice .die .f5 b:nth-child(3){grid-area:2/2}.dice .die .f5 b:nth-child(4){grid-area:3/1}.dice .die .f5 b:nth-child(5){grid-area:3/3}
+.dice .die .f6 b:nth-child(1){grid-area:1/1}.dice .die .f6 b:nth-child(2){grid-area:1/3}.dice .die .f6 b:nth-child(3){grid-area:2/1}.dice .die .f6 b:nth-child(4){grid-area:2/3}.dice .die .f6 b:nth-child(5){grid-area:3/1}.dice .die .f6 b:nth-child(6){grid-area:3/3}
+.dice{perspective:500px}
+.dice.rolling .die{animation:tumble .5s linear infinite}
+@keyframes tumble{from{transform:rotateX(0) rotateY(0)}to{transform:rotateX(360deg) rotateY(360deg)}}
+.dice .die.n1{transform:rotateX(-20deg) rotateY(25deg)} .dice .die.n2{transform:rotateX(-20deg) rotateY(-65deg)} .dice .die.n3{transform:rotateX(-20deg) rotateY(205deg)}
+.dice .die.n4{transform:rotateX(-20deg) rotateY(115deg)} .dice .die.n5{transform:rotateX(-110deg) rotateY(0)} .dice .die.n6{transform:rotateX(70deg) rotateY(0)}
+.dice .die{transition:transform .5s cubic-bezier(.2,.8,.2,1)}
+/* patrimoine : classement lisible, filtre « Tout » visible */
+.rankpill{display:inline-flex;align-items:center;gap:6px;margin:4px 0 2px;padding:8px 12px;border-radius:12px;background:#FFF4D6;color:#7A4B00;font-size:13.5px;font-weight:700}
+.chip[aria-pressed="true"]{background:var(--blue);color:#fff;outline:none}
+.chip[aria-pressed="true"] .sq{box-shadow:0 0 0 2px #fff}
+/* partis : le bord politique sous le nom */
+.sp-node small{display:block;font-size:10.5px;font-weight:700;color:var(--muted);margin-top:1px}
+.pleg em{font-style:normal;color:var(--muted);font-weight:600}
+/* mon argent */
+.mday{margin-top:12px}
+.mdh{display:flex;justify-content:space-between;align-items:baseline;padding:0 4px 6px;font-size:12.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.ml{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:10px;align-items:center;width:100%;text-align:left;padding:9px 12px;background:#fff;border-radius:12px;margin-top:5px;box-shadow:var(--shadow)}
+.ml .ic{width:36px;height:36px;border-radius:11px;background:var(--soft);display:grid;place-items:center;font-size:17px}
+.ml .t{display:grid;min-width:0}
+.ml .t b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ml .t small{font-size:12px;color:var(--muted)}
+.ml>b.num{font-size:15px}
+/* patrimoine par arrondissement */
+.colh{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.colh .h2{margin:24px 0 8px}
+.seg.mini{height:34px;margin:0}
+.seg.mini button{font-size:12.5px;padding:0 10px}
+.agrp{margin-top:14px}
+.agh{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;text-align:left;padding:10px 12px;border-radius:14px;background:#fff;box-shadow:var(--shadow);border-left:6px solid var(--pc);margin-bottom:8px}
+.agh>b{font:900 18px/1 var(--f);background:var(--soft2);padding:9px 10px;border-radius:10px}
+.agh strong{display:block;font-size:14.5px}
+.agh small{display:block;font-size:12px;color:var(--muted);font-weight:700}
+.agv{text-align:right}
+.agv b{display:block;font-size:14.5px}
+.plabel{font:800 12px/1 var(--f);color:#2F6B2F;text-shadow:0 1px 0 #fff,0 -1px 0 #fff,1px 0 0 #fff,-1px 0 0 #fff,0 0 6px #fff;letter-spacing:.04em;text-transform:uppercase;pointer-events:none;white-space:nowrap;opacity:.9}
+.mmark{z-index:3}

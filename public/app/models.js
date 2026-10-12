@@ -113,7 +113,7 @@ window.addMonuments=function(map,models){
     set(lng,lat){ pawn.position.set((lng-lon0)*kx,0,-(lat-lat0)*ky); pawn.visible=true; map.triggerRepaint(); },
     color(hex){ pmat.color.set(hex); map.triggerRepaint(); },
     hide(){ pawn.visible=false; map.triggerRepaint(); },
-    k(z){ return (innerWidth < 700 ? .85 : 1.15)*Math.max(1,Math.pow(2,(16.4-z)*.7)); },
+    k(z){ return (innerWidth < 700 ? .5 : .62)*Math.max(1,Math.pow(2,(16.6-z)*.6)); },
     H:37
   };
   let renderer=null;

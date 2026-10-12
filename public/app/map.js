@@ -113,7 +113,8 @@ function buildMap(base) {
         { id: "water", type: "fill", source: "water", paint: { "fill-color": "#55A7EA" } },
         { id: "major-case", type: "line", source: "major", paint: { "line-color": "#D6CFC2", "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "k"], 3, 1.6, .6], 18, ["match", ["get", "k"], 3, 34, 20]] } },
         { id: "major", type: "line", source: "major", paint: { "line-color": "#FFFFFF", "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "k"], 3, 1.2, .4], 18, ["match", ["get", "k"], 3, 30, 17]] } },
-        { id: "mfill", type: "fill", source: "mfill", paint: { "fill-color": "#C9921A", "fill-opacity": ["interpolate", ["linear"], ["zoom"], 12, .2, 16, .06] } },
+        { id: "mfill", type: "fill", source: "mfill", paint: { "fill-color": "#E9C46A", "fill-opacity": ["interpolate", ["linear"], ["zoom"], 12, .35, 16, .25] } },
+        { id: "mfill-line", type: "line", source: "mfill", paint: { "line-color": "#B8860B", "line-width": 1.5, "line-dasharray": [2, 1.5] } },
         { id: "anchor-b", type: "background", layout: { visibility: "none" }, paint: {} },
         { id: "arrline", type: "line", source: "arr", paint: { "line-color": "#FFFFFF", "line-width": ["interpolate", ["linear"], ["zoom"], 11, 1.6, 16, 3] } },
         { id: "evline", type: "line", source: "arr", filter: ["==", ["id"], ev ? ev.arr - 1 : -1], paint: { "line-color": "#F59E0B", "line-width": ["interpolate", ["linear"], ["zoom"], 11, 3, 16, 6], "line-dasharray": [2, 1.2] } },
@@ -131,7 +132,7 @@ function buildMap(base) {
       el.addEventListener("click", ev => { ev.stopPropagation(); push("arr", i); });
       a.marker = new maplibregl.Marker({ element: el }).setLngLat(a.center).addTo(map);
     });
-    buildMonMarkers();
+    buildMonMarkers(); buildParkLabels();
     map.on("zoom", renderMarks); map.on("moveend", renderTags);
     // la boussole n'apparaît que si la carte a été tournée ; elle remet le nord en haut
     map.on("rotate", () => { const b = map.getBearing(); $("#t-north").hidden = Math.abs(b) < 2; $("#needle").style.transform = `rotate(${-b}deg)`; });
@@ -140,11 +141,20 @@ function buildMap(base) {
     loadAllProgressive();
   });
 }
+// les grands parcs et places, écrits sur la carte
+const PARKS = [["Bois de Vincennes", 2.4350, 48.8280, 11], ["Bois de Boulogne", 2.2490, 48.8620, 11], ["Jardin du Luxembourg", 2.3370, 48.8465, 13], ["Jardin des Tuileries", 2.3270, 48.8635, 13], ["Parc des Buttes-Chaumont", 2.3830, 48.8800, 13], ["Parc Monceau", 2.3090, 48.8795, 13.5], ["Parc Montsouris", 2.3380, 48.8225, 13], ["Jardin des Plantes", 2.3600, 48.8430, 13], ["Parc de la Villette", 2.3910, 48.8930, 12.5], ["Parc de Bercy", 2.3830, 48.8345, 13.5], ["Champ-de-Mars", 2.2980, 48.8560, 13], ["Place de la Concorde", 2.3210, 48.8656, 13.5], ["Place de la Bastille", 2.3690, 48.8530, 13.5], ["Place de la République", 2.3640, 48.8675, 13.5], ["Place de la Nation", 2.3960, 48.8485, 13.5], ["Cimetière du Père-Lachaise", 2.3935, 48.8610, 12.5], ["Parc André-Citroën", 2.2750, 48.8410, 13.5], ["Parc Georges-Brassens", 2.2990, 48.8320, 14], ["Les Invalides", 2.3125, 48.8560, 13], ["Champs-Élysées", 2.3070, 48.8700, 13]];
+let parkMarks = [];
+function buildParkLabels() {
+  parkMarks = PARKS.map(([n, lon, lat, minz]) => { const el = document.createElement("div"); el.className = "plabel"; el.textContent = n; return { mk: new maplibregl.Marker({ element: el }).setLngLat([lon, lat]), minz, on: false }; });
+}
+// noms courts pour les étiquettes de la carte
+const SHORT = { "Centre national d'art et de culture Georges-Pompidou": "Centre Pompidou", "cathédrale Notre-Dame de Paris": "Notre-Dame", "basilique du Sacré-Cœur de Montmartre": "Sacré-Cœur", "arc de triomphe de l'Étoile": "Arc de Triomphe", "palais de l'Élysée": "Élysée", "Paris-Nord": "Gare du Nord", "grande mosquée de Paris": "Grande Mosquée", "palais du Luxembourg": "Sénat (Luxembourg)", "Musée du Louvre": "Louvre", "église de la Madeleine": "La Madeleine", "palais Garnier": "Opéra Garnier", "catacombes de Paris": "Catacombes", "Palais Omnisports de Paris-Bercy": "Accor Arena (Bercy)", "Paris-Lyon": "Gare de Lyon", "Muséum national d'histoire naturelle": "Muséum", "hôtel de ville de Paris": "Hôtel de Ville", "conciergerie de Paris": "Conciergerie", "Paris-Est": "Gare de l'Est", "Paris-Montparnasse": "Gare Montparnasse", "Paris-Saint-Lazare": "Gare Saint-Lazare", "Paris-Austerlitz": "Gare d'Austerlitz" };
+const shortName = n => SHORT[n] || cap(n).replace(/^(Église|Musée|Théâtre|Hôtel|Palais|Basilique|Gare) /, "$1 ").replace(/ de Paris$/, "");
 let monMarks = [];
 function buildMonMarkers() {
   monMarks = IDX.mons.filter(m => m[2] === "M" || m[2] === "L").map(([g, n, r, lon, lat]) => {
     const model = IDX.models.find(x => x.g === g); const el = document.createElement("button"); el.className = "mmark"; el.style.setProperty("--mc", RAR[r].c);
-    el.innerHTML = `<i></i>${esc(cap(n))}`;
+    el.innerHTML = `<i></i>${esc(shortName(n))}`;
     el.addEventListener("click", ev => { ev.stopPropagation(); onBuildingTap(g); });
     const mk = new maplibregl.Marker({ element: el, anchor: "bottom" }).setLngLat(model ? [model.lon, model.lat] : [lon, lat]); if (model) mk.setOffset([0, -Math.min(140, model.h * .35)]);
     return { g, r, mk, el, on: false };
@@ -157,8 +167,9 @@ function renderMarks() {
     const m = ST.mayors[i]; el.style.setProperty("--pc", m ? PARTIES[m.party]?.c || "#64748B" : "#94A3B8");
     const s = document.getElementById("am" + i); if (s) s.innerHTML = m ? `${emblemSVG(m.party, 15)}${esc(m.pseudo)}` : "Siège libre";
   });
+  for (const p of parkMarks) { const show = z >= p.minz && z < 17.5; if (show && !p.on) { p.mk.addTo(map); p.on = true; } else if (!show && p.on) { p.mk.remove(); p.on = false; } }
   for (const m of monMarks) {
-    const show = z >= (m.r === "M" ? 11.4 : 16.5); m.el.classList.toggle("far", m.r !== "M" || z < (innerWidth < 700 ? 15.5 : 13.5)); if (show && !m.on) { m.mk.addTo(map); m.on = true; } else if (!show && m.on) { m.mk.remove(); m.on = false; }
+    const show = z >= (m.r === "M" ? 11.4 : 14); m.el.classList.toggle("far", z < (m.r === "M" ? (innerWidth < 700 ? 14.5 : 13.8) : 15.5)); if (show && !m.on) { m.mk.addTo(map); m.on = true; } else if (!show && m.on) { m.mk.remove(); m.on = false; }
     if (show && !m.ph) { const c = card(m.g); if (c) { m.ph = true; if (c.ph) m.el.querySelector("i").setAttribute("style", phStyle(c)); } }
   }
 }

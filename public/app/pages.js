@@ -34,7 +34,7 @@ function back() {
 async function renderDetail(anim) {
   const top = stack[stack.length - 1]; if (!top) return; const el = $("#p-detail");
   el.hidden = false; if (anim) { el.classList.remove("enter"); void el.offsetWidth; el.classList.add("enter"); el.scrollTop = 0; }
-  const K = { b: buildingPage, arr: arrPage, shop: shopPage, profile: profilePage, results: resultsPage, party: partyPage }[top.kind];
+  const K = { b: buildingPage, arr: arrPage, shop: shopPage, money: moneyPage, profile: profilePage, results: resultsPage, party: partyPage }[top.kind];
   if (!K) return;
   const html = await K(top.arg);
   if (stack[stack.length - 1] !== top) return;
@@ -62,7 +62,7 @@ function renderWallet() {
 }
 
 // ---------------- PATRIMOINE ----------------
-let assetF = "all";
+let assetF = "all", assetView = "arr";
 function worthNow() { const s = ST.state; return liveCash() + (+s.value || 0) - (+s.debt || 0) - (+s.loans || 0); }
 function logWorth() {
   try { const d = new Date().toISOString().slice(0, 10); const h = JSON.parse(localStorage.getItem("hm_hist") || "{}"); h[d] = Math.round(worthNow());
@@ -88,7 +88,8 @@ async function renderAssets() {
   const loans = +s.loans || 0, debt = +s.debt || 0;
   $("#p-assets").innerHTML = `<div class="wrap">
     <p class="eyebrow">Patrimoine net</p><h1 class="h1 num big" id="worth">${fmtE(worthNow())}</h1>
-    <p class="sub" style="margin:0 0 4px">Trésorerie + valeur de vos biens − ce que vous devez à la banque${rank ? ` · <button class="lnk" data-push="results">${rank === 1 ? "1er" : rank + "e"} sur ${ST.board.length}</button>` : ""}</p>
+    <p class="sub" style="margin:0 0 4px">Trésorerie + valeur de vos biens − ce que vous devez à la banque</p>
+    ${rank ? `<button class="rankpill" data-push="results">🏆 Classement : vous êtes <b>${rank === 1 ? "1er" : rank + "e"}</b> sur ${ST.board.length} joueur${ST.board.length > 1 ? "s" : ""}</button>` : ""}
     ${hv.length > 1 ? `<div class="box" style="padding:10px 12px 4px;margin:8px 0 6px">${sparkSVG(hv)}<div class="sub" style="margin:2px 0 6px;font-size:12px">Évolution sur ${hv.length} jours</div></div>` : ""}
     <div class="kpis k4">
       <div class="kpi"><span>Trésorerie</span><b class="num" id="cash2">${fmtE(liveCash())}</b><small class="muted">disponible</small></div>
@@ -96,18 +97,23 @@ async function renderAssets() {
       <div class="kpi"><span>Valeur des biens</span><b class="num">${fmtE(+s.value || 0)}</b><small class="muted">${nLots} logement${nLots > 1 ? "s" : ""}</small></div>
       <div class="kpi ${loans || debt ? "warn" : ""}"><span>Dettes</span><b class="num">${fmtE(loans + debt)}</b><small class="muted">${loans ? `crédits ${s.credits || 0}/3` : "aucun crédit"}${debt ? ` · hypothèques ${fmtE(debt)}` : ""}</small></div>
     </div>
-    <h2 class="h2">Ma collection</h2>
+    <div class="colh"><h2 class="h2">Ma collection</h2><div class="seg mini" role="tablist"><button data-av="arr" aria-selected="${assetView === "arr"}">Par arrondissement</button><button data-av="all" aria-selected="${assetView === "all"}">Toutes les cartes</button></div></div>
     <div class="chips"><button class="chip plain" data-af="all" aria-pressed="${assetF === "all"}">Tout · ${hs.length}</button>
       ${ORDER.split("").reverse().map(r => `<button class="chip" data-af="${r}" aria-pressed="${assetF === r}">${rarSq(r)}${counts[r]}</button>`).join("")}
       ${nLoan ? `<button class="chip plain" data-af="loan" aria-pressed="${assetF === "loan"}">🏦 À crédit · ${nLoan}</button>` : ""}
       ${nMort ? `<button class="chip plain" data-af="mort" aria-pressed="${assetF === "mort"}">🔒 Hypothéqués · ${nMort}</button>` : ""}</div>
-    ${assetF === "loan" ? `<div class="crx" style="margin:10px 0 0">Chaque bien à crédit se rembourse tout seul avec la moitié de son loyer. Vous pouvez aussi le rembourser en avance depuis sa fiche.</div>` : ""}
-    ${hs.length ? (list.length ? `<div class="grid-cards">${list.map(h => `<button data-push="b" data-arg="${h.g}" class="cw">${cardHTML(h.c, { w: "100%", item: { t: "own", ks: h.ks, n: h.n } })}${onLoan(h) ? `<span class="tagc loan">🏦 crédit ${fmtE(ST.loan.get(h.g))}</span>` : mortd(h) ? `<span class="tagc mort">🔒 hypothéqué</span>` : ""}</button>`).join("")}</div>` : `<div class="empty">Rien dans cette catégorie.</div>`)
-      : `<div class="empty">Vous n'avez encore aucun bien.<br><br><button class="btn" data-go="booster">Ouvrir un booster</button></div>`}
+    ${assetF === "loan" ? `<div class="crx" style="margin:10px 0 0">Chaque bien à crédit se rembourse tout seul avec 70 % de son loyer. Vous pouvez aussi le rembourser en avance depuis sa fiche.</div>` : ""}
+    ${!hs.length ? `<div class="empty">Vous n'avez encore aucun bien.<br><br><button class="btn" data-go="booster">Ouvrir un booster</button></div>`
+      : !list.length ? `<div class="empty">Rien dans cette catégorie.</div>`
+      : assetView === "all" ? `<div class="grid-cards">${list.map(cardBtn).join("")}</div>`
+      : (() => { const by = new Map(); for (const h of list) { const a = h.c.arr; if (!by.has(a)) by.set(a, []); by.get(a).push(h); }
+          return [...by.entries()].sort((x, y) => x[0] - y[0]).map(([arr, L]) => { const m = ST.mayors[arr - 1], pc = m ? PARTIES[m.party] : null, v = L.reduce((t, h) => t + h.c.v * unitsOf(h), 0), rent = L.reduce((t, h) => t + baseRent(h), 0), n = L.reduce((t, h) => t + h.ks.length + (h.n ? 1 : 0), 0);
+            return `<section class="agrp"><button class="agh" data-push="arr" data-arg="${arr - 1}" style="--pc:${pc ? pc.c : "#CBD5E1"}"><b>${ord(arr)}</b><span><strong>${ord(arr)} arrondissement</strong><small>${m?.mayor === ME ? "👑 Vous êtes le maire" : m ? `Maire : ${esc(m.pseudo)}` : "Siège libre"}</small></span><span class="agv num"><b>${fmtE(v)}</b><small>${n} bien${n > 1 ? "s" : ""} · +${fmtE(rent)}/j</small></span></button><div class="grid-cards">${L.map(cardBtn).join("")}</div></section>`; }).join(""); })()}
   </div>`;
+  function cardBtn(h) { return `<button data-push="b" data-arg="${h.g}" class="cw">${cardHTML(h.c, { w: "100%", item: { t: "own", ks: h.ks, n: h.n } })}${onLoan(h) ? `<span class="tagc loan">🏦 crédit ${fmtE(ST.loan.get(h.g))}</span>` : mortd(h) ? `<span class="tagc mort">🔒 hypothéqué</span>` : ""}</button>`; }
   if (!ST.board) rpc("leaderboard").then(b => { ST.board = b; if (cur() === "assets") renderAssets(); }).catch(() => { });
 }
-$("#p-assets").addEventListener("click", e => { const f = e.target.closest("[data-af]"); if (f) { assetF = f.dataset.af; renderAssets(); } });
+$("#p-assets").addEventListener("click", e => { const f = e.target.closest("[data-af]"); if (f) { assetF = f.dataset.af; renderAssets(); } const v = e.target.closest("[data-av]"); if (v) { assetView = v.dataset.av; renderAssets(); } });
 
 // ---------------- MARCHÉ ----------------
 let marketTab = "all";
@@ -184,7 +190,7 @@ async function renderParis() {
     <div class="box pbox">
       <div class="pb-h"><p class="eyebrow">Les 20 mairies</p>${w?.party ? `<span class="pill" style="background:${PARTIES[w.party].c};color:#fff">🏛 Hôtel de Ville : ${esc(PARTIES[w.party].n)}</span>` : ""}</div>
       ${mayorsMapSVG()}
-      <div class="pleg">${PARTY_ORDER.map(k => `<span><i style="background:${PARTIES[k].c}"></i>${esc(PARTIES[k].n)} <b>${seats[k] || 0}</b></span>`).join("")}</div>
+      <div class="pleg">${PARTY_ORDER.map(k => `<span><i style="background:${PARTIES[k].c}"></i>${esc(PARTIES[k].n)} <em>(${esc(PARTIES[k].side.toLowerCase())})</em> <b>${seats[k] || 0}</b></span>`).join("")}</div>
       <p class="sub" style="margin:8px 0 0;font-size:12.5px">Le maire d'un arrondissement est le joueur qui y possède le plus. Chaque lundi, le parti qui a le plus de maires gagne l'Hôtel de Ville. <button class="lnk" data-push="results">En savoir plus</button></p>
     </div>
     ${ev ? (() => { const t = evText(ev); return `<button class="box evbox" data-push="arr" data-arg="${ev.arr - 1}"><span class="ei">${t.ic}</span><span><small>Événement du jour</small><b>${esc(t.t)}</b><span>${t.d}</span></span></button>`; })() : ""}
@@ -250,9 +256,9 @@ async function buildingPage(g) {
       else actions = `<button class="btn sm amber" data-act="sale" data-k="${k}">Vendre</button><button class="btn sm light" data-act="mort" data-k="${k}">Hypothéquer</button>`;
       return `<div class="myrow"><b>${where}</b><div class="acts">${actions}</div></div>`;
     }).join("");
-    const days = loan ? Math.ceil(loan / Math.max(1, c.rent * unitsOf(h) / 2)) : 0;
+    const days = loan ? Math.ceil(loan / Math.max(1, c.rent * unitsOf(h) * .7)) : 0;
     mine = `<div class="box mine-box"><div class="mb-h"><span>Vous possédez</span><b>${esc(ownSentence(c, myKs, myN))}</b><small class="num">+${fmtE(baseRent(h))} / jour${fullTitle(h) ? " · immeuble complet +60 %" : myKs.some(k => fullFloor(c, myKs, k)) ? " · étage complet +25 %" : ""}</small></div>
-      ${loan ? `<div class="loanbox"><b>🏦 Crédit en cours : reste ${fmtE(loan)}</b><span>Il se rembourse tout seul avec la moitié du loyer (encore ~${days} jours). Remboursé, vous touchez tout le loyer et pouvez vendre ou hypothéquer.</span><button class="btn sm green" data-act="repay" ${liveCash() < loan ? "disabled" : ""}>Rembourser maintenant · ${fmtE(loan)}</button></div>` : ""}
+      ${loan ? `<div class="loanbox"><b>🏦 Crédit en cours : reste ${fmtE(loan)}</b><span>Il se rembourse tout seul avec 70 % du loyer (encore ~${days} jours). Remboursé, vous touchez tout le loyer et pouvez vendre ou hypothéquer.</span><button class="btn sm green" data-act="repay" ${liveCash() < loan ? "disabled" : ""}>Rembourser maintenant · ${fmtE(loan)}</button></div>` : ""}
       ${rows ? `<div class="myrows">${rows}</div>` : ""}</div>`;
   }
   const offers = bInfo.listings.filter(l => l.seller !== ME);
@@ -274,7 +280,7 @@ async function buildingPage(g) {
     <div class="bp-info">
       <div class="btitle"><span class="pill rar" style="background:${RAR[c.r].c}">${RAR[c.r].n}</span><span class="pill">${esc(kindLabel(c))}</span>${status}</div>
       <h1 class="h1">${esc(title(c))}</h1>
-      <p class="sub">${esc(c.name && c.adr ? c.adr + " · " : "")}${ord(c.arr)} arr.${c.y ? ` · construit vers ${esc(c.y)}` : ""} · <button class="lnk" data-mapto="${g}">sur la carte</button>${!isP ? ` · <a class="lnk" href="${streetURL(g)}" target="_blank" rel="noopener">📷 voir la vraie façade</a>` : ""}</p>
+      <p class="sub">${esc(c.name && c.adr ? c.adr + " · " : "")}${ord(c.arr)} arr.${c.y ? ` · construit vers ${esc(c.y)}` : ""} · <button class="lnk" data-mapto="${g}">sur la carte</button></p>
       <div class="bstat2 num"><div><span>Prix ${isP ? "d'une part" : `d'un ${unitW}`}</span><b>${fmtE(c.v)}</b></div><div><span>Loyer</span><b class="green">+${fmtE(c.rent)}<small>/j</small></b></div></div>
       <div class="actbar2" id="actbar">${buyActions(c, g, owners, free, isP)}</div>
       ${mine}${offersHTML}${plan}${about}
@@ -283,9 +289,9 @@ async function buildingPage(g) {
 }
 function farHTML(d, g) { return `<div class="buyfar"><b>🎲 Pour l'acheter à la banque, tombez dessus avec le dé.</b><span class="muted">Ou trouvez-le dans un booster, ou au Marché si un joueur le vend.</span></div>`; }
 function payToggle(price) {
-  const credits = ST.state?.credits || 0, can = credits < 3, cash = liveCash(), down = Math.ceil(price * .3);
-  const cr = can && (bCredit === null ? cash < price && cash >= down : bCredit);
-  return [cr, `<div class="pay" role="tablist"><button data-act="paymode" data-k="0" aria-selected="${!cr}">Comptant</button><button data-act="paymode" data-k="1" aria-selected="${cr}" ${can ? "" : "disabled"}>À crédit${can ? "" : " (3/3)"}</button></div>`];
+  const cap = ST.state?.loan_cap ?? 1e12, cash = liveCash(), down = Math.ceil(price * .1), can = price - down <= cap;
+  const cr = can && (bCredit === null ? cash >= down : bCredit);
+  return [cr, `<div class="pay" role="tablist"><button data-act="paymode" data-k="0" aria-selected="${!cr}">Comptant</button><button data-act="paymode" data-k="1" aria-selected="${cr}" ${can ? "" : "disabled"}>À crédit${can ? "" : " (capacité atteinte)"}</button></div>`];
 }
 function buyActions(c, g, owners, free, isP) {
   const cash = liveCash(), far = notLanded(g);
@@ -294,17 +300,17 @@ function buyActions(c, g, owners, free, isP) {
     const head = `<div class="what"><b>${lotName(c, k)}${c.lk === "l" ? " · " + ord(floorOfLot(c, k)) + " étage" : ""}</b><span class="num">${o ? (o.o === ME ? "À vous" : "À " + esc(o.ps)) : "Libre"}</span></div>`;
     let btn;
     if (!o && far) btn = farHTML(far, g);
-    else if (!o) { const [cr, tg] = payToggle(c.v); btn = tg + `<button class="btn block green" data-act="bank" data-k="${k}" ${cash < (cr ? Math.ceil(c.v * .3) : c.v) ? "disabled" : ""}>${cr ? `Acheter · apport ${fmtE(Math.ceil(c.v * .3))}` : `Acheter · ${fmtE(c.v)}`}</button>`; }
+    else if (!o) { const [cr, tg] = payToggle(c.v); btn = tg + `<button class="btn block green" data-act="bank" data-k="${k}" ${cash < (cr ? Math.ceil(c.v * .1) : c.v) ? "disabled" : ""}>${cr ? `Acheter · apport ${fmtE(Math.ceil(c.v * .1))}` : `Acheter · ${fmtE(c.v)}`}</button>`; }
     else if (o.o === ME) btn = `<div class="sub" style="margin:0">Il est à vous.</div>`;
     else btn = l ? `<button class="btn block green" data-act="buyl" data-id="${l.id}" ${cash < l.price ? "disabled" : ""}>Acheter à ${esc(l.pseudo)} · ${fmtE(l.price)}</button>` : `<div class="sub" style="margin:0">Appartient à ${esc(o.ps)}, pas en vente.</div>`;
     return head + btn + `<button class="btn sm ghost" data-act="unpick">Annuler</button>`;
   }
   if (free <= 0) return `<div class="what"><span>Tout est pris. Surveillez le Marché : les propriétaires peuvent mettre leurs biens en vente.</span></div>`;
   if (far) return farHTML(far, g);
-  const total = c.v * c.lots, allFree = !isP && owners.size === 0 && c.lots > 1, [cr, tg] = payToggle(c.v), need = p => cr ? Math.ceil(p * .3) : p;
+  const total = c.v * c.lots, allFree = !isP && owners.size === 0 && c.lots > 1, [cr, tg] = payToggle(c.v), need = p => cr ? Math.ceil(p * .1) : p;
   return tg + `<button class="btn block green" data-act="bank" ${cash < need(c.v) ? "disabled" : ""}>${isP ? "Acheter 1 part" : `Acheter un ${c.lk === "l" ? "logement" : "local"}`} · ${cr ? "apport " + fmtE(need(c.v)) : fmtE(c.v)}</button>
     ${allFree ? `<button class="btn block light" data-act="bbuild" ${cash < need(total) ? "disabled" : ""}>Tout l'immeuble · ${cr ? "apport " + fmtE(need(total)) : fmtE(total)} <span class="green" style="font-size:12px">+60 %</span></button>` : ""}
-    ${cr ? `<p class="crx">Vous payez 30 % maintenant ; la banque avance le reste, remboursé tout seul par la moitié du loyer.</p>` : cash < c.v ? `<small class="muted">Il vous manque ${fmtE(c.v - cash)}.</small>` : ""}`;
+    ${cr ? `<p class="crx">10 % maintenant ; la banque avance le reste, remboursé tout seul par 70 % du loyer.</p>` : cash < c.v ? `<small class="muted">Il vous manque ${fmtE(c.v - cash)}.</small>` : ""}`;
 }
 $("#p-detail").addEventListener("click", async e => {
   const top = stack[stack.length - 1]; if (!top) return;
@@ -345,7 +351,7 @@ async function arrPage(i) {
   else if (!lead) goal = `<div class="goal"><b>Siège libre</b><span>Achetez un bien ici : vous deviendrez maire.</span></div>`;
   else goal = `<div class="goal"><b>Pour devenir maire</b><span>Possédez plus que ${esc(lead.pseudo)} ici : il vous manque <b class="num">${fmtE(gap)}</b> de biens.</span></div>`;
   return dhead("") + `<div class="wrap">
-    <div class="ahead" style="--pc:${pc ? pc.c : "#94A3B8"}"><span class="an">${ord(a.n)}</span><div><small>arrondissement</small><b>${s?.pseudo ? "Maire : " + esc(s.pseudo) : "Pas encore de maire"}</b>${pc ? `<span class="ap">${emblemSVG(s.party, 18)}${esc(pc.n)}</span>` : ""}</div></div>
+    <div class="ahead" style="--pc:${pc ? pc.c : "#94A3B8"}"><span class="an">${ord(a.n)}</span><div><small>arrondissement</small><b>${s?.pseudo ? "Maire : " + esc(s.pseudo) : "Pas encore de maire"}</b>${pc ? `<span class="ap">${emblemSVG(s.party, 18)}${esc(pc.n)} · ${esc(pc.side.toLowerCase())}</span>` : ""}</div></div>
     ${goal}
     ${ev?.arr === a.n ? (() => { const t = evText(ev); return `<div class="box evbox" style="margin-top:10px"><span class="ei">${t.ic}</span><span><small>Aujourd'hui</small><b>${esc(t.t)}</b><span>${t.d}</span></span></div>`; })() : ""}
     <h2 class="h3">Plus gros propriétaires</h2>
@@ -358,6 +364,23 @@ async function arrPage(i) {
 document.addEventListener("click", e => { const b = e.target.closest("[data-arrmap]"); if (!b) return; const a = IDX.arr[+b.dataset.arrmap]; go("map"); setTimeout(() => map?.flyTo({ center: a.center, zoom: 14.4, pitch: 50, duration: 1200 }), 60); });
 
 // ---------------- BOUTIQUE, PROFIL ----------------
+// ---------------- MON ARGENT : historique ----------------
+const LK = { rent: ["🏠", "Loyers"], tax: ["🏛️", "Taxe des maires"], tax_in: ["👑", "Taxe de maire reçue"], salary: ["💼", "Salaire du tour"], toll_paid: ["💸", "Loyer de passage payé"], toll_in: ["💰", "Loyer de passage reçu"], buy: ["🔑", "Achat"], sale: ["🤝", "Vente"], chance: ["🃏", "Carte Chance"], booster: ["📦", "Booster"], rolls: ["🎲", "Lancers"], mortgage: ["🏦", "Hypothèque"], lift: ["🏦", "Hypothèque remboursée"], repay: ["🏦", "Crédit remboursé"], bonus: ["🏠", "Bonus"], credit: ["🏦", "Remboursement des crédits"] };
+async function moneyPage() {
+  let rows = []; try { rows = await rpc("my_ledger"); } catch (e) { }
+  await ensureCards(rows.filter(r => r.card != null).map(r => r.card));
+  const s = ST.state; const days = new Map();
+  for (const r of rows) { const d = new Date(r.at); const key = d.toDateString(); if (!days.has(key)) days.set(key, { d, items: [], tot: 0 }); const g = days.get(key); g.items.push(r); g.tot += +r.amount; }
+  const dayLabel = d => { const t = new Date(), y = new Date(Date.now() - 864e5); return d.toDateString() === t.toDateString() ? "Aujourd'hui" : d.toDateString() === y.toDateString() ? "Hier" : d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }); };
+  const line = r => { const [ic, dft] = LK[r.kind] || ["•", r.kind]; const c = r.card != null ? card(r.card) : null; const a = +r.amount;
+    return `<${c ? `button data-push="b" data-arg="${r.card}"` : "div"} class="ml"><span class="ic">${ic}</span><span class="t"><b>${esc(r.label || dft)}</b>${c ? `<small>${esc(title(c))}</small>` : ""}</span><b class="num ${a >= 0 ? "green" : "red"}">${a >= 0 ? "+" : "−"}${fmtE(Math.abs(a))}</b></${c ? "button" : "div"}>`; };
+  return dhead("Mon argent") + `<div class="wrap">
+    <div class="box" style="text-align:center"><p class="eyebrow">Trésorerie</p><b class="num" style="font-size:30px" id="cash2">${fmtE(liveCash())}</b><div class="sub" style="margin:4px 0 0">+${fmtE(netRate())} de loyers par jour${s?.loan_rate > 0 ? ` · ${fmtE(s.loan_rate)} / jour remboursent vos crédits` : ""}</div>
+      <div style="margin-top:10px"><button class="btn sm gold" data-push="shop">+ Ajouter de l'argent</button></div></div>
+    <h2 class="h2">Historique</h2>
+    ${rows.length ? [...days.values()].map(g => `<div class="mday"><div class="mdh"><span>${dayLabel(g.d)}</span><b class="num ${g.tot >= 0 ? "green" : "red"}">${g.tot >= 0 ? "+" : "−"}${fmtE(Math.abs(g.tot))}</b></div>${g.items.map(line).join("")}</div>`).join("") : `<div class="empty">Vos premiers mouvements apparaîtront ici : loyers, achats, salaires…</div>`}
+  </div>`;
+}
 async function shopPage() {
   const offers = [[0.99, 1e6], [4.99, 6e6, "Populaire"], [9.99, 13e6], [19.99, 28e6], [49.99, 75e6, "Meilleur prix"]];
   return dhead("Boutique") + `<div class="wrap">
@@ -382,7 +405,7 @@ async function profilePage() {
     ${pr ? `<div class="box" style="border-left:6px solid ${pr.c};display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center">${emblemSVG(p.party, 56)}<div><b style="color:${pr.c};font-size:17px">${esc(pr.n)}</b> <span class="muted">· ${esc(pr.side)}</span><div class="motto">« ${esc(pr.motto)} »</div><p class="sub" style="margin:6px 0 0">Vous protège de : ${esc(shieldText(p.party))}. Dans les arrondissements tenus par ${esc(pr.n)}, vos loyers sont à +${MEMBER_BONUS} %.</p></div></div>` : ""}
     <div style="margin-top:10px"><button class="btn block ${pr ? "light" : ""}" data-push="party" ${pr && wait > 0 ? "disabled" : ""}>${!pr ? "Choisir mon parti" : wait > 0 ? `Changer de parti possible dans ${hm(wait)}` : "Changer de parti"}</button></div>
     <h2 class="h2">Réglages</h2>
-    <button class="btn block light" id="mute">${(() => { try { return localStorage.getItem("hm_mute") === "1" ? "🔇 Sons coupés · réactiver" : "🔊 Sons activés · couper"; } catch (e) { return "🔊 Sons"; } })()}</button>
+    <button class="btn block light" id="mute">${(() => { try { return localStorage.getItem("hm_sound") === "1" ? "🔊 Sons activés · couper" : "🔇 Sons coupés · activer"; } catch (e) { return "🔇 Sons"; } })()}</button>
     <h2 class="h2">Compte</h2>
     <button class="btn block ghost" id="logout">Se déconnecter</button>
     <p class="sub" style="margin-top:16px;text-align:center"><a href="/terms" target="_blank">Conditions d'utilisation</a> · <a href="/privacy" target="_blank">Confidentialité</a></p>
@@ -396,8 +419,8 @@ let pickParty = null;
 function partyPickerHTML(current) {
   pickParty = current || PARTY_ORDER[2];
   return `<p class="sub">Chaque arrondissement a pour maire son plus gros propriétaire. Rejoignez un camp : quand un membre devient maire, tous les membres y touchent +${MEMBER_BONUS} % de loyers, et chaque semaine le parti qui a le plus de maires remporte l'Hôtel de Ville.</p>
-    <div class="spectrum"><div class="sp-line"></div>${PARTY_ORDER.map(k => `<button class="sp-node" data-party="${k}" aria-pressed="${pickParty === k}" style="--pc:${PARTIES[k].c}" aria-label="${esc(PARTIES[k].n)}">${emblemSVG(k, 46)}<span>${esc(PARTIES[k].n)}</span></button>`).join("")}</div>
-    <div class="sp-ends"><span>Gauche</span><span>Centre</span><span>Droite</span></div>
+    <div class="spectrum"><div class="sp-line"></div>${PARTY_ORDER.map(k => `<button class="sp-node" data-party="${k}" aria-pressed="${pickParty === k}" style="--pc:${PARTIES[k].c}" aria-label="${esc(PARTIES[k].n)}">${emblemSVG(k, 46)}<span>${esc(PARTIES[k].n)}</span><small>${esc(PARTIES[k].side)}</small></button>`).join("")}</div>
+    
     <div id="pdetail">${partyDetailHTML(pickParty)}</div>`;
 }
 function partyDetailHTML(k) {
@@ -413,6 +436,6 @@ async function partyClick(e) {
   const pc = e.target.closest("[data-party]"); if (pc) { pickParty = pc.dataset.party; $$("#p-detail [data-party]").forEach(b => b.setAttribute("aria-pressed", b === pc)); $("#pdetail").innerHTML = partyDetailHTML(pickParty); return; }
   if (e.target.closest("#party-save")) { if (await act("set_party", { p_party: pickParty }, `Bienvenue chez ${PARTIES[pickParty].n} !`)) { renderWallet(); back(); } return; }
   if (e.target.closest("#logout")) return signOut();
-  if (e.target.closest("#mute")) { try { localStorage.setItem("hm_mute", localStorage.getItem("hm_mute") === "1" ? "0" : "1"); } catch (x) { } return renderDetail(false); }
+  if (e.target.closest("#mute")) { try { localStorage.setItem("hm_sound", localStorage.getItem("hm_sound") === "1" ? "0" : "1"); } catch (x) { } return renderDetail(false); }
 }
 function afterDetail(top) { }

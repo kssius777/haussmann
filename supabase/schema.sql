@@ -328,35 +328,65 @@ begin
   group by allr.a, s.mayor, s.party;
 end $$;
 
+-- Historique de l'argent : chaque mouvement de trésorerie
+create table if not exists ledger (
+  id     bigserial primary key,
+  owner  uuid not null references profiles(id) on delete cascade,
+  at     timestamptz not null default now(),
+  kind   text not null,          -- rent, tax, tax_in, salary, toll_paid, toll_in, buy, sale, chance, booster, rolls, mortgage, lift, repay, bonus, credit
+  amount bigint not null,        -- positif = reçu, négatif = payé
+  label  text,
+  card   int
+);
+create index if not exists ledger_owner on ledger(owner, at desc);
+alter table ledger enable row level security;
+drop policy if exists ledger_own on ledger; create policy ledger_own on ledger for select using (owner = auth.uid());
+create or replace function _log(p uuid, k text, amt bigint, lbl text default null, c int default null) returns void language plpgsql as $$
+declare last ledger;
+begin
+  if amt = 0 then return; end if;
+  -- les loyers arrivent en continu : on regroupe dans une même ligne pendant 1 h
+  if k in ('rent','credit','tax') then
+    select * into last from ledger where owner=p and kind=k order by at desc limit 1;
+    if found and last.at > now() - interval '1 hour' then update ledger set amount = amount + amt, at = now() where id = last.id; return; end if;
+  end if;
+  insert into ledger(owner, kind, amount, label, card) values (p, k, amt, lbl, c);
+end $$;
+
 -- Verse les loyers dus depuis la dernière fois (appelé avant chaque action)
 create or replace function _sync(p uuid) returns void language plpgsql as $$
 #variable_conflict use_column
-declare pr profiles; secs float8; x record; w city_week; net float8 := 0; t float8;
+declare pr profiles; secs float8; x record; w city_week; net float8 := 0; t float8; gross float8 := 0; taxes float8 := 0; cr bigint := 0; py record;
 begin
   select * into pr from profiles where id=p for update;
-  with d as (delete from pay where owner=p returning amount) select coalesce(sum(amount),0) into t from d;
-  if t > 0 then update profiles set cash = cash + t::bigint where id=p; end if;
+  for py in with d as (delete from pay where owner=p returning amount, why) select why, sum(amount) amt from d group by why loop
+    update profiles set cash = cash + py.amt where id=p;
+    perform _log(p, case py.why when 'taxe' then 'tax_in' when 'vente' then 'sale' else 'toll_in' end, py.amt::bigint, case py.why when 'taxe' then 'Taxe de maire reçue' when 'vente' then 'Vente au Marché' else 'Loyer de passage reçu' end);
+  end loop;
   secs := extract(epoch from (now() - pr.rent_at));
   if secs < 1 then return; end if;
   for x in select * from _rates(p) loop
     t := x.rate * x.tax * secs / 86400;
-    net := net + x.rate * secs / 86400 - t;
+    net := net + x.rate * secs / 86400 - t; gross := gross + x.rate * secs / 86400; taxes := taxes + t;
     if t >= 1 then insert into pay(owner, amount, why) values (x.mayor, floor(t)::bigint, 'taxe'); end if;
   end loop;
   w := _week();
-  if w.party is not null and w.party = pr.party then net := net + w.bonus * secs / 86400; end if;
+  if w.party is not null and w.party = pr.party then net := net + w.bonus * secs / 86400; gross := gross + w.bonus * secs / 86400; end if;
   -- crédit immobilier : la moitié du loyer de base de chaque bien à crédit part à la banque, jusqu'au remboursement
   with r as (select l.card, l.k, least(l.loan, floor(c.rent * (cfg()->>'creditShare')::float8 * secs / 86400))::bigint amt
              from lots l join cards c on c.id = l.card where l.owner = p and l.loan > 0 and l.mort is null),
        u1 as (update lots set loan = nullif(lots.loan - r.amt, 0) from r where lots.card = r.card and lots.k = r.k returning r.amt)
   select coalesce(sum(amt), 0) into t from u1;
-  net := net - t;
+  net := net - t; cr := cr + t::bigint;
   with r as (select x.card, least(x.loan, floor(c.rent * x.n * (cfg()->>'creditShare')::float8 * secs / 86400))::bigint amt
              from parts x join cards c on c.id = x.card where x.owner = p and x.loan > 0 and x.mort is null),
        u2 as (update parts set loan = nullif(parts.loan - r.amt, 0) from r where parts.card = r.card and parts.owner = p returning r.amt)
   select coalesce(sum(amt), 0) into t from u2;
-  net := net - t;
+  net := net - t; cr := cr + t::bigint;
   update profiles set cash = greatest(0, cash + floor(net)::bigint), rent_at = now() where id=p;
+  perform _log(p, 'rent', floor(gross)::bigint, 'Loyers');
+  if taxes >= 1 then perform _log(p, 'tax', -floor(taxes)::bigint, 'Taxe des maires'); end if;
+  if cr > 0 then perform _log(p, 'credit', -cr, 'Remboursement des crédits'); end if;
 end $$;
 
 -- =====================================================================
@@ -485,6 +515,7 @@ begin
   path := _walk(u, pr.pos, a * (pawn_cfg()->>'stepMul')::int);
   t := path[array_length(path, 1)];
   update profiles set pos = t, land = t, cash = cash + (pawn_cfg()->>'salary')::bigint where id = u;   -- petit salaire à chaque lancer
+  perform _log(u, 'salary', (pawn_cfg()->>'salary')::bigint, 'Salaire du tour', t);
   select * into c from cards where id = t;
   -- loyer à payer : chaque propriétaire reçoit une journée de loyer de ses biens ici (plafonné à 20 % de votre trésorerie)
   for o in
@@ -510,12 +541,14 @@ begin
     end loop;
     toll := floor(toll * ratio);
     update profiles set cash = greatest(0, cash - toll::bigint) where id = u;
+    perform _log(u, 'toll_paid', -toll::bigint, 'Loyer de passage payé', t);
   end if;
   sq := _square(u, t);
   -- chez soi : une journée de loyer de ses biens ici en bonus
   if (sq->>'mine')::int > 0 then
     bonus := floor(c.rent::numeric * (sq->>'mine')::int);
     update profiles set cash = cash + bonus where id = u;
+    perform _log(u, 'bonus', bonus, 'Bonus : chez vous', t);
   end if;
   if _is_chance(t) then ch := _chance(u); end if;
   if ch ? 'extra' and ch->'extra' <> 'null'::jsonb then perform _refresh_mayors(array[(select arr from cards where id = (ch->'extra'->>'card')::int)::int]); end if;
@@ -555,6 +588,7 @@ begin
   select * into pr from profiles where id=u for update;
   price := rolls_price(pr);
   if pr.cash < price then raise exception 'Trésorerie insuffisante : il faut %', price; end if;
+  perform _log(u, 'rolls', -price, 'Achat de 5 lancers');
   update profiles set cash = cash - price, rolls = least(99, rolls + (pawn_cfg()->>'rollsPack')::int),
     rb_n = case when rb_day = paris_today() then rb_n + 1 else 1 end, rb_day = paris_today() where id=u;
   return state();
@@ -758,7 +792,7 @@ begin
   end if;
 
   if a <> 0 then
-    update profiles set cash = greatest(0, cash + a) where id=p;
+    update profiles set cash = greatest(0, cash + a) where id=p; perform _log(p, 'chance', a, 'Carte Chance');
     return jsonb_build_object('t','chance','k',k,'amount',a);
   end if;
 
@@ -781,10 +815,10 @@ begin
     when 'degat'     then insert into fx(owner,kind,card,k,m,until) values (p,'lot',h.card,h.k,0,now()+interval '24 hours');
     when 'squat'     then insert into fx(owner,kind,card,k,m,until) values (p,'lot',h.card,h.k,0,now()+interval '48 hours');
     when 'cambriolage' then
-      a := -30000; update profiles set cash = greatest(0, cash + a) where id=p;
+      a := -30000; update profiles set cash = greatest(0, cash + a) where id=p; perform _log(p, 'chance', a, 'Carte Chance : cambriolage', h.card);
       return jsonb_build_object('t','chance','k',k,'amount',a,'card',h.card);
     when 'ravalement' then
-      a := -floor(h.v*0.01); update profiles set cash = greatest(0, cash + a) where id=p;
+      a := -floor(h.v*0.01); update profiles set cash = greatest(0, cash + a) where id=p; perform _log(p, 'chance', a, 'Carte Chance : ravalement', h.card);
       return jsonb_build_object('t','chance','k',k,'amount',a,'card',h.card);
     else null;
   end case;
@@ -810,6 +844,7 @@ begin
     price := (cfg()->>'pack')::bigint * (2 ^ pr.bought_n)::bigint;
     if pr.cash < price then raise exception 'Trésorerie insuffisante'; end if;
     update profiles set cash = cash - price, bought_day = paris_today(), bought_n = pr.bought_n + 1 where id=u;
+    perform _log(u, 'booster', -price, 'Achat d''un booster');
   else raise exception 'Type de booster inconnu'; end if;
 
   for i in 1..4 loop
@@ -851,12 +886,12 @@ begin
   select p.cash into have from profiles p where id=u for update;
   if not coalesce(credit, false) then
     if have < price then raise exception 'Trésorerie insuffisante'; end if;
-    update profiles set cash = cash - price where id=u; return 0;
+    update profiles set cash = cash - price where id=u; perform _log(u, 'buy', -price, 'Achat comptant'); return 0;
   end if;
   down := ceil(price * (cfg()->>'creditDown')::numeric);
   if price - down > _loan_cap(u) then raise exception 'Capacité d''emprunt dépassée : la banque ne vous prête plus que % €', greatest(0, _loan_cap(u)); end if;
   if have < down then raise exception 'Apport insuffisant : il faut % € (10 %% du prix)', down; end if;
-  update profiles set cash = cash - down where id=u;
+  update profiles set cash = cash - down where id=u; perform _log(u, 'buy', -down, 'Apport (achat à crédit)');
   return price - down;
 end $$;
 
@@ -975,7 +1010,7 @@ begin
   end if;
   select party into mp from arr_state where arr=c.arr;
   fee := (cfg()->>'fee')::numeric;
-  update profiles set cash = cash - l.price where id=u;
+  update profiles set cash = cash - l.price where id=u; perform _log(u, 'buy', -l.price, 'Achat au Marché', l.card);
   insert into pay(owner, amount, why) values (l.seller, floor(l.price*(1-fee)), 'vente');
   perform _add_value(l.seller, c.arr, -c.v*l.n);
   perform _add_value(u, c.arr, c.v*l.n);
@@ -1008,7 +1043,7 @@ begin
     if not found then raise exception 'Rien à hypothéquer'; end if;
     delete from listings where card=p_card and k=p_k;
   end if;
-  update profiles set cash = cash + a where id=u;
+  update profiles set cash = cash + a where id=u; perform _log(u, 'mortgage', a, 'Hypothèque', p_card);
   return state();
 end $$;
 
@@ -1023,7 +1058,7 @@ begin
   if due <= 0 then raise exception 'Pas de crédit sur ce bien'; end if;
   perform 1 from profiles where id=u for update;
   if (select cash from profiles where id=u) < due then raise exception 'Trésorerie insuffisante : il faut %', due; end if;
-  update profiles set cash = cash - due where id=u;
+  update profiles set cash = cash - due where id=u; perform _log(u, 'repay', -due, 'Crédit remboursé en avance', p_card);
   update lots set loan = null where card=p_card and owner=u;
   update parts set loan = null where card=p_card and owner=u;
   return state();
@@ -1041,7 +1076,7 @@ begin
   cost := floor(m * (1 + (cfg()->>'mortDaily')::numeric * extract(epoch from (now()-mt))/86400));
   perform 1 from profiles where id=u for update;
   if (select cash from profiles where id=u) < cost then raise exception 'Trésorerie insuffisante'; end if;
-  update profiles set cash = cash - cost where id=u;
+  update profiles set cash = cash - cost where id=u; perform _log(u, 'lift', -cost, 'Hypothèque remboursée', p_card);
   if p_k is null then update parts set mort=null, mort_at=null where card=p_card and owner=u;
   else update lots set mort=null, mort_at=null where card=p_card and k=p_k and owner=u; end if;
   return state();
@@ -1094,6 +1129,11 @@ create or replace function feed() returns json language sql stable security defi
     from news n left join profiles p on p.id=n.actor order by n.at desc limit 60) x
 $$;
 
+-- Historique de mon argent (100 derniers mouvements)
+create or replace function my_ledger() returns json language sql stable security definer set search_path = public as $$
+  select coalesce(json_agg(x), '[]') from (select kind, amount, label, card, at from ledger where owner = auth.uid() order by at desc limit 100) x
+$$;
+
 -- Classement
 create or replace function leaderboard() returns json language sql stable security definer set search_path = public as $$
   select coalesce(json_agg(x), '[]') from (
@@ -1123,7 +1163,7 @@ alter default privileges in schema public revoke execute on functions from publi
 do $$ declare f text; begin
   foreach f in array array['join_game(text,text)','set_party(text)','state()','open_booster(text)','bank_buy(int,int,boolean)','buy_building(int,boolean)','repay(int)','roll()','teleport(int)','buy_rolls()',
     'list_item(int,int,int,bigint)','unlist(bigint)','buy_listing(bigint)','mortgage(int,int)','lift(int,int)',
-    'map_state()','my_holdings()','building(int)','market()','feed()','leaderboard()','arr_info(int)'] loop
+    'map_state()','my_holdings()','building(int)','market()','feed()','leaderboard()','arr_info(int)','my_ledger()'] loop
     execute format('grant execute on function %s to anon, authenticated', f);
   end loop;
 end $$;

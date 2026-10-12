@@ -128,7 +128,7 @@ function showLand(L) {
   if (L?.toll > 0) lines.push(`<span class="ln bad">Vous lui payez son loyer : <b>${fmtE(L.toll)}</b></span>`);
   if (L?.bonus > 0) lines.push(`<span class="ln good">Bonus : une journée de loyer offerte, <b>+${fmtE(L.bonus)}</b></span>`);
   if (L?.salary > 0) lines.push(`<span class="ln good">💼 Salaire du tour : <b>+${fmtE(L.salary)}</b></span>`);
-  if (L?.chance) { const ch = L.chance; const [nm] = CHANCE[ch.k] || ["Chance"]; lines.push(`<span class="ln ${BAD.has(ch.k) ? "bad" : "good"}">🃏 Case Chance : <b>${esc(nm)}</b> ${esc(chanceText(ch))}</span>`); }
+  if (L?.chance) { const ch = L.chance; const [nm] = CHANCE[ch.k] || ["Chance"]; lines.push(`<span class="ln ${BAD.has(ch.k) ? "bad" : "good"}">🃏 Case Chance ! Carte tirée : <b>${esc(nm)}</b> → ${esc(chanceText(ch))}</span>`); }
   const word = n => lotWord(c, n), tot = c.lots;
   const info = isP ? `${fmtN(free)} parts libres` : tot > 1 ? `Immeuble de ${tot} ${word(tot)} · <b>${free} libre${free > 1 ? "s" : ""}</b>` : "";
   let btns = "";
@@ -136,18 +136,17 @@ function showLand(L) {
     const unit = isP ? "1 part" : tot > 1 ? `1 ${word(1)}` : c.lk === "l" ? "le logement" : "le local", allFree = !isP && free === tot && tot > 1, total = c.v * tot;
     const cap = ST.state?.loan_cap ?? 1e12, down = p => Math.ceil(p * CREDIT_DOWN);
     const cashOK = cash >= c.v, creditOK = cash >= down(c.v) && c.v - down(c.v) <= cap;
-    const cr = creditOK && (landCredit === null ? !cashOK : landCredit);
+    const cr = creditOK && (landCredit === null ? true : landCredit);   // à crédit par défaut : c'est ce que tout le monde choisit
     if (!cashOK && !creditOK) {
       const need = cash >= down(c.v) ? 0 : down(c.v) - cash, rate = netRate(), days = rate > 0 ? Math.ceil(need / rate) : 0;
-      btns = `<div class="nomoney"><b>Pas assez pour celui-ci</b><span>${cash < down(c.v) ? `Il manque ${fmtE(need)} pour l'apport de 10 %${days ? ` : vos loyers les apportent dans ${days} jour${days > 1 ? "s" : ""}` : ""}.` : `La banque ne vous prête plus que ${fmtE(cap)} : remboursez un crédit d'abord.`}</span>
-        <div class="tips"><span>💡 En attendant :</span><button data-go="booster">ouvrir un booster</button>${holdings().length ? `<button data-go="assets">vendre un bien</button>` : ""}<button data-mvclose>relancer le dé</button></div></div>`;
+      btns = `<div class="nomoney"><b>Pas assez pour celui-ci</b><span>${cash < down(c.v) ? `Il manque ${fmtE(need)} pour l'apport de 10 %${days ? `, vos loyers les apportent dans ${days} jour${days > 1 ? "s" : ""}` : ""}.` : `Votre capacité d'emprunt est atteinte (il reste ${fmtE(cap)}). Elle remonte à mesure que vos crédits se remboursent.`}</span></div>`;
     } else {
       btns = cr
         ? `<button class="btn block blue2" data-lbuy="${g}"><span>Acheter ${unit} à crédit</span><small>${fmtE(down(c.v))} maintenant · +${fmtE(Math.round(c.rent * .3))} / jour pour vous</small></button>
            <p class="crx">10 % maintenant. La banque avance le reste (${fmtE(c.v - down(c.v))}), remboursé <b>tout seul</b> par 70 % du loyer. Après, tout le loyer est à vous.</p>`
         : `<button class="btn block green" data-lbuy="${g}"><span>Acheter ${unit} · ${fmtE(c.v)}</span><small>+${fmtE(c.rent)} / jour</small></button>`;
       const links = [];
-      if (cr && cashOK) links.push(`<button data-paymode="0">ou payer comptant (${fmtE(c.v)})</button>`);
+      if (cr && cashOK) links.push(`<button data-paymode="0">ou payer comptant (${fmtE(c.v)}) : tout le loyer tout de suite</button>`);
       if (!cr && creditOK) links.push(`<button data-paymode="1">ou à crédit : ${fmtE(down(c.v))} maintenant</button>`);
       if (allFree && (cr ? cash >= down(total) && total - down(total) <= cap : cash >= total)) links.push(`<button data-lbuild="${g}">${cr ? `tout l'immeuble à crédit · ${fmtE(down(total))} maintenant` : `tout l'immeuble · ${fmtE(total)}`} (+60 % de loyer)</button>`);
       if (links.length) btns += `<div class="llinks">${links.join("")}</div>`;
@@ -155,7 +154,7 @@ function showLand(L) {
     landCreditNow = cr;
   }
   setMovebar(`<div class="land"><div class="grab"></div><div class="lc" data-lopen="${g}">${cardHTML(c)}</div>
-    <div class="lr"><b class="lh ${cls}">${head}</b>${info ? `<span class="linfo">${info}</span>` : ""}${!isP ? `<a class="lnk lstreet" href="${streetURL(g)}" target="_blank" rel="noopener">📷 Voir la vraie façade</a>` : ""}${lines.join("")}<div class="lb">${btns}</div></div>
+    <div class="lr"><b class="lh ${cls}">${head}</b>${info ? `<span class="linfo">${info}</span>` : ""}${lines.join("")}<div class="lb">${btns}</div></div>
     <button class="x" data-mvclose aria-label="Fermer">×</button></div>`, "land");
   if (L?.chance && window.confetti && !BAD.has(L.chance.k)) confetti("#A855F7", 24);
 }
@@ -182,13 +181,13 @@ async function doTeleport(g) {
   lastLanding = null; setMovebar(""); hidePreview(); await placePawn(true); renderDice(); toast("Téléportation réussie ✨", "good"); showLand();
 }
 
-// ---- le dé ------------------------------------------------------------------------
-const PIPS = { 1: [5], 2: [1, 9], 3: [1, 5, 9], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9] };
-const dieHTML = n => `<div class="die">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => `<i class="${PIPS[n].includes(i) ? "on" : ""}"></i>`).join("")}</div>`;
+// ---- le dé : un vrai cube en 3D qui roule puis s'arrête sur la bonne face ----
+const PIPS = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6 };
+const dieHTML = n => `<div class="die n${n}">${[1, 2, 3, 4, 5, 6].map(f => `<i class="f${f}">${"<b></b>".repeat(f)}</i>`).join("")}</div>`;
 async function animDice(n) {
   const D = $("#dice3d"); D.hidden = false;
-  for (let i = 0; i < 10; i++) { D.innerHTML = `<div class="dice rolling">${dieHTML(1 + Math.floor(Math.random() * 6))}</div>`; await sleep(70); }
-  D.innerHTML = `<div class="dice">${dieHTML(n)}</div>`; await sleep(650);
+  D.innerHTML = `<div class="dice rolling">${dieHTML(n)}</div>`; await sleep(650);
+  D.querySelector(".dice").classList.remove("rolling"); await sleep(650);
   D.hidden = true;
 }
 
