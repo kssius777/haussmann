@@ -29,7 +29,7 @@ function push(kind, arg) { stack.push({ kind, arg }); renderDetail(true); }
 function back() {
   stack.pop(); if (stack.length) return renderDetail(true);
   $("#p-detail").hidden = true; sel = null; renderTab(tab);
-  if (tab === "map" && map) { pumpGeo(); paintAll(); }
+  if (tab === "map" && map) { pumpGeo(); paintAll(); if (pawnPos() != null && !moving) map.easeTo({ center: centerOf(pawnPos()), duration: 500 }); }   // retour sur la carte : recentrée sur la montgolfière
 }
 async function renderDetail(anim) {
   const top = stack[stack.length - 1]; if (!top) return; const el = $("#p-detail");

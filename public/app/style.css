@@ -1263,3 +1263,45 @@ html,body{background:var(--bg);font-family:var(--f);letter-spacing:-.005em}
   .land .lb{position:sticky;bottom:0;margin:0 -14px;padding:10px 14px 12px;background:linear-gradient(180deg,rgba(255,255,255,0),#fff 14px);z-index:3}
 }
 @media (max-width:699px) and (max-height:700px){.land .lc{width:min(56vw,210px)}.land .lc .hc{--w:min(56vw,210px)}}
+/* fin d'ouverture : les boutons restent toujours visibles en bas, les cartes tiennent sur l'écran */
+.sumbar{position:sticky;bottom:0;z-index:5;margin-top:auto;padding:14px 0 calc(env(safe-area-inset-bottom,0px) + 4px);background:linear-gradient(180deg,rgba(7,9,15,0),#07090F 30%)}
+@media (max-width:699px){.sumgrid{gap:8px}.sumgrid .hc .rn{font-size:3.2cqw}}
+/* le dé : dessiné proprement (3 faces, coins arrondis), et un vrai dé blanc au lancer */
+.dmain .cube{width:auto;height:auto;transform:none!important;animation:none!important;margin:0;display:grid;place-items:center}
+.dmain .dsvg{width:46px;height:46px;margin-top:-4px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.25))}
+.dmain:not(:disabled):hover .dsvg{transform:rotate(-8deg) scale(1.05);transition:transform .2s}
+#dice3d{background:rgba(255,255,255,.35);backdrop-filter:blur(2px)}
+.dice .die>i{background:radial-gradient(circle at 30% 25%,#FFFFFF,#ECF0F6);border-radius:18px;box-shadow:inset 0 0 0 1px #D8DEE9,inset 0 -8px 14px rgba(15,27,45,.08)}
+.dice .die>i>b{width:14px;height:14px;background:radial-gradient(circle at 35% 35%,#3A3F4B,#0B0C10)}
+.dice .die{filter:drop-shadow(0 18px 24px rgba(15,27,45,.28))}
+@media (max-width:699px){.dmain .dsvg{width:40px;height:40px}}
+/* après un achat */
+.land .lb .btn.more{min-height:40px;font-size:13.5px;font-weight:700}
+#movebar .ln small{display:block;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.75;margin-bottom:1px}
+#movebar .lns .ln{border-radius:12px;text-align:center}
+/* téléphone : tout tient dans l'écran sans faire défiler — la carte prend la place qui reste */
+@media (max-width:699px){
+  #movebar.k-land{top:calc(var(--bar-h) + 6px);bottom:calc(var(--tab-h) + env(safe-area-inset-bottom,0px) + 6px);padding:10px 12px 0;overflow:auto}
+  .land{gap:6px}
+  .land .lc{--cw:clamp(118px,calc((100dvh - var(--bar-h) - var(--tab-h) - 268px) / 1.45),min(66vw,250px));width:var(--cw)}
+  .land .lc .hc{--w:var(--cw)}
+  .land.hasln .lc{--cw:clamp(108px,calc((100dvh - var(--bar-h) - var(--tab-h) - 320px) / 1.45),min(62vw,240px))}
+  .land .lr{gap:6px}
+  .land .lh{font-size:17px;line-height:1.15}
+  .occ{padding:7px 10px;gap:4px;grid-template-columns:auto 1fr;align-items:center;column-gap:10px}
+  .occ .ot{display:none}
+  .occ .oc{gap:3px} .oc i{width:12px;height:12px;border-radius:3px}
+  .occ .ol{justify-content:flex-end;font-size:12px}
+  .land .pay button{padding:4px 6px}
+  .land .lb{gap:6px;padding:8px 12px 10px;margin:0 -12px}
+  .land .lb .btn.buy{min-height:50px}
+  #movebar .lns .ln{padding:4px 10px;font-size:12px}
+}
+/* téléphone : le panneau s'arrête à sa taille, la carte reste visible au-dessus ; toucher la carte le ferme */
+@media (max-width:699px){
+  #movebar.k-land{top:auto;max-height:calc(100dvh - var(--bar-h) - var(--tab-h) - 56px);padding-bottom:0}
+}
+@media (max-width:699px){.occ{grid-template-columns:1fr}.occ .ol{justify-content:flex-start;flex-wrap:nowrap;white-space:nowrap;overflow:hidden}}
+/* iPhone : la page ne doit jamais zoomer ni glisser (seule la carte se zoome) */
+html,body{touch-action:manipulation;overscroll-behavior:none;position:fixed;inset:0;width:100%}
+input,select,textarea{font-size:16px!important}

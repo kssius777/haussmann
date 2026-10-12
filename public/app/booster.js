@@ -94,8 +94,8 @@ function summary(seq) {
   R.innerHTML = `<div class="bstage" style="justify-content:flex-start;overflow:auto"><div class="rays"></div>
     <p class="pill-l" style="margin-top:8px">AJOUTÉ À VOTRE PATRIMOINE</p>
     <h2 class="h1 num" style="color:#fff;margin:0">${fmtE(tot)}</h2>
-    <div class="sumgrid">${seq.map((it, k) => `<button ${it.card != null ? `data-sg="${it.card}"` : ""} style="animation-delay:${k * 60}ms">${itemFace(it, "min(150px,42vw)")}</button>`).join("")}</div>
-    <div class="bbtns" style="grid-template-columns:1fr 1fr;width:min(100%,420px)">
+    <div class="sumgrid">${seq.map((it, k) => `<button ${it.card != null ? `data-sg="${it.card}"` : ""} style="animation-delay:${k * 60}ms">${itemFace(it, "min(150px,29vw)")}</button>`).join("")}</div>
+    <div class="bbtns sumbar" style="grid-template-columns:1fr 1fr;width:min(100%,420px)">
       <button class="btn glass" data-r="map">Retour à la carte</button>
       ${more ? `<button class="btn white" data-r="again">Ouvrir (${more})</button>` : `<button class="btn white" data-r="assets">Mon patrimoine</button>`}
     </div></div>`;

@@ -31,7 +31,7 @@ async function placePawn(fly) {
     <g fill="url(#pzg)"><path d="M9 52h26l-2.5-7h-21z"/><path d="M14.5 45l3-15h9l3 15z"/><circle cx="22" cy="17" r="9.5"/></g></svg><s></s>`;
   pawnMk.setLngLat(ll); paintTargets();
   if (window.pawn3d) { pawn3d.color(col); pawn3d.set(ll[0], ll[1]); pawnMk.getElement().classList.add("is3d"); }
-  if (fly) map.flyTo({ center: ll, zoom: Math.max(map.getZoom(), 16.2), pitch: 50, duration: 900, offset: [0, -90] });
+  if (fly) map.flyTo({ center: ll, zoom: Math.min(15.8, Math.max(map.getZoom(), 15.2)), pitch: 50, duration: 900, offset: [0, -90] });
 }
 // l'immeuble où l'on se trouve est surligné en jaune
 function paintTargets() {
@@ -39,7 +39,10 @@ function paintTargets() {
   if (landPainted != null && landPainted !== g && map.getSource("b" + ai(landPainted))) map.setFeatureState({ source: "b" + ai(landPainted), id: landPainted }, { tgt: 0 });
   if (g != null && map.getSource("b" + ai(g))) { map.setFeatureState({ source: "b" + ai(g), id: g }, { tgt: 1 }); landPainted = g; }
 }
-function onBuildingTap(g) { if (panelKind && panelKind !== "land") setMovebar(""); previewBuilding(g); }
+function onBuildingTap(g) {
+  if (panelKind === "land") { if (!moving) { justBought = null; setMovebar(""); } return; }   // 1er toucher : on ferme la case
+  if (panelKind) setMovebar(""); previewBuilding(g);
+}
 
 // centres des immeubles (pour les maquettes des cartes)
 const CEN = [];
@@ -82,19 +85,19 @@ async function doRoll() {
   let r; try { r = await rpc("roll"); } catch (e) { toast(e.message, "bad"); renderDice(); return; }
   if (!r.path) { toast("Le jeu est en cours de mise à jour : réessayez dans quelques minutes.", "bad"); renderDice(); return; }
   moving = true; renderDice(); sfx("dice");
-  await animDice(r.die);
+  await animDice(r.die); setDieIcon(r.die);
   await ensureCards(r.path);
   const line = smooth(r.path.map(centerOf)), lo = line.map(p => p[0]), la = line.map(p => p[1]);
-  map.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], { padding: { top: 140, bottom: 200, left: 50, right: 70 }, maxZoom: 17, pitch: 45, duration: 500 });
+  map.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], { padding: { top: 140, bottom: 200, left: 50, right: 70 }, maxZoom: 15.6, pitch: 50, duration: 500 });
   await sleep(450);
   await walk(line, Math.min(2400, 500 + 80 * r.path.length));
   setState(r.state); moving = false;
   await placePawn(false); renderDice(); renderWallet();
   setTimeout(() => map.getSource("walked")?.setData(FC([])), 2500);
-  lastLanding = r.landing; landCredit = null; showLand(r.landing);
+  lastLanding = r.landing; landCredit = null; justBought = null; showLand(r.landing);
   // la case reste visible au-dessus du panneau (téléphone) ou à gauche (ordinateur)
   const mb = $("#movebar"), mobile = innerWidth < 900;
-  map.easeTo({ center: centerOf(r.landing.card), zoom: Math.max(map.getZoom(), 16.4), duration: 600,
+  map.easeTo({ center: centerOf(r.landing.card), zoom: Math.min(15.8, Math.max(map.getZoom(), 15.2)), duration: 600,
     offset: mobile ? [0, -Math.round((mb.offsetHeight || 300) / 2) + 20] : [-Math.round((mb.offsetWidth || 380) / 2), 0] });
   refreshHold().then(refreshMap).then(() => { paintAll(); renderWallet(); if (panelKind === "land") showLand(); }).catch(() => { });
 }
@@ -127,7 +130,9 @@ function showLand(L) {
   const taken = isP ? (ST.own.get(g)?.parts || 0) : (ST.own.get(g)?.n || 0), others = Math.max(0, taken - mine), tot = c.lots;
   const word = n => lotWord(c, n);
   let head, cls;
-  if (L?.toll > 0) { head = `Chez ${L.payees.map(p => esc(p.pseudo)).join(", ")}`; cls = "bad"; }
+  const jb = justBought && justBought.g === g;
+  if (jb) { head = justBought.whole ? "✓ Acheté ! Tout l'immeuble est à vous" : `✓ Acheté ! ${isP ? "Une part" : tot > 1 ? "Un " + word(1) : "Il"} est à vous`; cls = "home"; }
+  else if (L?.toll > 0) { head = `Chez ${L.payees.map(p => esc(p.pseudo)).join(", ")}`; cls = "bad"; }
   else if (mine > 0 && free > 0) { head = "Vous êtes chez vous"; cls = "home"; }
   else if (mine > 0) { head = "Tout l'immeuble est à vous"; cls = "home"; }
   else if (free > 0) { head = "Libre, à vendre !"; cls = "free"; }
@@ -136,7 +141,7 @@ function showLand(L) {
   const lines = [];
   if (L?.toll > 0) lines.push(`<span class="ln bad">Vous payez son loyer · <b>−${fmtE(L.toll)}</b></span>`);
   if (L?.bonus > 0) lines.push(`<span class="ln good">Bonus chez vous · <b>+${fmtE(L.bonus)}</b></span>`);
-  if (L?.chance) { const ch = L.chance; const [nm] = CHANCE[ch.k] || ["Chance"]; lines.push(`<span class="ln ${BAD.has(ch.k) ? "bad" : "good"}">🃏 ${esc(nm)} · <b>${esc(chanceText(ch))}</b></span>`); }
+  if (L?.chance) { const ch = L.chance; const [nm] = CHANCE[ch.k] || ["Chance"]; lines.push(`<span class="ln ${BAD.has(ch.k) ? "bad" : "good"}"><small>Case Chance${BAD.has(ch.k) ? " · pas de chance" : ""}</small>🃏 <b>${esc(nm)}</b> : ${esc(chanceText(ch))}</span>`); }
   const occ = occHTML(c, mine, others, free);
   let btns = "";
   if (free > 0) {
@@ -154,10 +159,12 @@ function showLand(L) {
     }
     landCreditNow = cr;
   }
-  setMovebar(`<div class="land"><div class="grab"></div><div class="lc" data-lopen="${g}">${cardHTML(c)}</div>
+  if (jb) btns = `<button class="btn block buy" data-mvclose><span>Continuer</span><small>+${fmtE(Math.round(c.rent * (landCreditNow ? .3 : 1)))} / jour de loyer en plus</small></button>${free > 0 && !justBought.whole ? `<button class="btn block light more" data-lbuy="${g}">Acheter ${isP ? "une autre part" : "un autre " + word(1)} ici · ${fmtE(landCreditNow ? Math.ceil(c.v * CREDIT_DOWN) : c.v)}</button>` : ""}`;
+  setMovebar(`<div class="land${lines.length ? " hasln" : ""}"><div class="grab"></div><div class="lc" data-lopen="${g}">${cardHTML(c)}</div>
     <div class="lr"><b class="lh ${cls}">${head}</b>${lines.length ? `<div class="lns">${lines.join("")}</div>` : ""}${occ}<div class="lb">${btns}</div></div>
     <button class="x" data-mvclose aria-label="Fermer">×</button></div>`, "land");
   $("#movebar").classList.add("r" + c.r);
+  $("#movebar").scrollTop = 0;
   if (L?.chance && window.confetti && !BAD.has(L.chance.k)) confetti("#A855F7", 24);
 }
 // le plan de l'immeuble : une case par logement (à vous / à d'autres / libre) — aussi utilisé par la fiche
@@ -169,7 +176,7 @@ function occHTML(c, mine, others, free) {
     : `<div class="obar"><i class="me" style="width:${mine / tot * 100}%"></i><i class="th" style="width:${others / tot * 100}%"></i></div>`;
   return `<div class="occ"><div class="ot">${isP ? `Monument en ${fmtN(tot)} parts` : `Immeuble de ${tot} ${lotWord(c, tot)}`}</div>${viz}<div class="ol">${leg}</div></div>`;
 }
-let landCredit = null, landCreditNow = false;   // null = choix automatique (crédit si l'on n'a pas assez pour payer comptant)
+let landCredit = null, landCreditNow = false, justBought = null;   // null = choix automatique (crédit si l'on n'a pas assez pour payer comptant)
 const CREDIT_DOWN = 0.1;
 
 // ---- plus de lancers : en attendre un, ou en acheter ------------------------------
@@ -202,6 +209,14 @@ async function doTeleport(g) {
 
 // ---- le dé : un vrai cube en 3D qui roule puis s'arrête sur la bonne face ----
 const PIPS = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6 };
+const PIPXY = { 1: [[.5, .5]], 2: [[.27, .27], [.73, .73]], 3: [[.27, .27], [.5, .5], [.73, .73]], 4: [[.27, .27], [.73, .27], [.27, .73], [.73, .73]], 5: [[.27, .27], [.73, .27], [.5, .5], [.27, .73], [.73, .73]], 6: [[.27, .25], [.73, .25], [.27, .5], [.73, .5], [.27, .75], [.73, .75]] };
+const DSIDE = { 1: [2, 3], 2: [1, 3], 3: [1, 2], 4: [1, 5], 5: [1, 3], 6: [2, 4] };
+function setDieIcon(n) { const e = $("#dieico"); if (e) e.innerHTML = dieSVG(n, ...DSIDE[n]); }
+function dieSVG(top = 5, left = 1, right = 3, size = 40) {
+  const face = (m, fill, n, pip) => `<g transform="matrix(${m})"><rect x=".02" y=".02" width=".96" height=".96" rx=".2" fill="${fill}"/>${PIPXY[n].map(([x, y]) => `<circle cx="${x}" cy="${y}" r=".095" fill="${pip}"/>`).join("")}</g>`;
+  return `<svg class="dsvg" viewBox="0 0 40 40" width="${size}" height="${size}" aria-hidden="true"><ellipse cx="20" cy="31" rx="11" ry="2.4" fill="rgba(0,0,0,.18)"/>
+    ${face("10.4,6,-10.4,6,20,4", "#FFFFFF", top, "#0B0C10")}${face("10.4,6,0,12,9.6,10", "#E4E9F3", left, "#0B0C10")}${face("10.4,-6,0,12,20,16", "#C9D3E6", right, "#0B0C10")}</svg>`;
+}
 const dieHTML = n => `<div class="die n${n}">${[1, 2, 3, 4, 5, 6].map(f => `<i class="f${f}">${"<b></b>".repeat(f)}</i>`).join("")}</div>`;
 async function animDice(n) {
   const D = $("#dice3d"); D.hidden = false;
@@ -213,15 +228,15 @@ async function animDice(n) {
 function initPawnUI() {
   $("#b-roll").addEventListener("click", doRoll);
   $("#b-tp").addEventListener("click", openTeleport);
-  $("#minipack").innerHTML = packHTML("mini");
+  $("#minipack").innerHTML = packHTML("mini"); setDieIcon(5);
   $("#movebar").addEventListener("click", async e => {
-    if (e.target.closest("[data-mvclose]")) return setMovebar("");
+    if (e.target.closest("[data-mvclose]")) { justBought = null; return setMovebar(""); }
     const tp = e.target.closest("[data-tpgo]"); if (tp) return teleportRandom();
     if (e.target.closest("[data-buyrolls]")) { if (await act("buy_rolls", {}, "5 lancers en plus !")) { setMovebar(""); renderDice(); } return; }
     const pm = e.target.closest("[data-paymode]"); if (pm) { landCredit = pm.dataset.paymode === "1"; return showLand(); }
     const lb = e.target.closest("[data-lbuy],[data-lbuild]"); if (lb) {
       const g = +(lb.dataset.lbuy || lb.dataset.lbuild), whole = !!lb.dataset.lbuild, credit = landCreditNow; lb.disabled = true; lb.textContent = "Achat…";
-      if (await act(whole ? "buy_building" : "bank_buy", Object.assign(whole ? { p_card: g } : { p_card: g, p_k: null }, credit ? { p_credit: true } : {}), null)) { celebrate(card(g)); sfx("buy"); if (credit) toast("Acheté à crédit : il se rembourse tout seul avec la moitié du loyer.", "good"); }
+      if (await act(whole ? "buy_building" : "bank_buy", Object.assign(whole ? { p_card: g } : { p_card: g, p_k: null }, credit ? { p_credit: true } : {}), null)) { justBought = { g, whole }; sfx("buy"); if (window.confetti) confetti("#2563EB", 30); }
       return showLand();
     }
     const lo = e.target.closest("[data-lopen]"); if (lo) return push("b", +lo.dataset.lopen);

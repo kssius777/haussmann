@@ -128,7 +128,10 @@ function buildMap(base) {
     mapReady = true; pumpGeo();
     if (window.THREE && window.addMonuments) addMonuments(map, IDX.models);
     map.on("click", "mfill", e => { const f = e.features[0]; if (f) onBuildingTap(f.id); });
-    map.on("click", e => { if (e.defaultPrevented) return; if (!map.queryRenderedFeatures(e.point).some(f => /^(bd|rf)\d|^mfill$/.test(f.layer.id))) hidePreview(); closeSearch(); });
+    map.on("click", e => { if (e.defaultPrevented) return;
+      // un toucher sur la carte ferme la case ouverte (comme la croix)
+      if (panelKind === "land" && !moving) { justBought = null; setMovebar(""); closeSearch(); return; }
+      if (!map.queryRenderedFeatures(e.point).some(f => /^(bd|rf)\d|^mfill$/.test(f.layer.id))) hidePreview(); closeSearch(); });
     IDX.arr.forEach((a, i) => {
       const el = document.createElement("button"); el.className = "amark"; el.innerHTML = `<b>${ord(a.n)}</b><span id="am${i}"></span>`;
       el.addEventListener("click", ev => { ev.stopPropagation(); push("arr", i); });

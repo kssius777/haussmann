@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#FFFFFF">
 <title>Haussmann</title>
 <meta name="description" content="Collectionnez les vrais immeubles de Paris, touchez leurs loyers, devenez maire de votre arrondissement.">
@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.css" rel="stylesheet">
-<link href="/app/style.css" rel="stylesheet">
+<link href="/app/style.css?v=20261012f" rel="stylesheet">
 </head>
 <body>
 <header id="bar">
@@ -54,7 +54,7 @@
       <div id="preview" hidden></div>
       <div class="dicebar" id="dicebar">
         <button class="dside" id="b-tp" aria-label="Se téléporter sur un de ses biens"><span class="ic">✨</span><small>Téléport · <b id="tps">3</b></small></button>
-        <button class="dmain" id="b-roll" aria-label="Lancer le dé"><span class="cube"><i class="f1"><b></b></i><i class="f2"><b></b><b></b></i><i class="f3"><b></b><b></b><b></b></i><i class="f4"><b></b><b></b><b></b><b></b></i><i class="f5"><b></b><b></b><b></b><b></b><b></b></i><i class="f6"><b></b><b></b><b></b><b></b><b></b><b></b></i></span><b>Lancer</b><small id="rolls">10</small></button>
+        <button class="dmain" id="b-roll" aria-label="Lancer le dé"><span class="cube" id="dieico"></span><b>Lancer</b><small id="rolls">10</small></button>
         <button class="dside pk" id="b-pack" data-tab="booster" aria-label="Mes boosters"><span class="ic" id="minipack"></span><small>Boosters</small><b class="badge" id="packbadge" hidden></b></button>
       </div>
     </div>
@@ -83,16 +83,16 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/app/models.js"></script>
-<script src="/app/core.js"></script>
-<script src="/app/api.js"></script>
-<script src="/app/cards.js"></script>
-<script src="/app/map.js"></script>
-<script src="/app/pawn.js"></script>
-<script src="/app/pages.js"></script>
-<script src="/app/booster.js"></script>
-<script src="/app/onboard.js"></script>
-<script src="/app/landing.js"></script>
-<script src="/app/main.js"></script>
+<script src="/app/models.js?v=20261012f"></script>
+<script src="/app/core.js?v=20261012f"></script>
+<script src="/app/api.js?v=20261012f"></script>
+<script src="/app/cards.js?v=20261012f"></script>
+<script src="/app/map.js?v=20261012f"></script>
+<script src="/app/pawn.js?v=20261012f"></script>
+<script src="/app/pages.js?v=20261012f"></script>
+<script src="/app/booster.js?v=20261012f"></script>
+<script src="/app/onboard.js?v=20261012f"></script>
+<script src="/app/landing.js?v=20261012f"></script>
+<script src="/app/main.js?v=20261012f"></script>
 </body>
 </html>

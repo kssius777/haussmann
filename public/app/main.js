@@ -59,3 +59,8 @@ function showWelcome() {
   R.onclick = e => { const b = e.target.closest("[data-w]"); if (!b) return; R.onclick = null; R.hidden = true; R.innerHTML = "";
     if (b.dataset.w === "open") openBooster("welcome"); else { go("map"); showHint(); } };
 }
+
+// iPhone (Safari ignore « user-scalable=no ») : on bloque le zoom de la page au pincement (le double toucher est bloqué par touch-action),
+// sauf sur la carte qui gère son propre zoom
+document.addEventListener("gesturestart", e => { if (!e.target.closest?.("#map")) e.preventDefault(); }, { passive: false });
+window.addEventListener("scroll", () => { if (window.scrollX || window.scrollY) window.scrollTo(0, 0); });
