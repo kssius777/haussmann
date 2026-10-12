@@ -275,7 +275,7 @@ async function buildingPage(g) {
   let plan = "";
   if (!isP) {
     const groups = new Map(); for (let k = 0; k < c.lots; k++) { const f = floorOfLot(c, k); if (!groups.has(f)) groups.set(f, []); groups.get(f).push(k); }
-    plan = `<details class="plan" ${selLot !== null ? "open" : ""}><summary>Le plan, étage par étage</summary>
+    plan = `<details class="plan" ${selLot !== null ? "open" : ""}><summary>Choisir un ${unitW} précis, étage par étage</summary>
       <div class="floors">${[...groups.entries()].sort((a, b) => b[0] - a[0]).map(([f, ks]) => `<div class="floor"><span>${c.lk === "l" ? ord(f) : "RDC"}</span><div>${ks.map(k => { const o = owners.get(k); const cls = o ? (o.o === ME ? "mine" : "theirs") : ""; return `<button class="lot ${cls}${o?.m ? " mort" : ""}${listed.has(k) ? " sale" : ""}" data-k="${k}" data-pick="1" aria-pressed="${selLot === k}" aria-label="${lotName(c, k)}, ${o ? (o.o === ME ? "à vous" : "à " + esc(o.ps)) : "libre"}">${k + 1}</button>`; }).join("")}</div></div>`).join("")}</div>
       <div class="legend-s"><span><i style="background:var(--soft);border:1.5px solid var(--line)"></i>Libre</span><span><i style="background:var(--mine)"></i>À vous</span><span><i style="background:#E2E8F0"></i>Autre joueur</span><span><i style="background:var(--sale)"></i>En vente</span></div></details>`;
   } else {
@@ -287,21 +287,21 @@ async function buildingPage(g) {
   return `${dhead("")}<div class="wrap bp">
     <div class="bp-card">${cardHTML(c, { item: myKs.length || myN ? { t: "own", ks: myKs, n: myN } : null })}${goodPhoto(c) && c.cr ? `<small class="credit2">${esc(c.cr)}</small>` : ""}</div>
     <div class="bp-info">
-      <div class="btitle"><span class="pill rar" style="background:${RAR[c.r].c}">${RAR[c.r].n}</span><span class="pill">${esc(kindLabel(c))}</span>${status}</div>
       <h1 class="h1">${esc(title(c))}</h1>
-      <p class="sub">${esc(c.name && c.adr ? c.adr + " · " : "")}${ord(c.arr)} arr.${c.y ? ` · construit vers ${esc(c.y)}` : ""} · <button class="lnk" data-mapto="${g}">sur la carte</button></p>
-      <div class="bstat2 num"><div><span>Prix ${isP ? "d'une part" : `d'un ${unitW}`}</span><b>${fmtE(c.v)}</b></div><div><span>Loyer</span><b class="green">+${fmtE(c.rent)}<small>/j</small></b></div></div>
-      <div class="actbar2" id="actbar">${buyActions(c, g, owners, free, isP)}</div>
+      <p class="sub">${esc(kindLabel(c))} · ${ord(c.arr)} arr.${c.y ? ` · vers ${esc(c.y)}` : ""} · <button class="lnk" data-mapto="${g}">voir sur la carte</button></p>
+      ${occHTML(c, isP ? myN : myKs.length, isP ? Math.max(0, sold - myN) : Math.max(0, owners.size - myKs.length), free)}
+      <div class="actbar2 lbx" id="actbar"><div class="lb">${buyActions(c, g, owners, free, isP)}</div></div>
       ${mine}${offersHTML}${plan}${about}
     </div>
   </div>`;
 }
 function farHTML(d, g) { return `<div class="buyfar"><b>🎲 Pour l'acheter à la banque, tombez dessus avec le dé.</b><span class="muted">Ou trouvez-le dans un booster, ou au Marché si un joueur le vend.</span></div>`; }
-function payToggle(price) {
-  const cap = ST.state?.loan_cap ?? 1e12, cash = liveCash(), down = Math.ceil(price * .1), can = price - down <= cap;
-  const cr = can && (bCredit === null ? cash >= down : bCredit);
-  return [cr, `<div class="pay" role="tablist"><button data-act="paymode" data-k="0" aria-selected="${!cr}">Comptant</button><button data-act="paymode" data-k="1" aria-selected="${cr}" ${can ? "" : "disabled"}>À crédit${can ? "" : " (capacité atteinte)"}</button></div>`];
+function payToggle(price, rent) {
+  const cap = ST.state?.loan_cap ?? 1e12, cash = liveCash(), down = Math.ceil(price * .1), can = price - down <= cap && cash >= down;
+  const cr = can && (bCredit === null ? true : bCredit);
+  return [cr, `<div class="pay" role="tablist"><button data-act="paymode" data-k="1" aria-selected="${cr}" ${can ? "" : "disabled"}><b>À crédit</b><small>${fmtE(down)} · <em>+${fmtE(Math.round(rent * .3))}/j</em></small></button><button data-act="paymode" data-k="0" aria-selected="${!cr}"><b>Comptant</b><small>${fmtE(price)} · <em>+${fmtE(rent)}/j</em></small></button></div>`];
 }
+const buySub = cr => `<small>${cr ? "La banque prête le reste, remboursé tout seul par le loyer" : "Tout le loyer est pour vous, et le bien peut être revendu"}</small>`;
 function buyActions(c, g, owners, free, isP) {
   const cash = liveCash(), far = notLanded(g);
   if (selLot !== null && !isP) {
@@ -309,17 +309,17 @@ function buyActions(c, g, owners, free, isP) {
     const head = `<div class="what"><b>${lotName(c, k)}${c.lk === "l" ? " · " + ord(floorOfLot(c, k)) + " étage" : ""}</b><span class="num">${o ? (o.o === ME ? "À vous" : "À " + esc(o.ps)) : "Libre"}</span></div>`;
     let btn;
     if (!o && far) btn = farHTML(far, g);
-    else if (!o) { const [cr, tg] = payToggle(c.v); btn = tg + `<button class="btn block green" data-act="bank" data-k="${k}" ${cash < (cr ? Math.ceil(c.v * .1) : c.v) ? "disabled" : ""}>${cr ? `Acheter · apport ${fmtE(Math.ceil(c.v * .1))}` : `Acheter · ${fmtE(c.v)}`}</button>`; }
+    else if (!o) { const [cr, tg] = payToggle(c.v, c.rent); btn = tg + `<button class="btn block buy" data-act="bank" data-k="${k}" ${cash < (cr ? Math.ceil(c.v * .1) : c.v) ? "disabled" : ""}><span>Acheter · ${fmtE(cr ? Math.ceil(c.v * .1) : c.v)}</span>${buySub(cr)}</button>`; }
     else if (o.o === ME) btn = `<div class="sub" style="margin:0">Il est à vous.</div>`;
     else btn = l ? `<button class="btn block green" data-act="buyl" data-id="${l.id}" ${cash < l.price ? "disabled" : ""}>Acheter à ${esc(l.pseudo)} · ${fmtE(l.price)}</button>` : `<div class="sub" style="margin:0">Appartient à ${esc(o.ps)}, pas en vente.</div>`;
     return head + btn + `<button class="btn sm ghost" data-act="unpick">Annuler</button>`;
   }
   if (free <= 0) return `<div class="what"><span>Tout est pris. Surveillez le Marché : les propriétaires peuvent mettre leurs biens en vente.</span></div>`;
   if (far) return farHTML(far, g);
-  const total = c.v * c.lots, allFree = !isP && owners.size === 0 && c.lots > 1, [cr, tg] = payToggle(c.v), need = p => cr ? Math.ceil(p * .1) : p;
-  return tg + `<button class="btn block green" data-act="bank" ${cash < need(c.v) ? "disabled" : ""}>${isP ? "Acheter 1 part" : `Acheter un ${c.lk === "l" ? "logement" : "local"}`} · ${cr ? "apport " + fmtE(need(c.v)) : fmtE(c.v)}</button>
-    ${allFree ? `<button class="btn block light" data-act="bbuild" ${cash < need(total) ? "disabled" : ""}>Tout l'immeuble · ${cr ? "apport " + fmtE(need(total)) : fmtE(total)} <span class="green" style="font-size:12px">+60 %</span></button>` : ""}
-    ${cr ? `<p class="crx">10 % maintenant ; la banque avance le reste, remboursé tout seul par 70 % du loyer.</p>` : cash < c.v ? `<small class="muted">Il vous manque ${fmtE(c.v - cash)}.</small>` : ""}`;
+  const total = c.v * c.lots, allFree = !isP && owners.size === 0 && c.lots > 1, [cr, tg] = payToggle(c.v, c.rent), need = p => cr ? Math.ceil(p * .1) : p;
+  return tg + `<button class="btn block buy" data-act="bank" ${cash < need(c.v) ? "disabled" : ""}><span>${isP ? "Acheter 1 part" : `Acheter 1 ${c.lk === "l" ? "logement" : "local"}`} · ${fmtE(need(c.v))}</span>${buySub(cr)}</button>
+    ${allFree && cash >= need(total) ? `<button class="btn block light" data-act="bbuild">Tout l'immeuble · ${fmtE(need(total))} <small class="muted">(+60 % de loyer)</small></button>` : ""}
+    ${!cr && cash < c.v ? `<small class="muted">Il vous manque ${fmtE(c.v - cash)}.</small>` : ""}`;
 }
 $("#p-detail").addEventListener("click", async e => {
   const top = stack[stack.length - 1]; if (!top) return;

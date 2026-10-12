@@ -137,14 +137,7 @@ function showLand(L) {
   if (L?.toll > 0) lines.push(`<span class="ln bad">Vous payez son loyer · <b>−${fmtE(L.toll)}</b></span>`);
   if (L?.bonus > 0) lines.push(`<span class="ln good">Bonus chez vous · <b>+${fmtE(L.bonus)}</b></span>`);
   if (L?.chance) { const ch = L.chance; const [nm] = CHANCE[ch.k] || ["Chance"]; lines.push(`<span class="ln ${BAD.has(ch.k) ? "bad" : "good"}">🃏 ${esc(nm)} · <b>${esc(chanceText(ch))}</b></span>`); }
-  // le plan de l'immeuble : une case par logement (à vous / à d'autres / libre)
-  let occ = "";
-  if (tot > 1) {
-    const leg = [mine ? `<span class="o-me">${isP ? fmtN(mine) + " parts" : mine} à vous</span>` : "", others ? `<span class="o-th">${isP ? fmtN(others) + " parts" : others} à d'autres</span>` : "", free ? `<span class="o-fr">${isP ? fmtN(free) + " parts" : free} libre${free > 1 ? "s" : ""}</span>` : ""].filter(Boolean).join("");
-    const viz = !isP && tot <= 40 ? `<div class="oc">${"<i class='me'></i>".repeat(mine)}${"<i class='th'></i>".repeat(others)}${"<i></i>".repeat(Math.max(0, free))}</div>`
-      : `<div class="obar"><i class="me" style="width:${mine / tot * 100}%"></i><i class="th" style="width:${others / tot * 100}%"></i></div>`;
-    occ = `<div class="occ"><div class="ot">${isP ? `Monument en ${fmtN(tot)} parts` : `Immeuble de ${tot} ${word(tot)}`}</div>${viz}<div class="ol">${leg}</div></div>`;
-  }
+  const occ = occHTML(c, mine, others, free);
   let btns = "";
   if (free > 0) {
     const unit = isP ? "1 part" : tot > 1 ? `1 ${word(1)}` : c.lk === "l" ? "le logement" : "le local", allFree = !isP && free === tot && tot > 1, total = c.v * tot;
@@ -166,6 +159,15 @@ function showLand(L) {
     <button class="x" data-mvclose aria-label="Fermer">×</button></div>`, "land");
   $("#movebar").classList.add("r" + c.r);
   if (L?.chance && window.confetti && !BAD.has(L.chance.k)) confetti("#A855F7", 24);
+}
+// le plan de l'immeuble : une case par logement (à vous / à d'autres / libre) — aussi utilisé par la fiche
+function occHTML(c, mine, others, free) {
+  const tot = c.lots, isP = c.lk === "p"; if (tot <= 1) return "";
+  const u = n => isP ? fmtN(n) + " part" + (n > 1 ? "s" : "") : n;
+  const leg = [mine ? `<span class="o-me">${u(mine)} à vous</span>` : "", others ? `<span class="o-th">${u(others)} à d'autres</span>` : "", free ? `<span class="o-fr">${u(free)} libre${free > 1 ? "s" : ""}</span>` : ""].filter(Boolean).join("");
+  const viz = !isP && tot <= 40 ? `<div class="oc">${"<i class='me'></i>".repeat(mine)}${"<i class='th'></i>".repeat(others)}${"<i></i>".repeat(Math.max(0, free))}</div>`
+    : `<div class="obar"><i class="me" style="width:${mine / tot * 100}%"></i><i class="th" style="width:${others / tot * 100}%"></i></div>`;
+  return `<div class="occ"><div class="ot">${isP ? `Monument en ${fmtN(tot)} parts` : `Immeuble de ${tot} ${lotWord(c, tot)}`}</div>${viz}<div class="ol">${leg}</div></div>`;
 }
 let landCredit = null, landCreditNow = false;   // null = choix automatique (crédit si l'on n'a pas assez pour payer comptant)
 const CREDIT_DOWN = 0.1;

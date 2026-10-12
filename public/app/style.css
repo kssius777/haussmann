@@ -1235,3 +1235,31 @@ html,body{background:var(--bg);font-family:var(--f);letter-spacing:-.005em}
 .oc i.th,.obar i.th{background:#F4B4A5} .ol .o-th::before{background:#F4B4A5}
 .hc .plq{background:linear-gradient(180deg,#24459E,#1A3480)}
 .hc{--ink:#14213A;--ink2:#3A4660}
+
+/* fiche immeuble : mêmes boutons que la case */
+.lbx .pay{width:100%;padding:4px;border-radius:14px;background:var(--soft2);gap:4px}
+.lbx .pay button{height:auto;padding:7px 6px;border-radius:11px;display:grid;gap:1px;line-height:1.15}
+.lbx .pay button b{font-size:13.5px;font-weight:800}
+.lbx .pay button small{font-size:12px;font-weight:700;color:var(--muted)}
+.lbx .pay button[aria-selected="true"]{background:#fff;box-shadow:0 2px 8px rgba(20,33,58,.12)}
+.lbx .pay button[aria-selected="true"] b{color:var(--blue)}
+.lbx .lb .btn.buy{min-height:54px;border-radius:14px}
+.lbx .lb .btn.buy span{font-size:16px}
+.lbx .lb .btn.light{min-height:40px;font-size:13.5px}
+.lbx .lb .btn.light small{display:inline;font-size:12px}
+.lbx .pay small em{font-style:normal;color:var(--money)}
+.lbx .pay button[aria-selected="true"] b{color:var(--act)}
+.lbx .lb{display:grid;gap:8px}
+.lbx .lb .btn.buy{display:grid;gap:2px;padding:8px 12px;min-height:56px;line-height:1.2;white-space:normal;text-align:center}
+.lbx .lb .btn.buy small{font-size:12px;font-weight:600;opacity:.9}
+.bp-info .occ{margin:10px 0}
+.bp-info .h1{margin-top:6px}
+/* téléphone : quand on tombe sur une case, la carte s'affiche en grand, le bouton reste toujours visible en bas */
+@media (max-width:699px){
+  #movebar.k-land{top:calc(var(--bar-h) + env(safe-area-inset-top,0px) + 8px);bottom:calc(var(--tab-h) + env(safe-area-inset-bottom,0px) + 8px);max-height:none;display:flex;flex-direction:column;padding:12px 14px 0;overflow:auto}
+  #movebar.k-land .land{flex:1;align-content:start}
+  .land .lc{width:min(66vw,250px)}.land .lc .hc{--w:min(66vw,250px)}
+  .land .lr{gap:8px}
+  .land .lb{position:sticky;bottom:0;margin:0 -14px;padding:10px 14px 12px;background:linear-gradient(180deg,rgba(255,255,255,0),#fff 14px);z-index:3}
+}
+@media (max-width:699px) and (max-height:700px){.land .lc{width:min(56vw,210px)}.land .lc .hc{--w:min(56vw,210px)}}
