@@ -98,7 +98,7 @@ async function renderAssets() {
       <div class="kpi"><span>Trésorerie</span><b class="num" id="cash2">${fmtE(liveCash())}</b><small class="muted">disponible</small></div>
       <div class="kpi"><span>Loyers / jour</span><b class="green num">+${fmtE(netRate())}</b><small class="muted">${s.loan_rate > 0 ? `+ ${fmtE(s.loan_rate)} remboursent vos crédits` : s.taxes > 0 ? `après ${fmtE(s.taxes)} de taxe des maires` : "versés en continu"}</small></div>
       <div class="kpi"><span>Valeur des biens</span><b class="num">${fmtE(+s.value || 0)}</b><small class="muted">${nLots} logement${nLots > 1 ? "s" : ""}</small></div>
-      <div class="kpi ${loans || debt ? "warn" : ""}"><span>Dettes</span><b class="num">${fmtE(loans + debt)}</b><small class="muted">${loans ? `crédits ${s.credits || 0}/3` : "aucun crédit"}${debt ? ` · hypothèques ${fmtE(debt)}` : ""}</small></div>
+      <div class="kpi ${loans || debt ? "warn" : ""}"><span>Dettes</span><b class="num">${fmtE(loans + debt)}</b><small class="muted">${loans ? `${s.credits || 0} crédit${(s.credits || 0) > 1 ? "s" : ""} en cours` : "aucun crédit"}${debt ? ` · hypothèques ${fmtE(debt)}` : ""}</small></div>
     </div>
     ${dist.length ? `<h2 class="h2">Où sont vos biens</h2><div class="dist">${(distAll ? dist : dist.slice(0, 5)).map(distRow).join("")}${dist.length > 5 ? `<button class="dmore" data-dall>${distAll ? "Réduire" : `Voir les ${dist.length} arrondissements`}</button>` : ""}</div>` : ""}
     <h2 class="h2">Ma collection <span class="muted" style="font:700 14px var(--f)">${hs.length} carte${hs.length > 1 ? "s" : ""}</span></h2>

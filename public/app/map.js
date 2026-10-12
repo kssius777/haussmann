@@ -246,7 +246,7 @@ async function previewBuilding(g) {
     ${canBuy && far ? `<small class="muted">🎲 Pour l'acheter à la banque, tombez dessus avec le dé. Ou trouvez-le dans un booster, ou au Marché.</small>` : canBuy && cash < c.v ? `<small class="muted">Il vous manque ${fmtE(c.v - cash)}. Les loyers arrivent tout seuls, ou ouvrez un booster.</small>` : ""}</div><button class="x" data-closepv aria-label="Fermer">×</button>`;
   hideHint();
 }
-function hidePreview() { if (!moving && panelKind !== "land") setMovebar(""); const pv = $("#preview"); if (pv && !pv.hidden) { pv.hidden = true; sel = null; paintAll(); } }
+function hidePreview() { if (!moving && panelKind !== "land") setMovebar(""); const pv = $("#preview"); if (pv && !pv.hidden) { pv.hidden = true; sel = null; paintAll(); if (stripKind) $("#strip").hidden = false; } }
 function closeSearch() { $("#search").hidden = true; }
 
 function initMapUI() {
@@ -258,9 +258,10 @@ function initMapUI() {
       previewBuilding(g); }
   });
   $("#filter").addEventListener("click", e => {
-    const b = e.target.closest("[data-m]"); if (!b) return; mode = b.dataset.m;
-    $$("#filter button").forEach(x => x.setAttribute("aria-selected", x === b)); hidePreview(); applyMode();
-    if (mode === "mine") { const hs = holdings(); if (hs.length) { const pts = hs.map(h => centerOf(h.g)); const lo = pts.map(p => p[0]), la = pts.map(p => p[1]); map.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], { padding: 90, maxZoom: 15.5, pitch: 45, duration: 1100 }); } else toast("Vous n'avez encore aucun bien : ouvrez un booster !"); }
+    const b = e.target.closest("[data-m]"); if (!b) return;
+    // « Mes biens » / « À vendre » : la carte garde ses couleurs (les tiens sont déjà en bleu, à vendre en orange)
+    // et une rangée de cartes s'ouvre en bas ; toucher une carte emmène à l'immeuble
+    hidePreview(); showStrip(b.dataset.m);
   });
   $("#t-home").addEventListener("click", () => map.flyTo({ center: [2.3420, 48.8580], zoom: 11.9, pitch: 30, bearing: 0, duration: 1200 }));
   $("#t-north").addEventListener("click", () => map.easeTo({ bearing: 0, duration: 600 }));
@@ -285,3 +286,25 @@ function initMapUI() {
 function showHint() { try { if (localStorage.getItem("hm_hint")) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "🎲 Lancez le dé : votre personnage marche dans Paris et s'arrête sur un immeuble. S'il est libre, vous pouvez l'acheter !"; $("#p-map").appendChild(h); }
 function hideHint() { $("#maphint")?.remove(); try { localStorage.setItem("hm_hint", "1"); } catch (e) { } }
 function celebrate(c) { toast(`Félicitations ! ${title(c)} est à vous. Loyer : +${fmtE(c.rent)}/jour`, "good"); if (window.confetti) confetti("#0EA5A0", 30); }
+
+// ---- rangée de cartes en bas de la carte : mes biens / à vendre ----------------------------
+let stripKind = "";
+function showStrip(kind) {
+  const el = $("#strip"); if (!el) return;
+  $$("#filter button").forEach(x => x.setAttribute("aria-selected", x.dataset.m === (kind === "all" ? "all" : kind)));
+  if (kind === "all" || kind === stripKind) { stripKind = ""; el.hidden = true; el.innerHTML = ""; $$("#filter button").forEach(x => x.setAttribute("aria-selected", x.dataset.m === "all")); return; }
+  stripKind = kind;
+  const items = kind === "mine" ? holdings().sort((a, b) => b.c.v * unitsOf(b) - a.c.v * unitsOf(a)).map(h => ({ g: h.g, c: h.c, item: { t: "own", ks: h.ks, n: h.n } }))
+    : [...ST.sale].map(g => ({ g, c: card(g) })).filter(x => x.c);
+  if (!items.length) { stripKind = ""; el.hidden = true; return toast(kind === "mine" ? "Vous n'avez encore aucun bien : lancez le dé ou ouvrez un booster !" : "Rien à vendre en ce moment."); }
+  el.hidden = false;
+  el.innerHTML = `<div class="sh"><b>${kind === "mine" ? `Mes biens · ${items.length}` : `À vendre · ${items.length}`}</b><span>Touchez une carte pour y aller</span><button class="x" data-sclose aria-label="Fermer">×</button></div>
+    <div class="sr">${items.slice(0, 60).map(x => `<button data-sg="${x.g}">${cardHTML(x.c, { w: "96px", item: x.item })}<small>${ord(x.c.arr)} arr.</small></button>`).join("")}</div>`;
+}
+document.addEventListener("click", e => {
+  if (e.target.closest("[data-sclose]")) return showStrip("all");
+  const b = e.target.closest("#strip [data-sg]"); if (!b) return;
+  const g = +b.dataset.sg; $$("#strip [data-sg]").forEach(x => x.classList.toggle("on", x === b));
+  $("#strip").hidden = true;   // l'aperçu prend la place ; la rangée revient quand on le ferme
+  ensureCards([g]).then(() => { flyTo(g); previewBuilding(g); });
+});
