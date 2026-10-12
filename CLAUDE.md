@@ -50,6 +50,6 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
 - Cartes : image = maquette 3D de la vraie forme de l'immeuble (`maquetteSVG` dans cards.js), couleurs selon l'époque.
 - Le joueur est une montgolfière 3D (`models.js`, `pawn3d`) aux couleurs de son parti, qui survole les toits sur le trajet du dé. Barre du bas : Téléport (avec confirmation) · Lancer · Boosters (mini paquet, badge) — il n'y a plus d'onglet Boosters.
 - Sur téléphone : pas de bandeau des maires sur la carte (il est dans l'onglet Paris) ; quand on tombe sur une case, la carte s'affiche en grand.
-- Thème : crème « Paris », polices Plus Jakarta Sans (texte) + Fraunces (titres). Cartes : cadre, ciel, bandeau étoilé et reflets selon la rareté ; époque en étiquette sur la maquette.
+- Thème « Blanc pur » (choisi par le propriétaire) : Paris en maquette blanche (couleurs dans `MC` de map.js), police Inter Tight partout, interface noir et blanc, bleu vif `--act` (#2563EB) pour le dé et les achats ; tes biens en bleu, ceux des autres en rose pâle, à vendre en orange. Booster = sachet métallisé (`packHTML`, classes `.sachet`). Cartes : cadre, ciel, bandeau étoilé et reflets selon la rareté ; époque en étiquette sur la maquette.
 - Case : plan des logements (à vous / à d'autres / libres), choix « À crédit / Comptant » avec le loyer de chaque option.
 - Patrimoine : « Où sont vos biens » (barres par arrondissement, clic = filtre), collection triable et paginée.

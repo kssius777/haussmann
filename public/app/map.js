@@ -6,8 +6,9 @@ let map = null, mapReady = false, mode = "all", sel = null;
 const hideSet = new Set(), lastState = new Map(); let painted = new Set();
 // Palette « Paris » : pierre de taille et toits en zinc
 // (les toits sont un gris chaud clair : un Paris beige, pas bleu ; les immeubles des autres joueurs sont en terre cuite)
-const MC = { mine: "#0EA5A0", mineB: "#8FDDD6", theirs: "#C59383", theirsB: "#EEDDD3", sale: "#F59E0B", saleB: "#F9D58F",
-  sel: "#0F1B2D", selB: "#7DD3FC", mute: "#EEEAE3", muteR: "#DAD5CC", stone: "#F3DFBC", zinc: "#D3CCC0" };
+// thème « Blanc pur » : Paris en maquette blanche, seules les infos de jeu sont en couleur
+const MC = { mine: "#2563EB", mineB: "#BFD2FB", theirs: "#F4B4A5", theirsB: "#FCEDE9", sale: "#F5A524", saleB: "#FCE1AE",
+  sel: "#0B0C10", selB: "#9DB4F7", mute: "#F7F7F8", muteR: "#EDEEF0", stone: "#FFFFFF", zinc: "#F2F3F5" };
 
 function geoArr(i) {
   const A = ARR[i], feats = []; const ih = FIELDS.indexOf("h"), ir = FIELDS.indexOf("r");
@@ -104,17 +105,17 @@ function buildMap(base) {
     container: "map", attributionControl: false, center: [2.3440, 48.8566], zoom: 14.2, pitch: 55, bearing: 0, maxPitch: 75, minZoom: 10.8,
     maxBounds: [[2.10, 48.74], [2.60, 48.98]], fadeDuration: 0, dragRotate: true, touchPitch: true, pitchWithRotate: true,
     style: { version: 8,
-      light: { anchor: "viewport", color: "#FFF6E8", intensity: .45, position: [1.15, 210, 40] },
-      sky: { "sky-color": "#9FCBEF", "horizon-color": "#F4E9DA", "fog-color": "#EFE7DA", "sky-horizon-blend": .6, "horizon-fog-blend": .7, "fog-ground-blend": .8, "atmosphere-blend": 0 },
+      light: { anchor: "viewport", color: "#FFFFFF", intensity: .55, position: [1.15, 210, 40] },
+      sky: { "sky-color": "#E9F0F8", "horizon-color": "#FFFFFF", "fog-color": "#EFF0F2", "sky-horizon-blend": .6, "horizon-fog-blend": .7, "fog-ground-blend": .85, "atmosphere-blend": 0 },
       sources: { water: { type: "geojson", data: polysGeo(base.water) }, parks: { type: "geojson", data: polysGeo(base.parks) }, major: { type: "geojson", data: linesGeo(base.major) }, arr: { type: "geojson", data: outline }, mfill: { type: "geojson", data: mfill } },
       layers: [
-        { id: "bg", type: "background", paint: { "background-color": "#E7E2D8" } },
+        { id: "bg", type: "background", paint: { "background-color": "#ECEDEF" } },
         { id: "arrfill", type: "fill", source: "arr", paint: { "fill-color": partyFill(), "fill-opacity": ["interpolate", ["linear"], ["zoom"], 11, .5, 12.8, .26, 14, .06, 15, 0] } },
-        { id: "parks", type: "fill", source: "parks", paint: { "fill-color": "#9BD67C", "fill-opacity": .95 } },
-        { id: "water", type: "fill", source: "water", paint: { "fill-color": "#55A7EA" } },
-        { id: "major-case", type: "line", source: "major", paint: { "line-color": "#D6CFC2", "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "k"], 3, 1.6, .6], 18, ["match", ["get", "k"], 3, 34, 20]] } },
+        { id: "parks", type: "fill", source: "parks", paint: { "fill-color": "#CFE5C2", "fill-opacity": 1 } },
+        { id: "water", type: "fill", source: "water", paint: { "fill-color": "#A9CCE8" } },
+        { id: "major-case", type: "line", source: "major", paint: { "line-color": "#DFE1E5", "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "k"], 3, 1.6, .6], 18, ["match", ["get", "k"], 3, 34, 20]] } },
         { id: "major", type: "line", source: "major", paint: { "line-color": "#FFFFFF", "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "k"], 3, 1.2, .4], 18, ["match", ["get", "k"], 3, 30, 17]] } },
-        { id: "mfill", type: "fill", source: "mfill", paint: { "fill-color": "#E9C46A", "fill-opacity": ["interpolate", ["linear"], ["zoom"], 12, .35, 16, .25] } },
+        { id: "mfill", type: "fill", source: "mfill", paint: { "fill-color": "#F5D98A", "fill-opacity": ["interpolate", ["linear"], ["zoom"], 12, .35, 16, .25] } },
         { id: "mfill-line", type: "line", source: "mfill", paint: { "line-color": "#B8860B", "line-width": 1.5, "line-dasharray": [2, 1.5] } },
         { id: "anchor-b", type: "background", layout: { visibility: "none" }, paint: {} },
         { id: "arrline", type: "line", source: "arr", paint: { "line-color": "#FFFFFF", "line-width": ["interpolate", ["linear"], ["zoom"], 11, 1.6, 16, 3] } },

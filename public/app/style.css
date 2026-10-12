@@ -1179,3 +1179,59 @@ html,body{font-family:var(--f)}
 .dmain .cube i{inset:0}
 .cube .f1{transform:translateZ(17px)} .cube .f2{transform:rotateY(90deg) translateZ(17px)} .cube .f3{transform:rotateY(180deg) translateZ(17px)}
 .cube .f4{transform:rotateY(-90deg) translateZ(17px)} .cube .f5{transform:rotateX(90deg) translateZ(17px)} .cube .f6{transform:rotateX(-90deg) translateZ(17px)}
+
+/* =====================================================================
+   v6 (12/10) : thème « Blanc pur » — Paris en maquette blanche, Inter Tight,
+   interface noir et blanc, bleu vif pour les actions
+   ===================================================================== */
+:root{
+  --f:"Inter Tight",system-ui,-apple-system,sans-serif; --f-num:"Inter Tight",system-ui,sans-serif; --f-d:"Inter Tight",system-ui,sans-serif;
+  --bg:#F6F7F8; --surface:#fff; --ink:#0B0C10; --ink2:#30343C; --muted:#80858F; --line:#E7E8EB; --soft:#F7F7F8; --soft2:#EFF0F2;
+  --blue:#0B0C10; --blue2:#2563EB; --accent:#2563EB; --act:#2563EB; --actD:#1A4BC4;
+  --money:#16A34A; --mine:#2563EB; --sale:#F5A524; --gold:#F5A524; --danger:#E5383B;
+  --shadow:0 1px 2px rgba(10,12,16,.04),0 6px 18px rgba(10,12,16,.06); --shadow-l:0 18px 50px rgba(10,12,16,.14);
+}
+html,body{background:var(--bg);font-family:var(--f);letter-spacing:-.005em}
+.h1,.h2,.kpi b,.land .lh{font-family:var(--f)!important;letter-spacing:-.025em}
+.h1{font-weight:800} .h1.big{font-size:40px;font-weight:700}
+.h2{font-weight:700;font-size:20px}
+.kpi b{font-weight:700}
+#bar{background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.plaque-mini{background:#0B0C10!important;border:0!important;outline:none!important;border-radius:7px!important;letter-spacing:.32em;color:#fff!important}
+.money{background:#fff!important;border:1px solid var(--line);box-shadow:none}
+.avatar{border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.money .plus{background:var(--act)!important}
+#tabs{background:#fff!important;border-top:1px solid var(--line)!important}
+#tabs button{font-weight:600}
+#tabs button[aria-selected=true]{background:#0B0C10!important;color:#fff!important}
+.mbtn,.dside{background:#fff!important;box-shadow:0 0 0 1px var(--line),0 8px 22px rgba(10,20,40,.10)!important}
+.dside small{font-weight:600!important;color:var(--ink2)!important}
+/* le dé et les boutons d'achat : le bleu vif, pour savoir où toucher */
+.dmain{background:radial-gradient(circle at 35% 30%,#4F86FF,var(--act) 70%)!important;border-color:#fff!important;box-shadow:0 6px 0 var(--actD),0 14px 30px rgba(37,99,235,.38)!important}
+.dmain small{background:#0B0C10!important;color:#fff!important;border-color:#fff!important;font-weight:700}
+.dmain.empty{background:radial-gradient(circle at 35% 30%,#A7AFBD,#7B8494 70%)!important;box-shadow:0 6px 0 #5F6776!important}
+.cube i b{background:var(--act)!important}
+.btn{font-weight:700;letter-spacing:-.005em;box-shadow:none}
+.btn:not(.light):not(.ghost):not(.white):not(.gold):not(.green){background:#0B0C10}
+.btn.blue2,.btn.buy,.btn.green{background:var(--act)!important;color:#fff!important}
+.btn.light{background:#fff;border:1px solid var(--line)}
+#movebar{background:#fff!important;border:1px solid var(--line)!important;box-shadow:var(--shadow-l)!important}
+#movebar.k-land{background:#fff!important}
+.kpi,.drow,.occ,.box{background:#fff!important;border:1px solid var(--line)!important;box-shadow:none!important}
+.chip{background:#fff;border:1px solid var(--line)}
+.chip[aria-pressed="true"]{background:#0B0C10!important;color:#fff!important;border-color:#0B0C10}
+.seg button[aria-selected="true"]{color:var(--ink)!important}
+.mmark{background:#fff!important;box-shadow:0 4px 14px rgba(0,0,0,.10)!important}
+.score,.filter{background:rgba(255,255,255,.96)!important;box-shadow:0 0 0 1px var(--line),var(--shadow)!important}
+.filter button[aria-selected="true"]{background:#0B0C10!important}
+.land .lh.free{color:#15803D} .land .lh.home{color:var(--act)}
+.land .pay button[aria-selected="true"] b{color:var(--act)}
+.drow .bar i{background:linear-gradient(90deg,var(--act),#7FA6FF)!important}
+.drow[aria-pressed="true"]{border-color:var(--act)!important;box-shadow:0 0 0 2px rgba(37,99,235,.15)!important}
+.afilter{background:#0B0C10}
+.rankpill{background:#F3F4F6;color:var(--ink)}
+#pawnoff{background:#0B0C10} #pawnoff i{color:#0B0C10}
+.pawn.is3d em{background:#0B0C10}
+.oc i.th,.obar i.th{background:#F4B4A5} .ol .o-th::before{background:#F4B4A5}
+.hc .plq{background:linear-gradient(180deg,#24459E,#1A3480)}
+.hc{--ink:#14213A;--ink2:#3A4660}
