@@ -1156,3 +1156,26 @@ html,body{font-family:var(--f)}
 .page.dark,#reveal{background:radial-gradient(70% 50% at 50% 42%,rgba(60,100,255,.35),transparent 70%),radial-gradient(120% 90% at 50% 40%,#10172A 0%,#07090F 70%)!important;color:#fff}
 .page.dark .rays{display:none}
 .page.dark .h1{font-family:var(--f);font-weight:300;letter-spacing:.3em;text-transform:uppercase;font-size:20px;color:rgba(255,255,255,.9)}
+/* téléphone : le panneau de la case tient dans l'écran, la carte reste visible au-dessus */
+@media (max-width:699px){
+  body.landopen .dicebar{display:none}
+  #movebar.k-land{bottom:calc(var(--tab-h) + env(safe-area-inset-bottom,0px) + 8px);max-height:calc(100dvh - var(--bar-h) - var(--tab-h) - 170px);padding:10px 12px 12px}
+  .land{gap:6px}
+  .land .lc{width:118px}.land .lc .hc{--w:118px}
+  .land .lh{font-size:17px}
+  .occ{padding:8px 10px;gap:5px}
+  .occ .ot{font-size:11px}
+  .oc i{width:13px;height:13px;border-radius:3px}
+  .ol{font-size:12px}
+  .land .pay button{padding:5px 6px}
+  .land .pay button b{font-size:13px} .land .pay button small{font-size:11.5px}
+  .land .lb .btn.buy{min-height:48px}
+  .land .lb .btn.buy span{font-size:15px}
+  .land .lb .btn.buy small{font-size:11px;line-height:1.25}
+}
+/* bouton du dé : le compteur ne cache plus le mot */
+.dmain>b{display:none}
+.dmain .cube{width:34px;height:34px;margin-top:-6px}
+.dmain .cube i{inset:0}
+.cube .f1{transform:translateZ(17px)} .cube .f2{transform:rotateY(90deg) translateZ(17px)} .cube .f3{transform:rotateY(180deg) translateZ(17px)}
+.cube .f4{transform:rotateY(-90deg) translateZ(17px)} .cube .f5{transform:rotateX(90deg) translateZ(17px)} .cube .f6{transform:rotateX(-90deg) translateZ(17px)}

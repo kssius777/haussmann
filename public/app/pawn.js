@@ -58,6 +58,8 @@ function setMovebar(html, kind) {
   m.className = panelKind ? "k-" + panelKind : "";
   if (!html) { m.hidden = true; m.innerHTML = ""; } else { m.hidden = false; m.innerHTML = html; }
   $("#dicebar").classList.toggle("off", moving);
+  document.body.classList.toggle("landopen", panelKind === "land");
+  if (panelKind === "land") $("#pawnoff").hidden = true;
 }
 function renderDice() {
   const p = ST.state?.profile; if (!p) return;
@@ -88,9 +90,12 @@ async function doRoll() {
   await walk(line, Math.min(2400, 500 + 80 * r.path.length));
   setState(r.state); moving = false;
   await placePawn(false); renderDice(); renderWallet();
-  map.easeTo({ center: centerOf(r.landing.card), zoom: Math.max(map.getZoom(), 16.6), duration: 600, offset: [0, innerWidth < 700 ? -230 : -150] });
   setTimeout(() => map.getSource("walked")?.setData(FC([])), 2500);
   lastLanding = r.landing; landCredit = null; showLand(r.landing);
+  // la case reste visible au-dessus du panneau (téléphone) ou à gauche (ordinateur)
+  const mb = $("#movebar"), mobile = innerWidth < 900;
+  map.easeTo({ center: centerOf(r.landing.card), zoom: Math.max(map.getZoom(), 16.4), duration: 600,
+    offset: mobile ? [0, -Math.round((mb.offsetHeight || 300) / 2) + 20] : [-Math.round((mb.offsetWidth || 380) / 2), 0] });
   refreshHold().then(refreshMap).then(() => { paintAll(); renderWallet(); if (panelKind === "land") showLand(); }).catch(() => { });
 }
 function walk(line, ms) {   // le pion suit le trajet, la ligne parcourue se dessine derrière lui
@@ -151,7 +156,7 @@ function showLand(L) {
       btns = `<div class="nomoney"><b>Pas assez pour celui-ci</b><span>${cash < down(c.v) ? `Il manque ${fmtE(need)} pour l'apport${days ? ` · vos loyers l'apportent dans ${days} jour${days > 1 ? "s" : ""}` : ""}.` : `Capacité d'emprunt atteinte. Elle remonte à mesure que vos crédits se remboursent.`}</span></div>`;
     } else {
       const seg = creditOK && cashOK ? `<div class="pay"><button data-paymode="1" aria-selected="${cr}"><b>À crédit</b><small>${fmtE(down(c.v))} · <em>+${fmtE(Math.round(c.rent * .3))}/j</em></small></button><button data-paymode="0" aria-selected="${!cr}"><b>Comptant</b><small>${fmtE(c.v)} · <em>+${fmtE(c.rent)}/j</em></small></button></div>` : "";
-      btns = `${seg}<button class="btn block ${cr ? "blue2" : "green"} buy" data-lbuy="${g}"><span>Acheter ${unit} · ${fmtE(cr ? down(c.v) : c.v)}</span><small>${cr ? "Le reste est prêté par la banque et se rembourse tout seul avec le loyer" : "Tout le loyer est pour vous, et le bien peut être revendu"}</small></button>`;
+      btns = `${seg}<button class="btn block ${cr ? "blue2" : "green"} buy" data-lbuy="${g}"><span>Acheter ${unit} · ${fmtE(cr ? down(c.v) : c.v)}</span><small>${cr ? "La banque prête le reste, remboursé tout seul par le loyer" : "Tout le loyer est pour vous, et le bien peut être revendu"}</small></button>`;
       if (allFree && (cr ? cash >= down(total) && total - down(total) <= cap : cash >= total)) btns += `<button class="btn block light" data-lbuild="${g}">Tout l'immeuble · ${fmtE(cr ? down(total) : total)} <small class="muted">(+60 % de loyer)</small></button>`;
     }
     landCreditNow = cr;
@@ -226,6 +231,7 @@ function initPawnUI() {
 // quand le pion sort de l'écran : une flèche au bord indique où il est
 function pawnOff() {
   const el = $("#pawnoff"); if (!pawnMk || !el) return;
+  if (panelKind === "land" && innerWidth < 900) { el.hidden = true; return; }
   if (window.pawn3d) {   // l'étiquette « Vous » flotte au-dessus du pion 3D
     const z = map.getZoom(), mpp = 40075016 * Math.cos(48.86 * Math.PI / 180) / (512 * Math.pow(2, z));
     const px = pawn3d.H * pawn3d.k(z) / mpp * Math.sin(map.getPitch() * Math.PI / 180);
