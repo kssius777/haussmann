@@ -49,7 +49,9 @@ async function openBooster(kind) {
   const seq = props.length ? [...props.slice(0, -1), ...ch, props[props.length - 1]] : ch;
   await sleep(Math.max(0, 450 - (performance.now() - t0)));
   pack.classList.remove("shake"); pack.classList.add("open");
-  await sleep(380);
+  await sleep(420);
+  R.querySelector("#rpack").classList.add("gone");   // le paquet s'efface, les cartes sortent à sa place
+  await sleep(220);
   refreshHold().then(refreshMap).then(() => { paintAll(); renderWallet(); }).catch(() => { });
   await revealSeq(seq);
   opening = false;

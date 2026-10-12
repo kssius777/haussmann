@@ -12,7 +12,7 @@ far = db.sql("select id from cards where lk='l' and id not in (select card from 
 check("avant de lancer : pas d'achat à la banque", "tomber dessus" in (err(lambda: db.rpc(A, "bank_buy", p_card=far, p_k=None)) or ""))
 t = time.time(); r = db.rpc(A, "roll"); dt = time.time() - t
 path, L = r["path"], r["landing"]
-check(f"lancer ({dt*1000:.0f} ms) : dé {r['die']} → {len(path)-1} pas", 1 <= r["die"] <= 6 and r["die"] * 4 <= len(path) - 1 <= r["die"] * 4 + 15)
+check(f"lancer ({dt*1000:.0f} ms) : dé {r['die']} → {len(path)-1} pas", 1 <= r["die"] <= 6 and 1 <= len(path) - 1 <= r["die"] * 4)
 check("on ne retombe jamais sur sa case de départ (≥ 60 m)", db.sql("select _dist(%s,%s)", path[0], path[-1])[0][0] >= 59)
 check("le pion marche d'immeuble voisin en immeuble voisin", path[0] == 300658 and all(db.sql("select 1 from edges where a=%s and b=%s", a, b) for a, b in zip(path, path[1:])))
 st = db.rpc(A, "state")["profile"]
@@ -55,6 +55,10 @@ for _ in range(15):
     db.sql("update profiles set rolls=10 where id=%s", str(C)); x = db.rpc(C, "roll"); t2 = x["landing"]["card"]
     same += (t2 == prev); prev = t2; far_ = max(far_, db.sql("select _dist(300658,%s)", t2)[0][0])
 check("autour de Notre-Dame : le pion s'éloigne (pas de boucle)", far_ > 400 and same == 0, f"{far_:.0f} m au plus loin")
+# acheter des lancers
+db.sql("update profiles set rolls=0, cash=10000000, rb_n=0, rb_day=null where id=%s", str(A))
+p0 = db.rpc(A, "state")["rolls_price"]; db.rpc(A, "buy_rolls"); st = db.rpc(A, "state")
+check("acheter 5 lancers avec l'argent du jeu, prix qui double", st["profile"]["rolls"] == 5 and st["rolls_price"] == p0 * 2, (p0, st["rolls_price"]))
 nch = db.sql("select count(*) from (select id from cards order by id limit 1200) x where _is_chance(id)")[0][0]
 check("cases Chance réparties sur la carte (≈ 1 sur 8)", 100 < nch < 210, nch)
 print(f"\n{sum(R)}/{len(R)} OK")

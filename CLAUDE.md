@@ -38,7 +38,8 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
 - **Pion façon Monopoly** : un dé de 1 à 6, le pion marche tout seul (4 immeubles voisins par point) et s'arrête sur un immeuble.
   Libre → on peut l'acheter à la banque (c'est le seul endroit où l'on achète à la banque). À un autre joueur → on lui paie
   une journée de ses loyers ici (max 20 % de sa trésorerie). À soi → une journée de loyer en bonus. 1 case sur 8 environ : carte Chance.
-  10 lancers max, +1 toutes les 30 min. 3 téléportations par jour vers ses propres biens (on peut y acheter les logements libres).
+  Le pion va vers un immeuble lointain atteignable en n pas et suit le plus court chemin (pas de boucle).
+  10 lancers max, +1 toutes les 30 min ; on peut acheter 5 lancers (50 000 €, prix doublé à chaque achat du jour). 3 téléportations par jour vers ses propres biens (on peut y acheter les logements libres).
 - **Crédit immobilier** (achat à la banque) : apport 30 %, la banque prête le reste ; la moitié du loyer de base du bien
   rembourse le crédit automatiquement (impossible d'être en défaut) ; 3 crédits max ; remboursement anticipé (`repay`) ;
   un bien à crédit ne peut être ni vendu ni hypothéqué. Le patrimoine et le classement retirent crédits et hypothèques.

@@ -175,14 +175,14 @@ function maquetteSVG(c) {
 // --- libellés -------------------------------------------------------------
 function itemLabel(c, it) {
   if (!it) return c.lk === "p" ? `${fmtN(c.lots)} parts` : `${c.lots} ${lotWord(c, c.lots)}`;
-  if (it.t === "key") { const k = it.ks[0]; return c.lk === "l" ? `Clé · ${lotName(c, k)} · ${ord(floorOfLot(c, k))} étage` : `Clé · ${lotName(c, k)}`; }
+  if (it.t === "key") { const k = it.ks[0]; return c.lk === "l" ? `Clé · Apt ${k + 1} · ${ord(floorOfLot(c, k))} étage` : `Clé · Local n°${k + 1}`; }
   if (it.t === "floor") return `${ord(floorOfLot(c, it.ks[0]))} étage entier · ${it.ks.length} logements`;
   if (it.t === "title") return `Immeuble entier · ${c.lots} ${lotWord(c, c.lots)}`;
   if (it.t === "part") return `${it.n} part${it.n > 1 ? "s" : ""} sur ${fmtN(c.lots)}`;
   if (it.t === "own") {
     if (it.n) return `${fmtN(it.n)} part${it.n > 1 ? "s" : ""} sur ${fmtN(c.lots)}`;
     if (it.ks.length === c.lots && c.lots > 1) return `Immeuble entier · ${c.lots} ${lotWord(c, c.lots)}`;
-    if (it.ks.length === 1) return c.lk === "l" ? `${lotName(c, it.ks[0])} · ${ord(floorOfLot(c, it.ks[0]))} étage` : lotName(c, it.ks[0]);
+    if (it.ks.length === 1) return c.lk === "l" ? `Apt ${it.ks[0] + 1} · ${ord(floorOfLot(c, it.ks[0]))} étage` : c.lk === "c" ? `Local n°${it.ks[0] + 1}` : lotName(c, it.ks[0]);
     return `${it.ks.length} ${lotWord(c, it.ks.length)} sur ${c.lots}`;
   }
   return "";
@@ -236,4 +236,12 @@ function packHTML(cls = "") {
       ${[0, 1, 2, 3, 4].map(i => `<path d="M${17 + i * 19} 50v-10a4.5 4.5 0 019 0v10z"/><rect x="${17 + i * 19}" y="58" width="9" height="13"/>`).join("")}
       <path d="M12 53h96M12 74h96"/></svg>
     <span class="lbl">BOOSTER<small>4 biens · 1 Chance</small></span></div><div class="shine"></div></div>`;
+}
+
+// phrase claire pour « ce que je possède » dans un immeuble
+function ownSentence(c, ks, n) {
+  if (n) return `${fmtN(n)} part${n > 1 ? "s" : ""} du monument sur ${fmtN(c.lots)}`;
+  const w = x => c.lk === "l" ? (x > 1 ? "logements" : "logement") : (x > 1 ? "locaux commerciaux" : "local commercial");
+  if (ks.length === c.lots && c.lots > 1) return `Tout l'immeuble : ses ${c.lots} ${w(c.lots)}`;
+  return `${ks.length} ${w(ks.length)} sur les ${c.lots} de l'immeuble`;
 }

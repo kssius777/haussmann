@@ -383,7 +383,7 @@ alter table profiles add column if not exists heading float8;                   
 alter table profiles add column if not exists land int;                                -- immeuble où le pion s'est arrêté : achetable à la banque
 
 create or replace function pawn_cfg() returns jsonb language sql immutable as $$ select '{
-  "maxRolls":10, "rollEveryMin":30, "tpPerDay":3, "buyRadius":150, "tollCap":0.2, "spawn":300658, "chanceEvery":8, "stepMul":4, "dieMax":6
+  "maxRolls":10, "rollEveryMin":30, "tpPerDay":3, "buyRadius":150, "tollCap":0.2, "spawn":300658, "chanceEvery":8, "stepMul":4, "dieMax":6, "rollsPrice":50000, "rollsPack":5
 }'::jsonb $$;
 
 -- distance en mètres entre deux immeubles (null si coordonnées inconnues)
@@ -439,31 +439,29 @@ create or replace function _square(u uuid, t int) returns jsonb language sql sta
     'mine', (select count(*) from lots where card = t and owner = u) + coalesce((select sum(n) from parts where card = t and owner = u), 0))
   from cards c where c.id = t $$;
 
--- Le pion marche tout seul : il garde à peu près sa direction, s'éloigne de son point de départ
--- (pour ne pas tourner en rond, par exemple autour de Notre-Dame) et s'arrête à au moins 60 m.
+-- Le pion marche tout seul. Il ne peut pas tourner en rond : on cherche tous les immeubles atteignables
+-- en exactement n pas, on choisit l'un des plus éloignés (plutôt dans la direction du lancer précédent),
+-- puis le pion suit le PLUS COURT chemin pour y aller.
 create or replace function _walk(u uuid, start int, n int) returns int[] language plpgsql as $$
 #variable_conflict use_column
-declare cur int := start; path int[] := array[start]; hd float8; x0 int; y0 int; sx int; sy int; best record; i int; d float8;
+declare hd float8; sx float8; sy float8; t int; cur int; path int[] := '{}'; dmax int; tx float8; ty float8;
 begin
-  select coalesce(heading, random() * 2 * pi()) + (random() - 0.5) * 1.2 into hd from profiles where id = u;
-  select cx, cy into sx, sy from cards where id = start;
-  for i in 1..n + 15 loop
-    select cx, cy into x0, y0 from cards where id = cur;
-    select e.b node, atan2((c.cy - y0) * 1.10574, (c.cx - x0) * 0.7324) brg,
-           sqrt(power((c.cx - sx) * 0.7324, 2) + power((c.cy - sy) * 1.10574, 2)) dist into best
-      from edges e join cards c on c.id = e.b
-      where e.a = cur
-      order by (e.b = any(path)),                                                     -- jamais deux fois la même case si possible
-               abs(mod((atan2((c.cy - y0) * 1.10574, (c.cx - x0) * 0.7324) - hd + 3 * pi())::numeric, (2 * pi())::numeric) - pi())
-               - 0.012 * sqrt(power((c.cx - sx) * 0.7324, 2) + power((c.cy - sy) * 1.10574, 2))   -- s'éloigner du départ
-               + random() * 0.5
-      limit 1;
-    exit when best.node is null;
-    hd := hd + 0.5 * (mod((best.brg - hd + 3 * pi())::numeric, (2 * pi())::numeric) - pi());
-    cur := best.node; path := path || cur; d := best.dist;
-    exit when i >= n and d >= 60;
-  end loop;
-  update profiles set heading = hd where id = u;
+  select coalesce(heading, random() * 2 * pi()) + (random() - 0.5) * 1.8 into hd from profiles where id = u;
+  select cx * 0.7324, cy * 1.10574 into sx, sy from cards where id = start;
+  create temp table if not exists _wk(node int primary key, d int, par int) on commit drop;
+  truncate _wk; insert into _wk select * from _reach(start, n);
+  select max(d) into dmax from _wk;
+  select r.node into t from _wk r join cards c on c.id = r.node
+    where r.d = dmax
+    order by sqrt(power(c.cx * 0.7324 - sx, 2) + power(c.cy * 1.10574 - sy, 2))
+             * (0.55 + 0.45 * cos(atan2(c.cy * 1.10574 - sy, c.cx * 0.7324 - sx) - hd))
+             * (0.85 + random() * 0.3) desc
+    limit 1;
+  if t is null then return array[start]; end if;
+  cur := t;
+  while cur is not null loop path := cur || path; select par into cur from _wk where node = cur; end loop;
+  select cx * 0.7324, cy * 1.10574 into tx, ty from cards where id = t;
+  update profiles set heading = atan2(ty - sy, tx - sx) where id = u;   -- la prochaine fois, à peu près la même direction
   return path;
 end $$;
 
@@ -542,6 +540,27 @@ begin
   return state();
 end $$;
 
+-- Acheter des lancers de dé avec l'argent du jeu : 5 lancers, prix qui double à chaque achat dans la journée
+alter table profiles add column if not exists rb_day date;
+alter table profiles add column if not exists rb_n int not null default 0;
+create or replace function rolls_price(p profiles) returns bigint language sql stable as $$
+  select (pawn_cfg()->>'rollsPrice')::bigint * (2 ^ (case when p.rb_day = paris_today() then p.rb_n else 0 end))::bigint $$;
+create or replace function buy_rolls() returns json
+language plpgsql security definer set search_path = public as $$
+#variable_conflict use_column
+declare u uuid := _need_me(); pr profiles; price bigint;
+begin
+  perform _sync(u); perform _regen(u);
+  select * into pr from profiles where id=u for update;
+  price := rolls_price(pr);
+  if pr.cash < price then raise exception 'Trésorerie insuffisante : il faut %', price; end if;
+  update profiles set cash = cash - price, rolls = least(99, rolls + (pawn_cfg()->>'rollsPack')::int),
+    rb_n = case when rb_day = paris_today() then rb_n + 1 else 1 end, rb_day = paris_today() where id=u;
+  return state();
+end $$;
+revoke all on function rolls_price(profiles) from public, anon, authenticated;
+grant execute on function buy_rolls() to anon, authenticated;
+
 -- À la banque, on n'achète que l'immeuble sur lequel son pion s'est arrêté
 create or replace function _near_or_fail(u uuid, card int) returns void language plpgsql as $$
 declare l int;
@@ -618,6 +637,7 @@ begin
     'credits', _credits(u),
     'loan_rate', coalesce((select sum(c.rent) from lots l join cards c on c.id=l.card where l.owner=u and l.loan > 0 and l.mort is null),0) * (cfg()->>'creditShare')::float8
                + coalesce((select sum(c.rent * x.n) from parts x join cards c on c.id=x.card where x.owner=u and x.loan > 0 and x.mort is null),0) * (cfg()->>'creditShare')::float8,
+    'rolls_price', rolls_price(pr),
     'roll_in', case when pr.rolls >= (pawn_cfg()->>'maxRolls')::int then 0 else greatest(0, extract(epoch from (pr.rolls_at + ((pawn_cfg()->>'rollEveryMin') || ' minutes')::interval - now())))::int end,
     'now', now());
 end $$;
@@ -1093,7 +1113,7 @@ $$;
 revoke all on all functions in schema public from public, anon, authenticated;
 alter default privileges in schema public revoke execute on functions from public, anon, authenticated;
 do $$ declare f text; begin
-  foreach f in array array['join_game(text,text)','set_party(text)','state()','open_booster(text)','bank_buy(int,int,boolean)','buy_building(int,boolean)','repay(int)','roll()','teleport(int)',
+  foreach f in array array['join_game(text,text)','set_party(text)','state()','open_booster(text)','bank_buy(int,int,boolean)','buy_building(int,boolean)','repay(int)','roll()','teleport(int)','buy_rolls()',
     'list_item(int,int,int,bigint)','unlist(bigint)','buy_listing(bigint)','mortgage(int,int)','lift(int,int)',
     'map_state()','my_holdings()','building(int)','market()','feed()','leaderboard()','arr_info(int)'] loop
     execute format('grant execute on function %s to anon, authenticated', f);

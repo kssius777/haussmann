@@ -30,6 +30,7 @@ async function placePawn(fly) {
     <g stroke="#fff" stroke-width="2.4" stroke-linejoin="round"><path d="M9 52h26l-2.5-7h-21z" fill="${col}"/><path d="M14.5 45l3-15h9l3 15z" fill="${col}"/><path d="M13 30.5h18" stroke-linecap="round"/><circle cx="22" cy="17" r="9.5" fill="${col}"/></g>
     <g fill="url(#pzg)"><path d="M9 52h26l-2.5-7h-21z"/><path d="M14.5 45l3-15h9l3 15z"/><circle cx="22" cy="17" r="9.5"/></g></svg><s></s>`;
   pawnMk.setLngLat(ll); paintTargets();
+  if (window.pawn3d) { pawn3d.color(col); pawn3d.set(ll[0], ll[1]); pawnMk.getElement().classList.add("is3d"); }
   if (fly) map.flyTo({ center: ll, zoom: Math.max(map.getZoom(), 16.2), pitch: 50, duration: 900, offset: [0, -90] });
 }
 // l'immeuble où l'on se trouve est surligné en jaune
@@ -63,7 +64,7 @@ function renderDice() {
   const r = $("#b-roll"), left = p.rolls ?? 0;
   const wait = Math.max(0, (ST.state.roll_in || 0) - (performance.now() - ST.stAt) / 1000);
   $("#rolls").textContent = left > 0 ? `${left} lancer${left > 1 ? "s" : ""}` : `dans ${hm(wait)}`;
-  r.disabled = left <= 0 || moving;
+  r.disabled = moving; r.classList.toggle("empty", left <= 0);
   $("#tps").textContent = p.tp ?? 0; $("#b-tp").disabled = !(p.tp > 0);
   $("#dicebar").classList.toggle("off", moving);
 }
@@ -74,6 +75,7 @@ function smooth(pts) {   // adoucit le trajet d'immeuble en immeuble
 }
 async function doRoll() {
   if (moving) return;
+  if ((ST.state?.profile?.rolls ?? 0) <= 0) return showBuyRolls();
   const b = $("#b-roll"); b.disabled = true; hidePreview(); hideHint(); setMovebar("");
   let r; try { r = await rpc("roll"); } catch (e) { toast(e.message, "bad"); renderDice(); return; }
   if (!r.path) { toast("Le jeu est en cours de mise à jour : réessayez dans quelques minutes.", "bad"); renderDice(); return; }
@@ -100,7 +102,7 @@ function walk(line, ms) {   // le pion suit le trajet, la ligne parcourue se des
       const t = Math.min(1, (now - t0) / ms), e = t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2, at = e * L;
       let i = 1; while (i < line.length - 1 && seg[i] < at) i++;
       const f = (at - seg[i - 1]) / ((seg[i] - seg[i - 1]) || 1), p = [line[i - 1][0] + (line[i][0] - line[i - 1][0]) * f, line[i - 1][1] + (line[i][1] - line[i - 1][1]) * f];
-      pawnMk.setLngLat(p); src?.setData(FC([{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [...line.slice(0, i), p] } }]));
+      pawnMk.setLngLat(p); window.pawn3d?.set(p[0], p[1]); src?.setData(FC([{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [...line.slice(0, i), p] } }]));
       if (t < 1) requestAnimationFrame(step); else res();
     };
     requestAnimationFrame(step);
@@ -131,22 +133,39 @@ function showLand(L) {
   let btns = "";
   if (free > 0) {
     const unit = isP ? "1 part" : tot > 1 ? `1 ${word(1)}` : c.lk === "l" ? "le logement" : "le local", allFree = !isP && free === tot && tot > 1, total = c.v * tot;
-    const credits = ST.state?.credits || 0, canCredit = credits < CREDIT_MAX;
-    const down = p => Math.ceil(p * CREDIT_DOWN), cr = canCredit && (landCredit === null ? cash < c.v && cash >= down(c.v) : landCredit);
-    const need = p => cr ? down(p) : p;
-    btns += `<div class="pay" role="tablist"><button data-paymode="0" aria-selected="${!cr}">Comptant</button><button data-paymode="1" aria-selected="${cr}" ${canCredit ? "" : "disabled"}>À crédit${canCredit ? "" : " (3/3)"}</button></div>`;
-    btns += `<button class="btn block green" data-lbuy="${g}" ${cash < need(c.v) ? "disabled" : ""}><span>${cr ? `Acheter ${unit} · apport ${fmtE(down(c.v))}` : `Acheter ${unit} · ${fmtE(c.v)}`}</span><small>+${fmtE(c.rent)} / jour${cr ? " (moitié pour vous pendant le crédit)" : ""}</small></button>`;
-    if (allFree) btns += `<button class="btn block light" data-lbuild="${g}" ${cash < need(total) ? "disabled" : ""}><span>${cr ? `Les ${tot} · apport ${fmtE(down(total))}` : `Acheter les ${tot} · ${fmtE(total)}`}</span><small>tout l'immeuble : +60 % de loyer</small></button>`;
-    if (cr) btns += `<p class="crx">Vous payez <b>30 %</b> maintenant. La banque avance le reste (<b>${fmtE(c.v - down(c.v))}</b>) : il se rembourse <b>tout seul</b> avec la moitié du loyer de ce bien. Remboursable en avance, 3 crédits max.</p>`;
-    else if (cash < c.v) btns += `<small class="muted">Il vous manque ${fmtE(c.v - cash)}.${canCredit && cash >= down(c.v) ? " Essayez « À crédit » !" : ""}</small>`;
+    const canCredit = (ST.state?.credits || 0) < CREDIT_MAX, down = p => Math.ceil(p * CREDIT_DOWN);
+    const cashOK = cash >= c.v, creditOK = canCredit && cash >= down(c.v);
+    const cr = creditOK && (landCredit === null ? !cashOK : landCredit);
+    if (!cashOK && !creditOK) {
+      btns = `<div class="nomoney"><b>Pas assez d'argent pour celui-ci</b><span>${canCredit ? `Il faut au moins ${fmtE(down(c.v))} d'apport (30 %) pour l'acheter à crédit.` : `Il coûte ${fmtE(c.v)} et vous avez déjà 3 crédits en cours.`} Vous avez ${fmtE(cash)}.</span></div>`;
+    } else {
+      btns = cr
+        ? `<button class="btn block blue2" data-lbuy="${g}"><span>Acheter ${unit} à crédit</span><small>apport ${fmtE(down(c.v))} · +${fmtE(c.rent)} / jour</small></button>
+           <p class="crx">Vous payez <b>30 %</b> maintenant. La banque avance le reste (${fmtE(c.v - down(c.v))}), qui se rembourse <b>tout seul</b> avec la moitié du loyer de ce bien.</p>`
+        : `<button class="btn block green" data-lbuy="${g}"><span>Acheter ${unit} · ${fmtE(c.v)}</span><small>+${fmtE(c.rent)} / jour</small></button>`;
+      const links = [];
+      if (cr && cashOK) links.push(`<button data-paymode="0">ou payer comptant</button>`);
+      if (!cr && creditOK) links.push(`<button data-paymode="1">ou à crédit (apport ${fmtE(down(c.v))})</button>`);
+      if (allFree && cash >= (cr ? down(total) : total)) links.push(`<button data-lbuild="${g}">${cr ? `tout l'immeuble à crédit · apport ${fmtE(down(total))}` : `tout l'immeuble · ${fmtE(total)}`} (+60 %)</button>`);
+      if (links.length) btns += `<div class="llinks">${links.join("")}</div>`;
+    }
+    landCreditNow = cr;
   }
   setMovebar(`<div class="land"><div class="grab"></div><div class="lc" data-lopen="${g}">${cardHTML(c)}</div>
-    <div class="lr"><b class="lh ${cls}">${head}</b>${info ? `<span class="linfo">${info}</span>` : ""}${lines.join("")}<div class="lb">${btns}</div></div>
+    <div class="lr"><b class="lh ${cls}">${head}</b>${info ? `<span class="linfo">${info}</span>` : ""}${!isP ? `<a class="lnk lstreet" href="${streetURL(g)}" target="_blank" rel="noopener">📷 Voir la vraie façade</a>` : ""}${lines.join("")}<div class="lb">${btns}</div></div>
     <button class="x" data-mvclose aria-label="Fermer">×</button></div>`, "land");
   if (L?.chance && window.confetti && !BAD.has(L.chance.k)) confetti("#A855F7", 24);
 }
-let landCredit = null;   // null = choix automatique (crédit si l'on n'a pas assez pour payer comptant)
+let landCredit = null, landCreditNow = false;   // null = choix automatique (crédit si l'on n'a pas assez pour payer comptant)
 const CREDIT_DOWN = 0.3, CREDIT_MAX = 3;
+
+// ---- plus de lancers : en attendre un, ou en acheter ------------------------------
+function showBuyRolls() {
+  const s = ST.state, price = s.rolls_price || 50000, wait = Math.max(0, (s.roll_in || 0) - (performance.now() - ST.stAt) / 1000);
+  setMovebar(`<div class="mvh"><span class="pin">🎲</span><div><b>Plus de lancers pour l'instant</b><span>Un lancer revient toutes les 30 min (le prochain dans ${hm(wait)}).</span></div><button class="x" data-mvclose aria-label="Fermer">×</button></div>
+    <button class="btn block gold" data-buyrolls ${liveCash() < price ? "disabled" : ""}>Acheter 5 lancers · ${fmtE(price)}</button>
+    <small class="muted" style="text-align:center">Le prix double à chaque achat dans la journée.</small>`, "buy");
+}
 
 // ---- téléportation ------------------------------------------------------------
 function openTeleport() {
@@ -177,9 +196,10 @@ function initPawnUI() {
   $("#movebar").addEventListener("click", async e => {
     if (e.target.closest("[data-mvclose]")) return setMovebar("");
     const tp = e.target.closest("[data-tpgo]"); if (tp) return doTeleport(+tp.dataset.tpgo);
+    if (e.target.closest("[data-buyrolls]")) { if (await act("buy_rolls", {}, "5 lancers en plus !")) { setMovebar(""); renderDice(); } return; }
     const pm = e.target.closest("[data-paymode]"); if (pm) { landCredit = pm.dataset.paymode === "1"; return showLand(); }
     const lb = e.target.closest("[data-lbuy],[data-lbuild]"); if (lb) {
-      const g = +(lb.dataset.lbuy || lb.dataset.lbuild), whole = !!lb.dataset.lbuild, credit = landCredit; lb.disabled = true; lb.textContent = "Achat…";
+      const g = +(lb.dataset.lbuy || lb.dataset.lbuild), whole = !!lb.dataset.lbuild, credit = landCreditNow; lb.disabled = true; lb.textContent = "Achat…";
       if (await act(whole ? "buy_building" : "bank_buy", Object.assign(whole ? { p_card: g } : { p_card: g, p_k: null }, credit ? { p_credit: true } : {}), null)) { celebrate(card(g)); if (credit) toast("Acheté à crédit : il se rembourse tout seul avec la moitié du loyer.", "good"); }
       return showLand();
     }
@@ -192,6 +212,11 @@ function initPawnUI() {
 // quand le pion sort de l'écran : une flèche au bord indique où il est
 function pawnOff() {
   const el = $("#pawnoff"); if (!pawnMk || !el) return;
+  if (window.pawn3d) {   // l'étiquette « Vous » flotte au-dessus du pion 3D
+    const z = map.getZoom(), mpp = 40075016 * Math.cos(48.86 * Math.PI / 180) / (512 * Math.pow(2, z));
+    const px = pawn3d.H * pawn3d.k(z) / mpp * Math.sin(map.getPitch() * Math.PI / 180);
+    pawnMk.getElement().style.setProperty("--ph", Math.round(Math.max(18, px) + 6) + "px");
+  }
   const W = map.getContainer().clientWidth, H = map.getContainer().clientHeight, pt = map.project(pawnMk.getLngLat());
   const top = 110, bot = H - (($(".mapbottom")?.offsetHeight || 80) + 24), left = 30, right = W - 30;
   if (pt.x > left && pt.x < right && pt.y > top && pt.y < bot) { el.hidden = true; return; }

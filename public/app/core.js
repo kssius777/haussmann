@@ -120,6 +120,9 @@ async function ensureCards(gs) { await Promise.all([...new Set(gs.map(ai))].map(
 const title = c => c.name ? cap(c.name) : (c.adr || "Immeuble sans adresse");
 const floorOfLot = (c, k) => c.lk !== "l" ? 0 : Math.min(c.et2, 1 + Math.floor(k * c.et2 / c.lots));
 function lotsOfFloor(c, f) { const o = []; for (let k = 0; k < c.lots; k++) if (floorOfLot(c, k) === f) o.push(k); return o; }
-const lotName = (c, k) => c.lk === "l" ? `Apt ${k + 1}` : c.lk === "c" ? `Local ${k + 1}` : "Part";
+const lotName = (c, k) => c.lk === "l" ? `Appartement n°${k + 1}` : c.lk === "c" ? `Local commercial n°${k + 1}` : "Part";
 const lotWord = (c, n) => c.lk === "l" ? (n > 1 ? "logements" : "logement") : c.lk === "p" ? (n > 1 ? "parts" : "part") : (n > 1 ? "locaux" : "local");
-const kindLabel = c => c.lk === "p" ? "Monument" : c.lk === "c" ? (USE[c.u] || "Commerces") : (USE[c.u] || "Immeuble");
+const kindLabel = c => c.lk === "p" ? "Monument" : c.lk === "c" ? "Commerces & bureaux" : (USE[c.u] || "Immeuble");
+
+// lien vers la vraie rue (Google Street View, dans un nouvel onglet)
+function streetURL(g) { try { const [x, y] = centerOf(g); return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${y.toFixed(6)},${x.toFixed(6)}`; } catch (e) { return ""; } }

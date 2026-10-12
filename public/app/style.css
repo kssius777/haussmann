@@ -723,3 +723,32 @@ input{font:inherit;color:inherit}
 .goal span{font-size:13.5px;color:var(--ink2)}
 /* profil : boutons pas trop grands */
 #p-detail .wrap>div>.btn.block,#p-detail .wrap>.btn.block{max-width:380px}
+.dmain.empty{background:radial-gradient(circle at 35% 30%,#8FA3C9,#5B6F98 70%);animation:none}
+.pawn.is3d{height:118px}
+.pawn.is3d .pz,.pawn.is3d s{display:none}
+.pawn.is3d{height:auto}
+.pawn.is3d em{margin-bottom:var(--ph,60px)}
+/* ouverture : le paquet garde sa taille, puis s'efface quand les cartes sortent */
+.rv{display:grid;place-items:center}
+.rv>.slot,.rv>#rpack{grid-area:1/1}
+.rv .pack{--pw:min(250px,60vw);margin-top:0;aspect-ratio:5/7.6;overflow:hidden}
+.rv #rpack{transition:transform .35s ease-in,opacity .35s ease-in;z-index:1}
+.rv #rpack.gone{transform:translateY(30%) scale(.85);opacity:0;pointer-events:none}
+.rv .slot{z-index:2;min-height:0}
+/* panneau de la case : toute la hauteur à droite (ordinateur), moins de boutons */
+.btn.blue2{background:var(--blue2)}
+.nomoney{display:grid;gap:4px;padding:12px;border-radius:12px;background:#FFF4E5;color:#7A2E0E;font-size:13px}
+.nomoney b{font-size:14.5px}
+.llinks{display:grid;gap:2px;justify-items:center}
+.llinks button{font-size:13px;font-weight:700;color:var(--blue2);text-decoration:underline;text-underline-offset:2px;padding:4px}
+@media (min-width:900px){
+  #movebar.k-land{top:calc(var(--bar-h) + 10px);bottom:calc(var(--tab-h) + 10px);max-height:none;width:380px;display:flex;flex-direction:column;padding:22px 20px}
+  #movebar.k-land .land{flex:1;align-content:start;gap:16px}
+  .land .lc{width:260px}
+  .land .lc .hc{--w:260px}
+  .land .lh{font-size:22px}
+  .land .linfo{font-size:14.5px}
+  .land .lb{gap:10px;margin-top:4px}
+  .land .lb .btn{min-height:54px;font-size:16px}
+}
+.lstreet{font-size:13px;justify-self:start}@media (min-width:900px){.lstreet{justify-self:center}}

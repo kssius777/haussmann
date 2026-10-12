@@ -240,7 +240,7 @@ async function buildingPage(g) {
     const h = { g, c, ks: myKs, n: myN };
     const rows = isP ? "" : myKs.map(k => {
       const l = listed.get(k), m = ST.mort.get(g + ":" + k);
-      const where = c.lk === "l" ? `${lotName(c, k)} · ${ord(floorOfLot(c, k))} ét.` : lotName(c, k);
+      const where = c.lk === "l" ? `${lotName(c, k)} · ${ord(floorOfLot(c, k))} étage` : `${lotName(c, k)} · rez-de-chaussée`;
       let actions;
       if (loan) actions = `<span class="pill">🏦 à crédit</span>`;
       else if (l) actions = `<span class="pill" style="background:var(--sale);color:#fff">En vente ${fmtE(l.price)}</span><button class="btn sm ghost" data-act="unlist" data-id="${l.id}">Retirer</button>`;
@@ -250,7 +250,7 @@ async function buildingPage(g) {
       return `<div class="myrow"><b>${where}</b><div class="acts">${actions}</div></div>`;
     }).join("");
     const days = loan ? Math.ceil(loan / Math.max(1, c.rent * unitsOf(h) / 2)) : 0;
-    mine = `<div class="box mine-box"><div class="mb-h"><span>Vous possédez</span><b>${esc(itemLabel(c, { t: "own", ks: myKs, n: myN }))}</b><small class="num">+${fmtE(baseRent(h))} / jour${fullTitle(h) ? " · immeuble complet +60 %" : myKs.some(k => fullFloor(c, myKs, k)) ? " · étage complet +25 %" : ""}</small></div>
+    mine = `<div class="box mine-box"><div class="mb-h"><span>Vous possédez</span><b>${esc(ownSentence(c, myKs, myN))}</b><small class="num">+${fmtE(baseRent(h))} / jour${fullTitle(h) ? " · immeuble complet +60 %" : myKs.some(k => fullFloor(c, myKs, k)) ? " · étage complet +25 %" : ""}</small></div>
       ${loan ? `<div class="loanbox"><b>🏦 Crédit en cours : reste ${fmtE(loan)}</b><span>Il se rembourse tout seul avec la moitié du loyer (encore ~${days} jours). Remboursé, vous touchez tout le loyer et pouvez vendre ou hypothéquer.</span><button class="btn sm green" data-act="repay" ${liveCash() < loan ? "disabled" : ""}>Rembourser maintenant · ${fmtE(loan)}</button></div>` : ""}
       ${rows ? `<div class="myrows">${rows}</div>` : ""}</div>`;
   }
@@ -273,7 +273,7 @@ async function buildingPage(g) {
     <div class="bp-info">
       <div class="btitle"><span class="pill rar" style="background:${RAR[c.r].c}">${RAR[c.r].n}</span><span class="pill">${esc(kindLabel(c))}</span>${status}</div>
       <h1 class="h1">${esc(title(c))}</h1>
-      <p class="sub">${esc(c.name && c.adr ? c.adr + " · " : "")}${ord(c.arr)} arr.${c.y ? ` · construit vers ${esc(c.y)}` : ""} · <button class="lnk" data-mapto="${g}">sur la carte</button></p>
+      <p class="sub">${esc(c.name && c.adr ? c.adr + " · " : "")}${ord(c.arr)} arr.${c.y ? ` · construit vers ${esc(c.y)}` : ""} · <button class="lnk" data-mapto="${g}">sur la carte</button>${!isP ? ` · <a class="lnk" href="${streetURL(g)}" target="_blank" rel="noopener">📷 voir la vraie façade</a>` : ""}</p>
       <div class="bstat2 num"><div><span>Prix ${isP ? "d'une part" : `d'un ${unitW}`}</span><b>${fmtE(c.v)}</b></div><div><span>Loyer</span><b class="green">+${fmtE(c.rent)}<small>/j</small></b></div></div>
       <div class="actbar2" id="actbar">${buyActions(c, g, owners, free, isP)}</div>
       ${mine}${offersHTML}${plan}${about}
