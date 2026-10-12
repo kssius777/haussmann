@@ -126,3 +126,17 @@ const kindLabel = c => c.lk === "p" ? "Monument" : c.lk === "c" ? "Commerces & b
 
 // lien vers la vraie rue (Google Street View, dans un nouvel onglet)
 function streetURL(g) { try { const [x, y] = centerOf(g); return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${y.toFixed(6)},${x.toFixed(6)}`; } catch (e) { return ""; } }
+
+// petits sons (sans fichier audio) : dé, achat, arrivée
+let _ac = null;
+function sfx(kind) {
+  try {
+    if (localStorage.getItem("hm_mute") === "1") return;
+    _ac = _ac || new (window.AudioContext || window.webkitAudioContext)(); const ac = _ac, t = ac.currentTime;
+    const tone = (f, t0, d, type = "sine", g = .08) => { const o = ac.createOscillator(), v = ac.createGain(); o.type = type; o.frequency.setValueAtTime(f, t0); v.gain.setValueAtTime(0, t0); v.gain.linearRampToValueAtTime(g, t0 + .01); v.gain.exponentialRampToValueAtTime(.0001, t0 + d); o.connect(v).connect(ac.destination); o.start(t0); o.stop(t0 + d); };
+    if (kind === "dice") for (let i = 0; i < 6; i++) tone(180 + Math.random() * 120, t + i * .07, .06, "square", .03);
+    if (kind === "buy") { tone(523, t, .12); tone(659, t + .1, .12); tone(784, t + .2, .25); }
+    if (kind === "coin") { tone(880, t, .08, "triangle", .06); tone(1320, t + .06, .12, "triangle", .06); }
+    if (kind === "bad") { tone(220, t, .18, "sawtooth", .04); tone(170, t + .15, .25, "sawtooth", .04); }
+  } catch (e) { }
+}

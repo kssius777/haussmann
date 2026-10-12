@@ -177,7 +177,7 @@ end $$;
 -- =====================================================================
 create or replace function cfg() returns jsonb language sql immutable as $$ select '{
   "start":1000000, "welcome":5, "pack":150000, "freeH":24,
-  "fee":0.05, "mortRate":0.5, "mortDaily":0.005, "creditDown":0.3, "creditShare":0.5, "creditMax":3,
+  "fee":0.05, "mortRate":0.5, "mortDaily":0.005, "creditDown":0.1, "creditShare":0.7, "creditCap":5000000, "creditCapDays":20, "salary":20000,
   "floorBonus":1.25, "titleBonus":1.6, "gardien":1.2, "cityShare":0.01,
   "tax":0.08
 }'::jsonb $$;
@@ -383,7 +383,7 @@ alter table profiles add column if not exists heading float8;                   
 alter table profiles add column if not exists land int;                                -- immeuble où le pion s'est arrêté : achetable à la banque
 
 create or replace function pawn_cfg() returns jsonb language sql immutable as $$ select '{
-  "maxRolls":10, "rollEveryMin":30, "tpPerDay":3, "buyRadius":150, "tollCap":0.2, "spawn":300658, "chanceEvery":8, "stepMul":4, "dieMax":6, "rollsPrice":50000, "rollsPack":5
+  "maxRolls":10, "rollEveryMin":30, "tpPerDay":3, "buyRadius":150, "tollCap":0.2, "spawn":300354, "chanceEvery":8, "stepMul":4, "dieMax":6, "rollsPrice":50000, "rollsPack":5, "salary":20000
 }'::jsonb $$;
 
 -- distance en mètres entre deux immeubles (null si coordonnées inconnues)
@@ -484,7 +484,7 @@ begin
     rolls_at = case when pr.rolls >= (pawn_cfg()->>'maxRolls')::int then now() else rolls_at end where id=u;
   path := _walk(u, pr.pos, a * (pawn_cfg()->>'stepMul')::int);
   t := path[array_length(path, 1)];
-  update profiles set pos = t, land = t where id = u;
+  update profiles set pos = t, land = t, cash = cash + (pawn_cfg()->>'salary')::bigint where id = u;   -- petit salaire à chaque lancer
   select * into c from cards where id = t;
   -- loyer à payer : chaque propriétaire reçoit une journée de loyer de ses biens ici (plafonné à 20 % de votre trésorerie)
   for o in
@@ -505,6 +505,7 @@ begin
       if floor(o.amt * ratio) >= 1 then
         insert into pay(owner, amount, why) values (o.owner, floor(o.amt * ratio), 'loyer de passage');
         payees := payees || jsonb_build_object('pseudo', o.pseudo, 'amount', floor(o.amt * ratio));
+        insert into news(kind, arr, card, actor, data) values ('toll', c.arr, t, u, jsonb_build_object('to', o.owner, 'pseudo', o.pseudo, 'amount', floor(o.amt * ratio)));
       end if;
     end loop;
     toll := floor(toll * ratio);
@@ -519,7 +520,7 @@ begin
   if _is_chance(t) then ch := _chance(u); end if;
   if ch ? 'extra' and ch->'extra' <> 'null'::jsonb then perform _refresh_mayors(array[(select arr from cards where id = (ch->'extra'->>'card')::int)::int]); end if;
   return json_build_object('die', a, 'path', path, 'landing', json_build_object(
-      'card', t, 'toll', toll, 'payees', payees, 'chance', ch, 'bonus', bonus, 'free', (sq->>'free')::int, 'mine', (sq->>'mine')::int),
+      'card', t, 'toll', toll, 'payees', payees, 'chance', ch, 'bonus', bonus, 'salary', (pawn_cfg()->>'salary')::bigint, 'free', (sq->>'free')::int, 'mine', (sq->>'mine')::int),
     'state', state());
 end $$;
 
@@ -634,7 +635,7 @@ begin
     'value', coalesce((select sum(v) from arr_value where owner=u),0),
     'debt',  coalesce((select sum(mort) from lots where owner=u),0) + coalesce((select sum(mort) from parts where owner=u),0),
     'loans', coalesce((select sum(loan) from lots where owner=u),0) + coalesce((select sum(loan) from parts where owner=u),0),
-    'credits', _credits(u),
+    'credits', _credits(u), 'loan_cap', greatest(0, _loan_cap(u)),
     'loan_rate', coalesce((select sum(c.rent) from lots l join cards c on c.id=l.card where l.owner=u and l.loan > 0 and l.mort is null),0) * (cfg()->>'creditShare')::float8
                + coalesce((select sum(c.rent * x.n) from parts x join cards c on c.id=x.card where x.owner=u and x.loan > 0 and x.mort is null),0) * (cfg()->>'creditShare')::float8,
     'rolls_price', rolls_price(pr),
@@ -836,7 +837,14 @@ end $$;
 -- nombre de crédits en cours (un crédit = un immeuble acheté à crédit)
 create or replace function _credits(u uuid) returns int language sql stable as $$
   select count(distinct card)::int from (select card from lots where owner=u and loan > 0 union select card from parts where owner=u and loan > 0) x $$;
+-- capacité d'emprunt : 5 M€ + 20 jours de loyers de base, moins ce qui est déjà emprunté
+create or replace function _loan_cap(u uuid) returns bigint language sql stable as $$
+  select (cfg()->>'creditCap')::bigint
+       + (cfg()->>'creditCapDays')::bigint * (coalesce((select sum(c.rent) from lots l join cards c on c.id=l.card where l.owner=u),0)
+                                             + coalesce((select sum(c.rent * x.n) from parts x join cards c on c.id=x.card where x.owner=u),0))::bigint
+       - coalesce((select sum(loan) from lots where owner=u),0)::bigint - coalesce((select sum(loan) from parts where owner=u),0)::bigint $$;
 -- prix comptant ou apport ; renvoie le montant emprunté
+revoke all on function _loan_cap(uuid), _credits(uuid) from public, anon, authenticated;
 create or replace function _pay_or_borrow(u uuid, price bigint, credit boolean) returns bigint language plpgsql as $$
 declare have bigint; down bigint;
 begin
@@ -845,9 +853,9 @@ begin
     if have < price then raise exception 'Trésorerie insuffisante'; end if;
     update profiles set cash = cash - price where id=u; return 0;
   end if;
-  if _credits(u) >= (cfg()->>'creditMax')::int then raise exception 'Vous avez déjà % crédits en cours : remboursez-en un d''abord', (cfg()->>'creditMax')::int; end if;
   down := ceil(price * (cfg()->>'creditDown')::numeric);
-  if have < down then raise exception 'Apport insuffisant : il faut % € (30 %% du prix)', down; end if;
+  if price - down > _loan_cap(u) then raise exception 'Capacité d''emprunt dépassée : la banque ne vous prête plus que % €', greatest(0, _loan_cap(u)); end if;
+  if have < down then raise exception 'Apport insuffisant : il faut % € (10 %% du prix)', down; end if;
   update profiles set cash = cash - down where id=u;
   return price - down;
 end $$;

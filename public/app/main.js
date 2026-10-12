@@ -50,12 +50,11 @@ function showWelcome() {
   const R = $("#reveal"); R.hidden = false; const p = ST.state.profile;
   R.innerHTML = `<div class="bstage"><div class="rays"></div><div class="welcome">
     <p class="eyebrow" style="color:#9FB4D6">Bienvenue à Paris</p>
-    <h2>${esc(p.pseudo)}, voici de quoi démarrer</h2>
-    <div class="wl"><span>💶</span><div><b>${fmtE(p.cash)} sur votre compte</b><p>Pour dépenser cet argent, il y a les boosters, le Marché entre joueurs… et votre pion.</p></div></div>
-    <div class="wl"><span>🎲</span><div><b>Comme au Monopoly</b><p>Lancez le dé : votre pion (marqué « Vous ») marche dans Paris et s'arrête sur un immeuble. S'il est libre, vous pouvez l'acheter. S'il appartient à un joueur, vous lui payez son loyer. Chez vous, vous gagnez un bonus. Pas assez d'argent ? Achetez à crédit avec 30 % d'apport.</p></div></div>
-    <div class="wl"><span>🎁</span><div><b>${p.welcome} boosters offerts</b><p>Un booster, c'est une pochette surprise : 4 biens de Paris tirés au hasard (un appartement, parfois un étage ou un immeuble entier, voire un bout de monument) et 1 carte Chance. C'est la façon la moins chère de démarrer.</p></div></div>
-    <div class="wl"><span>🏠</span><div><b>Vos biens rapportent tout seuls</b><p>Chaque bien verse un loyer en continu, même quand vous n'êtes pas là. Réinvestissez-le pour grandir et devenir maire de votre arrondissement.</p></div></div>
-    <div class="bbtns"><button class="btn white block" data-w="open">Ouvrir mon premier booster</button><button class="btn glass block" data-w="map">D'abord, explorer la carte</button></div>
+    <h2>${esc(p.pseudo)}, Paris est à prendre</h2>
+    <div class="wl"><span>🎲</span><div><b>Lancez le dé</b><p>Votre pion marche dans les vraies rues. Il s'arrête sur un immeuble : s'il est libre, achetez-le.</p></div></div>
+    <div class="wl"><span>💶</span><div><b>${fmtE(p.cash)} et ${p.welcome} boosters pour démarrer</b><p>Un booster, c'est 4 biens de Paris au hasard + 1 carte Chance.</p></div></div>
+    <div class="wl"><span>🏛️</span><div><b>Devenez maire</b><p>Le plus gros propriétaire d'un arrondissement touche 8 % des loyers des autres.</p></div></div>
+    <div class="bbtns"><button class="btn white block" data-w="open">Ouvrir mon premier booster</button><button class="btn glass block" data-w="map">Lancer le dé d'abord</button></div>
   </div></div>`;
   R.onclick = e => { const b = e.target.closest("[data-w]"); if (!b) return; R.onclick = null; R.hidden = true; R.innerHTML = "";
     if (b.dataset.w === "open") openBooster("welcome"); else { go("map"); showHint(); } };

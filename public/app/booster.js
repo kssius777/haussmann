@@ -16,7 +16,7 @@ function renderBoosterPage() {
     <p class="bnote">4 vrais biens de Paris + 1 carte Chance</p>
     <button id="packbtn" aria-label="Ouvrir un booster">${packHTML(kind ? "ready" : "")}${n ? `<span class="pcount">${n}</span>` : ""}</button>
     <div class="bbtns">
-      ${kind ? `<button class="btn white block big" data-open="${kind}">Ouvrir${n > 1 ? ` · ${n} à ouvrir` : ""}</button>`
+      ${kind ? `<button class="btn white block big" data-open="${kind}">Ouvrir${n > 1 ? ` (${n})` : ""}</button>`
              : `<button class="btn gold block big" data-open="paid" ${liveCash() < s.price ? "disabled" : ""}>Acheter · ${fmtE(s.price)}</button>
                 <p class="bnote">Prochain booster gratuit dans <b class="num" id="freein">${hm(fin)}</b></p>`}
     </div>
@@ -50,7 +50,7 @@ async function openBooster(kind) {
   await sleep(Math.max(0, 450 - (performance.now() - t0)));
   pack.classList.remove("shake"); pack.classList.add("open");
   await sleep(420);
-  R.querySelector("#rpack").classList.add("gone");   // le paquet s'efface, les cartes sortent à sa place
+  R.querySelector("#rpack").classList.add("gone"); sfx("coin");   // le paquet s'efface, les cartes sortent à sa place
   await sleep(220);
   refreshHold().then(refreshMap).then(() => { paintAll(); renderWallet(); }).catch(() => { });
   await revealSeq(seq);

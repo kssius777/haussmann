@@ -40,7 +40,9 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
   une journée de ses loyers ici (max 20 % de sa trésorerie). À soi → une journée de loyer en bonus. 1 case sur 8 environ : carte Chance.
   Le pion va vers un immeuble lointain atteignable en n pas et suit le plus court chemin (pas de boucle).
   10 lancers max, +1 toutes les 30 min ; on peut acheter 5 lancers (50 000 €, prix doublé à chaque achat du jour). 3 téléportations par jour vers ses propres biens (on peut y acheter les logements libres).
-- **Crédit immobilier** (achat à la banque) : apport 30 %, la banque prête le reste ; la moitié du loyer de base du bien
-  rembourse le crédit automatiquement (impossible d'être en défaut) ; 3 crédits max ; remboursement anticipé (`repay`) ;
-  un bien à crédit ne peut être ni vendu ni hypothéqué. Le patrimoine et le classement retirent crédits et hypothèques.
+- **Crédit immobilier** (achat à la banque) : apport 10 %, la banque prête le reste ; 70 % du loyer de base du bien
+  rembourse le crédit automatiquement (impossible d'être en défaut) ; capacité d'emprunt = 5 M€ + 20 jours de loyers − crédits en cours ;
+  remboursement anticipé (`repay`) ; un bien à crédit ne peut être ni vendu ni hypothéqué. Patrimoine et classement retirent crédits et hypothèques.
+- **Salaire** : +20 000 € à chaque lancer de dé. Le pion démarre au 12 rue du Cloître Notre-Dame (300354), pas sur la cathédrale.
+- Sons (`sfx()` dans core.js, sans fichier audio), coupables dans le profil (localStorage `hm_mute`).
 - Cartes : image = maquette 3D de la vraie forme de l'immeuble (`maquetteSVG` dans cards.js), couleurs selon l'époque.

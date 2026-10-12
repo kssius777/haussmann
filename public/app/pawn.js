@@ -79,7 +79,7 @@ async function doRoll() {
   const b = $("#b-roll"); b.disabled = true; hidePreview(); hideHint(); setMovebar("");
   let r; try { r = await rpc("roll"); } catch (e) { toast(e.message, "bad"); renderDice(); return; }
   if (!r.path) { toast("Le jeu est en cours de mise à jour : réessayez dans quelques minutes.", "bad"); renderDice(); return; }
-  moving = true; renderDice();
+  moving = true; renderDice(); sfx("dice");
   await animDice(r.die);
   await ensureCards(r.path);
   const line = smooth(r.path.map(centerOf)), lo = line.map(p => p[0]), la = line.map(p => p[1]);
@@ -127,26 +127,29 @@ function showLand(L) {
   const lines = [];
   if (L?.toll > 0) lines.push(`<span class="ln bad">Vous lui payez son loyer : <b>${fmtE(L.toll)}</b></span>`);
   if (L?.bonus > 0) lines.push(`<span class="ln good">Bonus : une journée de loyer offerte, <b>+${fmtE(L.bonus)}</b></span>`);
+  if (L?.salary > 0) lines.push(`<span class="ln good">💼 Salaire du tour : <b>+${fmtE(L.salary)}</b></span>`);
   if (L?.chance) { const ch = L.chance; const [nm] = CHANCE[ch.k] || ["Chance"]; lines.push(`<span class="ln ${BAD.has(ch.k) ? "bad" : "good"}">🃏 Case Chance : <b>${esc(nm)}</b> ${esc(chanceText(ch))}</span>`); }
   const word = n => lotWord(c, n), tot = c.lots;
   const info = isP ? `${fmtN(free)} parts libres` : tot > 1 ? `Immeuble de ${tot} ${word(tot)} · <b>${free} libre${free > 1 ? "s" : ""}</b>` : "";
   let btns = "";
   if (free > 0) {
     const unit = isP ? "1 part" : tot > 1 ? `1 ${word(1)}` : c.lk === "l" ? "le logement" : "le local", allFree = !isP && free === tot && tot > 1, total = c.v * tot;
-    const canCredit = (ST.state?.credits || 0) < CREDIT_MAX, down = p => Math.ceil(p * CREDIT_DOWN);
-    const cashOK = cash >= c.v, creditOK = canCredit && cash >= down(c.v);
+    const cap = ST.state?.loan_cap ?? 1e12, down = p => Math.ceil(p * CREDIT_DOWN);
+    const cashOK = cash >= c.v, creditOK = cash >= down(c.v) && c.v - down(c.v) <= cap;
     const cr = creditOK && (landCredit === null ? !cashOK : landCredit);
     if (!cashOK && !creditOK) {
-      btns = `<div class="nomoney"><b>Pas assez d'argent pour celui-ci</b><span>${canCredit ? `Il faut au moins ${fmtE(down(c.v))} d'apport (30 %) pour l'acheter à crédit.` : `Il coûte ${fmtE(c.v)} et vous avez déjà 3 crédits en cours.`} Vous avez ${fmtE(cash)}.</span></div>`;
+      const need = cash >= down(c.v) ? 0 : down(c.v) - cash, rate = netRate(), days = rate > 0 ? Math.ceil(need / rate) : 0;
+      btns = `<div class="nomoney"><b>Pas assez pour celui-ci</b><span>${cash < down(c.v) ? `Il manque ${fmtE(need)} pour l'apport de 10 %${days ? ` : vos loyers les apportent dans ${days} jour${days > 1 ? "s" : ""}` : ""}.` : `La banque ne vous prête plus que ${fmtE(cap)} : remboursez un crédit d'abord.`}</span>
+        <div class="tips"><span>💡 En attendant :</span><button data-go="booster">ouvrir un booster</button>${holdings().length ? `<button data-go="assets">vendre un bien</button>` : ""}<button data-mvclose>relancer le dé</button></div></div>`;
     } else {
       btns = cr
-        ? `<button class="btn block blue2" data-lbuy="${g}"><span>Acheter ${unit} à crédit</span><small>apport ${fmtE(down(c.v))} · +${fmtE(c.rent)} / jour</small></button>
-           <p class="crx">30 % maintenant, le reste (${fmtE(c.v - down(c.v))}) se rembourse <b>tout seul</b> avec la moitié du loyer.</p>`
+        ? `<button class="btn block blue2" data-lbuy="${g}"><span>Acheter ${unit} à crédit</span><small>${fmtE(down(c.v))} maintenant · +${fmtE(Math.round(c.rent * .3))} / jour pour vous</small></button>
+           <p class="crx">10 % maintenant. La banque avance le reste (${fmtE(c.v - down(c.v))}), remboursé <b>tout seul</b> par 70 % du loyer. Après, tout le loyer est à vous.</p>`
         : `<button class="btn block green" data-lbuy="${g}"><span>Acheter ${unit} · ${fmtE(c.v)}</span><small>+${fmtE(c.rent)} / jour</small></button>`;
       const links = [];
-      if (cr && cashOK) links.push(`<button data-paymode="0">ou payer comptant</button>`);
-      if (!cr && creditOK) links.push(`<button data-paymode="1">ou à crédit (apport ${fmtE(down(c.v))})</button>`);
-      if (allFree && cash >= (cr ? down(total) : total)) links.push(`<button data-lbuild="${g}">${cr ? `tout l'immeuble à crédit · apport ${fmtE(down(total))}` : `tout l'immeuble · ${fmtE(total)}`} (+60 %)</button>`);
+      if (cr && cashOK) links.push(`<button data-paymode="0">ou payer comptant (${fmtE(c.v)})</button>`);
+      if (!cr && creditOK) links.push(`<button data-paymode="1">ou à crédit : ${fmtE(down(c.v))} maintenant</button>`);
+      if (allFree && (cr ? cash >= down(total) && total - down(total) <= cap : cash >= total)) links.push(`<button data-lbuild="${g}">${cr ? `tout l'immeuble à crédit · ${fmtE(down(total))} maintenant` : `tout l'immeuble · ${fmtE(total)}`} (+60 % de loyer)</button>`);
       if (links.length) btns += `<div class="llinks">${links.join("")}</div>`;
     }
     landCreditNow = cr;
@@ -157,7 +160,7 @@ function showLand(L) {
   if (L?.chance && window.confetti && !BAD.has(L.chance.k)) confetti("#A855F7", 24);
 }
 let landCredit = null, landCreditNow = false;   // null = choix automatique (crédit si l'on n'a pas assez pour payer comptant)
-const CREDIT_DOWN = 0.3, CREDIT_MAX = 3;
+const CREDIT_DOWN = 0.1;
 
 // ---- plus de lancers : en attendre un, ou en acheter ------------------------------
 function showBuyRolls() {
@@ -200,7 +203,7 @@ function initPawnUI() {
     const pm = e.target.closest("[data-paymode]"); if (pm) { landCredit = pm.dataset.paymode === "1"; return showLand(); }
     const lb = e.target.closest("[data-lbuy],[data-lbuild]"); if (lb) {
       const g = +(lb.dataset.lbuy || lb.dataset.lbuild), whole = !!lb.dataset.lbuild, credit = landCreditNow; lb.disabled = true; lb.textContent = "Achat…";
-      if (await act(whole ? "buy_building" : "bank_buy", Object.assign(whole ? { p_card: g } : { p_card: g, p_k: null }, credit ? { p_credit: true } : {}), null)) { celebrate(card(g)); if (credit) toast("Acheté à crédit : il se rembourse tout seul avec la moitié du loyer.", "good"); }
+      if (await act(whole ? "buy_building" : "bank_buy", Object.assign(whole ? { p_card: g } : { p_card: g, p_k: null }, credit ? { p_credit: true } : {}), null)) { celebrate(card(g)); sfx("buy"); if (credit) toast("Acheté à crédit : il se rembourse tout seul avec la moitié du loyer.", "good"); }
       return showLand();
     }
     const lo = e.target.closest("[data-lopen]"); if (lo) return push("b", +lo.dataset.lopen);

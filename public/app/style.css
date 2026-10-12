@@ -780,3 +780,39 @@ input{font:inherit;color:inherit}
   .pawn em{font-size:10px;padding:1px 6px}
   #movebar.k-land{bottom:calc(var(--tab-h) + env(safe-area-inset-bottom,0px) + 96px)}
 }
+
+/* ===== ordinateur : onglets dans la barre du haut, écrans qui remplissent la page ===== */
+@media (min-width:900px){
+  #tabs{top:7px;bottom:auto;left:50%;right:auto;transform:translateX(-50%);height:44px;padding:4px;display:flex;gap:2px;border:1px solid var(--line);border-radius:14px;background:var(--soft);z-index:31}
+  #tabs button{flex-direction:row;gap:7px;padding:0 14px;border-radius:10px;font-size:13.5px}
+  #tabs svg{width:18px;height:18px}
+  #tabs .badge{top:-4px;right:-4px}
+  #pages{bottom:0}
+  :root{--tab-h:0px}
+  .mapside{bottom:40px}
+  .mapbottom{bottom:24px}
+  #movebar.k-land{bottom:16px}
+  #toast{bottom:28px}
+  /* écrans de connexion : fond vivant et carte centrée */
+  #onb{background:radial-gradient(1200px 600px at 20% -10%,#DCE7FF,transparent 60%),radial-gradient(900px 500px at 110% 110%,#FFF1D6,transparent 60%),var(--bg)}
+  .onb{max-width:480px;background:#fff;border-radius:24px;box-shadow:var(--shadow-l);margin:60px auto;min-height:0;padding:36px}
+  #onb .landing{background:none}
+  /* ouverture de booster : carte plus grande */
+  .rv .rc .hc{--w:360px!important}
+  .rv .slot{min-height:0}
+  .sumgrid .hc{--w:200px!important}
+  .pack{--pw:270px}
+  .wrap{max-width:900px}
+  .welcome{max-width:560px}
+}
+/* confettis sous les panneaux, message vert au-dessus de la carte sans la masquer */
+.conf{z-index:3}
+#movebar.k-land~#toast,#toast{z-index:90}
+.nomoney .tips{display:flex;flex-wrap:wrap;gap:4px 8px;margin-top:6px;font-size:12.5px;color:var(--ink2)}
+.nomoney .tips button{color:var(--blue2);font-weight:800;text-decoration:underline;text-underline-offset:2px}
+.pawn.is3d em{margin-bottom:var(--ph,40px)}
+.welcome .wl p{font-size:13px}
+/* monuments vus de loin : juste la pastille photo, le nom n'apparaît qu'en zoomant */
+.mmark.far{padding:2px;font-size:0;gap:0;border-width:2px}
+.mmark.far>:not(i){display:none}
+.mmark.far i{width:26px;height:26px}

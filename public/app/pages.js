@@ -125,7 +125,7 @@ async function renderMarket() {
   const sales = ST.market.sales.map(s => { const c = card(s.card); return c ? `<button class="lrow" data-push="b" data-arg="${s.card}"><div class="th">${photo(c)}</div><div class="t"><b>${esc(title(c))}</b><span>${s.k != null ? lotName(c, s.k) : s.n + " parts"} · acheté par ${esc(s.buyer || "?")} · ${ago(s.at)}</span></div><div class="v num"><b>${fmtE(s.price)}</b></div></button>` : ""; }).join("");
   el.innerHTML = `<div class="wrap"><h1 class="h1">Marché</h1><p class="sub">Les biens mis en vente par les joueurs. Le vendeur reçoit le prix moins 5 % de commission.</p>
     <div class="seg" role="tablist"><button data-mt="all" aria-selected="${marketTab === "all"}">Annonces · ${others.length}</button><button data-mt="mine" aria-selected="${marketTab === "mine"}">Les miennes · ${mineL.length}</button><button data-mt="sales" aria-selected="${marketTab === "sales"}">Ventes</button></div>
-    ${marketTab === "all" ? (others.length ? `<div class="rows">${rows(others, false)}</div>` : `<div class="empty">Aucune annonce pour l'instant.</div>`) : ""}
+    ${marketTab === "all" ? (others.length ? `<div class="rows">${rows(others, false)}</div>` : `<div class="empty"><b>Aucune annonce pour l'instant.</b><br><span class="muted">Les joueurs peuvent vendre leurs biens ici, 5 % de commission. Soyez le premier !</span><br><br><button class="btn sm light" data-go="assets">Vendre un de mes biens</button></div>${sales ? `<h2 class="h3">Dernières ventes</h2><div class="rows">${sales}</div>` : ""}`) : ""}
     ${marketTab === "mine" ? (mineL.length ? `<div class="rows">${rows(mineL, true)}</div>` : `<div class="empty">Pour vendre un bien, ouvrez sa fiche depuis votre Patrimoine puis « Mettre en vente ».</div>`) : ""}
     ${marketTab === "sales" ? (sales ? `<div class="rows">${sales}</div>` : `<div class="empty">Pas encore de vente entre joueurs.</div>`) : ""}</div>`;
 }
@@ -150,6 +150,7 @@ function newsLine(n) {
     case "mayor": return ["🏛️", `<b>${who}</b> devient maire du ${a}`, PARTIES[n.party]?.n || "", pc];
     case "title": return ["🏢", `<b>${who}</b> possède maintenant tout le <b>${esc(c ? title(c) : "immeuble")}</b>`, a, "#0EA5A0"];
     case "pull": return [n.data?.tier === "M" ? "✨" : "⭐", `<b>${who}</b> tire une carte ${RAR[n.data?.tier]?.n || ""} : <b>${esc(c ? title(c) : "")}</b>`, a, RAR[n.data?.tier]?.c];
+    case "toll": return ["💸", `<b>${who}</b> passe chez <b>${esc(n.data?.pseudo || "")}</b>${n.data?.to === ME ? " (vous)" : ""} et lui paie ${fmtE(n.data?.amount || 0)}`, c ? title(c) : "", n.data?.to === ME ? "#0FA968" : "#94A3B8"];
     case "sale": return ["🤝", `<b>${who}</b> achète <b>${esc(c ? title(c) : "un bien")}</b> pour ${fmtE(n.data?.price || 0)}`, a, "#F59E0B"];
     case "week": return ["🗳️", `<b>${esc(PARTIES[n.data?.party]?.n || "")}</b> remporte l'Hôtel de Ville cette semaine`, `${n.data?.mayors} maires · ${fmtE(n.data?.bonus || 0)}/j par membre`, PARTIES[n.data?.party]?.c];
     default: return ["•", n.kind, "", "#94A3B8"];
@@ -370,10 +371,18 @@ async function profilePage() {
   const wait = p.party_at ? Math.max(0, 48 * 3600 - (Date.now() - new Date(p.party_at).getTime()) / 1000) : 0;
   return dhead("Mon profil") + `<div class="wrap">
     <div class="box" style="display:flex;gap:14px;align-items:center"><span class="avatar" style="width:56px;height:56px;display:grid;place-items:center;font-size:22px;background:${pr?.c || "#94A3B8"}">${esc(p.pseudo[0].toUpperCase())}</span><div><b style="font-size:19px">${esc(p.pseudo)}</b><div class="sub" style="margin:2px 0 0">Membre depuis le ${new Date(p.created_at).toLocaleDateString("fr-FR")}</div></div></div>
+    <div class="kpis k4" style="margin-top:12px">
+      <div class="kpi"><span>Biens</span><b>${holdings().length}</b></div>
+      <div class="kpi"><span>Maire de</span><b>${ST.mayors.filter(m => m?.mayor === ME).length}<small> arr.</small></b></div>
+      <div class="kpi"><span>Patrimoine net</span><b class="num">${fmtE(worthNow())}</b></div>
+      <div class="kpi"><span>Classement</span><b>${ST.board ? (ST.board.findIndex(x => x.id === ME) + 1 || "—") : "—"}<small>${ST.board ? ` / ${ST.board.length}` : ""}</small></b></div>
+    </div>
     <h2 class="h2">Mon parti</h2>
     ${!pr ? `<div class="box"><b>Vous n'avez pas encore de parti</b><p class="sub" style="margin:4px 0 0">Rejoignez un camp pour toucher +${MEMBER_BONUS} % de loyers dans les arrondissements qu'il tient, et jouer pour l'Hôtel de Ville.</p></div>` : ""}
     ${pr ? `<div class="box" style="border-left:6px solid ${pr.c};display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center">${emblemSVG(p.party, 56)}<div><b style="color:${pr.c};font-size:17px">${esc(pr.n)}</b> <span class="muted">· ${esc(pr.side)}</span><div class="motto">« ${esc(pr.motto)} »</div><p class="sub" style="margin:6px 0 0">Vous protège de : ${esc(shieldText(p.party))}. Dans les arrondissements tenus par ${esc(pr.n)}, vos loyers sont à +${MEMBER_BONUS} %.</p></div></div>` : ""}
     <div style="margin-top:10px"><button class="btn block ${pr ? "light" : ""}" data-push="party" ${pr && wait > 0 ? "disabled" : ""}>${!pr ? "Choisir mon parti" : wait > 0 ? `Changer de parti possible dans ${hm(wait)}` : "Changer de parti"}</button></div>
+    <h2 class="h2">Réglages</h2>
+    <button class="btn block light" id="mute">${(() => { try { return localStorage.getItem("hm_mute") === "1" ? "🔇 Sons coupés · réactiver" : "🔊 Sons activés · couper"; } catch (e) { return "🔊 Sons"; } })()}</button>
     <h2 class="h2">Compte</h2>
     <button class="btn block ghost" id="logout">Se déconnecter</button>
     <p class="sub" style="margin-top:16px;text-align:center"><a href="/terms" target="_blank">Conditions d'utilisation</a> · <a href="/privacy" target="_blank">Confidentialité</a></p>
@@ -404,5 +413,6 @@ async function partyClick(e) {
   const pc = e.target.closest("[data-party]"); if (pc) { pickParty = pc.dataset.party; $$("#p-detail [data-party]").forEach(b => b.setAttribute("aria-pressed", b === pc)); $("#pdetail").innerHTML = partyDetailHTML(pickParty); return; }
   if (e.target.closest("#party-save")) { if (await act("set_party", { p_party: pickParty }, `Bienvenue chez ${PARTIES[pickParty].n} !`)) { renderWallet(); back(); } return; }
   if (e.target.closest("#logout")) return signOut();
+  if (e.target.closest("#mute")) { try { localStorage.setItem("hm_mute", localStorage.getItem("hm_mute") === "1" ? "0" : "1"); } catch (x) { } return renderDetail(false); }
 }
 function afterDetail(top) { }

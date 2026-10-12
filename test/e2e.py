@@ -25,7 +25,7 @@ async def main():
         await W("document.querySelector('#ps')")
         await pg.fill("#ps", "Alice"); await pg.click("#pf button")
         await W("document.querySelector('.welcome')"); await pg.wait_for_timeout(400); await pg.screenshot(path=T + "02_welcome.png")
-        check("bienvenue : 1 M€ et 5 boosters expliqués, sans choix de parti", await E("!ST.state.profile.party && document.querySelector('.welcome').innerText.includes('boosters offerts')"))
+        check("bienvenue : 1 M€ et 5 boosters expliqués, sans choix de parti", await E("!ST.state.profile.party && document.querySelector('.welcome').innerText.includes('boosters pour démarrer')"))
         await pg.click("[data-w=open]")
         await W("!document.querySelector('#reveal').hidden && document.querySelector('#rpack .pack.open')", 30000)
         await W("document.querySelector('#slot .hc')")

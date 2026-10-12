@@ -158,7 +158,7 @@ function renderMarks() {
     const s = document.getElementById("am" + i); if (s) s.innerHTML = m ? `${emblemSVG(m.party, 15)}${esc(m.pseudo)}` : "Siège libre";
   });
   for (const m of monMarks) {
-    const show = z >= (m.r === "M" ? 11.4 : 15.6); m.el.classList.toggle("far", z < (innerWidth < 700 ? 17 : 14)); if (show && !m.on) { m.mk.addTo(map); m.on = true; } else if (!show && m.on) { m.mk.remove(); m.on = false; }
+    const show = z >= (m.r === "M" ? 11.4 : 16.5); m.el.classList.toggle("far", m.r !== "M" || z < (innerWidth < 700 ? 15.5 : 13.5)); if (show && !m.on) { m.mk.addTo(map); m.on = true; } else if (!show && m.on) { m.mk.remove(); m.on = false; }
     if (show && !m.ph) { const c = card(m.g); if (c) { m.ph = true; if (c.ph) m.el.querySelector("i").setAttribute("style", phStyle(c)); } }
   }
 }

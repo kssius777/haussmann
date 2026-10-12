@@ -22,7 +22,7 @@ alter table profiles add column if not exists heading float8;                   
 alter table profiles add column if not exists land int;                                -- immeuble où le pion s'est arrêté : achetable à la banque
 
 create or replace function pawn_cfg() returns jsonb language sql immutable as $$ select '{
-  "maxRolls":10, "rollEveryMin":30, "tpPerDay":3, "buyRadius":150, "tollCap":0.2, "spawn":300658, "chanceEvery":8, "stepMul":4, "dieMax":6, "rollsPrice":50000, "rollsPack":5
+  "maxRolls":10, "rollEveryMin":30, "tpPerDay":3, "buyRadius":150, "tollCap":0.2, "spawn":300354, "chanceEvery":8, "stepMul":4, "dieMax":6, "rollsPrice":50000, "rollsPack":5, "salary":20000
 }'::jsonb $$;
 
 -- distance en mètres entre deux immeubles (null si coordonnées inconnues)
@@ -123,7 +123,7 @@ begin
     rolls_at = case when pr.rolls >= (pawn_cfg()->>'maxRolls')::int then now() else rolls_at end where id=u;
   path := _walk(u, pr.pos, a * (pawn_cfg()->>'stepMul')::int);
   t := path[array_length(path, 1)];
-  update profiles set pos = t, land = t where id = u;
+  update profiles set pos = t, land = t, cash = cash + (pawn_cfg()->>'salary')::bigint where id = u;   -- petit salaire à chaque lancer
   select * into c from cards where id = t;
   -- loyer à payer : chaque propriétaire reçoit une journée de loyer de ses biens ici (plafonné à 20 % de votre trésorerie)
   for o in
@@ -144,6 +144,7 @@ begin
       if floor(o.amt * ratio) >= 1 then
         insert into pay(owner, amount, why) values (o.owner, floor(o.amt * ratio), 'loyer de passage');
         payees := payees || jsonb_build_object('pseudo', o.pseudo, 'amount', floor(o.amt * ratio));
+        insert into news(kind, arr, card, actor, data) values ('toll', c.arr, t, u, jsonb_build_object('to', o.owner, 'pseudo', o.pseudo, 'amount', floor(o.amt * ratio)));
       end if;
     end loop;
     toll := floor(toll * ratio);
@@ -158,7 +159,7 @@ begin
   if _is_chance(t) then ch := _chance(u); end if;
   if ch ? 'extra' and ch->'extra' <> 'null'::jsonb then perform _refresh_mayors(array[(select arr from cards where id = (ch->'extra'->>'card')::int)::int]); end if;
   return json_build_object('die', a, 'path', path, 'landing', json_build_object(
-      'card', t, 'toll', toll, 'payees', payees, 'chance', ch, 'bonus', bonus, 'free', (sq->>'free')::int, 'mine', (sq->>'mine')::int),
+      'card', t, 'toll', toll, 'payees', payees, 'chance', ch, 'bonus', bonus, 'salary', (pawn_cfg()->>'salary')::bigint, 'free', (sq->>'free')::int, 'mine', (sq->>'mine')::int),
     'state', state());
 end $$;
 
