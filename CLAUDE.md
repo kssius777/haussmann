@@ -43,7 +43,7 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
 - **Crédit immobilier** (achat à la banque) : apport 10 %, la banque prête le reste ; 70 % du loyer de base du bien
   rembourse le crédit automatiquement (impossible d'être en défaut) ; capacité d'emprunt = 5 M€ + 20 jours de loyers − crédits en cours ;
   remboursement anticipé (`repay`) ; un bien à crédit ne peut être ni vendu ni hypothéqué. Patrimoine et classement retirent crédits et hypothèques.
-- **Salaire** : +20 000 € à chaque lancer de dé. Le pion démarre au 12 rue du Cloître Notre-Dame (300354), pas sur la cathédrale.
+- **Salaire** : +20 000 € à chaque lancer de dé. Le pion démarre au 18 rue de la Bûcherie (400761), face à Notre-Dame, rive gauche.
 - Historique de l'argent : table `ledger` + `_log()` appelé à chaque mouvement ; page « Mon argent » (clic sur la trésorerie), RPC `my_ledger()`.
 - Sons (`sfx()` dans core.js, sans fichier audio) : coupés par défaut, activables dans le profil (localStorage `hm_sound`).
 - Achat à la banque : le crédit est proposé en premier (c'est ce que tout le monde choisit) ; « payer comptant » en lien dessous.

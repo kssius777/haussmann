@@ -7,14 +7,14 @@ def err(f):
 A, B = uuid.uuid4(), uuid.uuid4()
 for u in (A, B): db.sql("insert into auth.users(id) values (%s)", str(u))
 s = db.rpc(A, "join_game", p_pseudo="Pion" + str(A)[:4], p_party=None); db.rpc(B, "join_game", p_pseudo="Rival" + str(B)[:4], p_party="poing")
-p = s["profile"]; check("nouveau joueur : pion posé devant Notre-Dame, 10 lancers, 3 téléportations", p["pos"] == 300354 and p["rolls"] == 10 and p["tp"] == 3, (p["pos"], p["rolls"], p["tp"]))
-far = db.sql("select id from cards where lk='l' and id not in (select card from lots) and _dist(300354, id) > 2000 limit 1")[0][0]
+p = s["profile"]; check("nouveau joueur : pion posé devant Notre-Dame, 10 lancers, 3 téléportations", p["pos"] == 400761 and p["rolls"] == 10 and p["tp"] == 3, (p["pos"], p["rolls"], p["tp"]))
+far = db.sql("select id from cards where lk='l' and id not in (select card from lots) and _dist(400761, id) > 2000 limit 1")[0][0]
 check("avant de lancer : pas d'achat à la banque", "tomber dessus" in (err(lambda: db.rpc(A, "bank_buy", p_card=far, p_k=None)) or ""))
 t = time.time(); r = db.rpc(A, "roll"); dt = time.time() - t
 path, L = r["path"], r["landing"]
 check(f"lancer ({dt*1000:.0f} ms) : dé {r['die']} → {len(path)-1} pas", 1 <= r["die"] <= 6 and 1 <= len(path) - 1 <= r["die"] * 4)
 check("on ne retombe jamais sur sa case de départ (≥ 60 m)", db.sql("select _dist(%s,%s)", path[0], path[-1])[0][0] >= 59)
-check("le pion marche d'immeuble voisin en immeuble voisin", path[0] == 300354 and all(db.sql("select 1 from edges where a=%s and b=%s", a, b) for a, b in zip(path, path[1:])))
+check("le pion marche d'immeuble voisin en immeuble voisin", path[0] == 400761 and all(db.sql("select 1 from edges where a=%s and b=%s", a, b) for a, b in zip(path, path[1:])))
 st = db.rpc(A, "state")["profile"]
 check("le pion s'arrête sur la dernière case, achetable", st["pos"] == path[-1] == L["card"] and st["land"] == L["card"] and st["rolls"] == 9)
 check("un petit salaire à chaque lancer", L["salary"] == 20000 and st["cash"] >= 1000000 + 20000 - L["toll"], (L["salary"], st["cash"]))
@@ -24,14 +24,14 @@ if L["free"] > 0:
     check("achat de l'immeuble où l'on est tombé", db.sql("select count(*)+0 from lots where card=%s and owner=%s", L["card"], str(A))[0][0] + db.sql("select coalesce(sum(n),0) from parts where card=%s and owner=%s", L["card"], str(A))[0][0] >= 1)
 check("achat ailleurs refusé", "tomber dessus" in (err(lambda: db.rpc(A, "bank_buy", p_card=far, p_k=None)) or ""))
 # loyer de passage : B possède l'immeuble d'arrivée → on force l'arrivée en mettant tout autour à B
-db.sql("update profiles set pos=300354, heading=0 where id=%s", str(A))
+db.sql("update profiles set pos=400761, heading=0 where id=%s", str(A))
 def land_on_b():
     for _ in range(12):
         x = db.rpc(A, "roll"); t2 = x["landing"]["card"]
         if not db.sql("select 1 from lots where card=%s and owner=%s", t2, str(A)): return x
     return None
 # donne à B tous les immeubles proches pour être sûr de payer
-near = [g for (g,) in db.sql("select id from cards where lk<>'p' and _dist(300354, id) < 600 and id not in (select card from lots where owner=%s)", str(A))]
+near = [g for (g,) in db.sql("select id from cards where lk<>'p' and _dist(400761, id) < 600 and id not in (select card from lots where owner=%s)", str(A))]
 db.sql("delete from lots where card = any(%s) and owner<>%s", near, str(A))
 db.sql("insert into lots(card,k,owner) select c.id, 0, %s from cards c where c.id = any(%s) on conflict do nothing", str(B), near)
 db.sql("update profiles set rolls=10, rent_at=now() where id=%s", str(A))
@@ -54,7 +54,7 @@ C = uuid.uuid4(); db.sql("insert into auth.users(id) values (%s)", str(C)); db.r
 far_ = 0; same = 0; prev = 300658
 for _ in range(15):
     db.sql("update profiles set rolls=10 where id=%s", str(C)); x = db.rpc(C, "roll"); t2 = x["landing"]["card"]
-    same += (t2 == prev); prev = t2; far_ = max(far_, db.sql("select _dist(300354,%s)", t2)[0][0])
+    same += (t2 == prev); prev = t2; far_ = max(far_, db.sql("select _dist(400761,%s)", t2)[0][0])
 check("autour de Notre-Dame : le pion s'éloigne (pas de boucle)", far_ > 400 and same == 0, f"{far_:.0f} m au plus loin")
 # acheter des lancers
 db.sql("update profiles set rolls=0, cash=10000000, rb_n=0, rb_day=null where id=%s", str(A))

@@ -1,4 +1,4 @@
--- Haussmann · mise à jour du 12/10 (4) : historique de l'argent (ledger).
+-- Haussmann · mise à jour du 12/10 (4) : historique de l'argent (ledger), départ du pion face à Notre-Dame.
 -- À coller dans Supabase → SQL Editor → Run (une seule fois).
 
 -- Historique de l'argent : chaque mouvement de trésorerie
@@ -353,4 +353,9 @@ $$;
 
 revoke all on function _log(uuid,text,bigint,text,int), _sync(uuid), _chance(uuid), _pay_or_borrow(uuid,bigint,boolean) from public, anon, authenticated;
 grant execute on function my_ledger(), roll(), buy_rolls(), open_booster(text), buy_listing(bigint), mortgage(int,int), repay(int), lift(int,int) to anon, authenticated;
+create or replace function pawn_cfg() returns jsonb language sql immutable as $$ select '{
+  "maxRolls":10, "rollEveryMin":30, "tpPerDay":3, "buyRadius":150, "tollCap":0.2, "spawn":400761, "chanceEvery":8, "stepMul":4, "dieMax":6, "rollsPrice":50000, "rollsPack":5, "salary":20000
+}'::jsonb $$;
+update profiles set pos = 400761, land = null where pos in (300658, 300354);
+revoke all on function pawn_cfg() from public, anon, authenticated;
 notify pgrst, 'reload schema';

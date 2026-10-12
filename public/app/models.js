@@ -100,28 +100,32 @@ window.addMonuments=function(map,models){
     const halo=new T.Mesh(new T.RingGeometry(Math.max(m.L,m.W)*.62,Math.max(m.L,m.W)*.7,48),new T.MeshBasicMaterial({color:COL.pink,transparent:true,opacity:.28,side:T.DoubleSide})); halo.rotation.x=-Math.PI/2; halo.position.y=.3; g.add(halo);
     let ang=m.ang; if(m.m!=="sacrecoeur"&&Math.cos(ang)<0) ang+=Math.PI; g.position.set((m.lon-lon0)*kx,0,-(m.lat-lat0)*ky); g.rotation.y=ang; scene.add(g);
   }
-  // le pion du joueur : une vraie pièce d'échecs en 3D, aux couleurs de son parti
+  // la position du joueur : un faisceau de lumière qui monte de l'immeuble où l'on est, avec un anneau qui pulse au sol
   const pawn=new T.Group(); pawn.visible=false;
-  const prof=[[0,0],[13,0],[13.5,1.2],[13,3],[11.2,4],[11,5.6],[8.6,6.6],[6.4,8.6],[5.2,12],[4.5,18.5],[7.6,19.6],[7.8,21.2],[5,22.4],[4.4,23.4]].map(([r,y])=>new T.Vector2(r,y));
-  const pmat=new T.MeshStandardMaterial({color:0x1C3FA8,roughness:.32,metalness:.18});
-  const body=new T.Mesh(new T.LatheGeometry(prof,48),pmat); pawn.add(body);
-  const head=new T.Mesh(new T.SphereGeometry(7.4,40,28),pmat); head.position.y=29.5; pawn.add(head);
-  const ring=new T.Mesh(new T.TorusGeometry(15,1.1,8,48),new T.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.85})); ring.rotation.x=-Math.PI/2; ring.position.y=.6; pawn.add(ring);
-  const shadow=new T.Mesh(new T.CircleGeometry(17,40),new T.MeshBasicMaterial({color:0x0f1b2d,transparent:true,opacity:.22})); shadow.rotation.x=-Math.PI/2; shadow.position.y=.3; pawn.add(shadow);
+  const beamMat=new T.MeshBasicMaterial({color:0x1C3FA8,transparent:true,opacity:.42,depthWrite:false,side:T.DoubleSide});
+  const beam=new T.Mesh(new T.CylinderGeometry(9,16,110,24,1,true),beamMat); beam.position.y=55; pawn.add(beam);
+  const coreMat=new T.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.55,depthWrite:false});
+  const core=new T.Mesh(new T.CylinderGeometry(3.5,5,110,12,1,true),coreMat); core.position.y=55; pawn.add(core);
+  const orbMat=new T.MeshBasicMaterial({color:0x1C3FA8}); const orb=new T.Mesh(new T.SphereGeometry(9,24,16),orbMat); orb.position.y=114; pawn.add(orb);
+  const orbHalo=new T.Mesh(new T.SphereGeometry(13,24,16),new T.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.35,depthWrite:false})); orbHalo.position.y=114; pawn.add(orbHalo);
+  const ringMat=new T.MeshBasicMaterial({color:0x1C3FA8,transparent:true,opacity:.8,depthWrite:false,side:T.DoubleSide});
+  const ring=new T.Mesh(new T.RingGeometry(18,22,48),ringMat); ring.rotation.x=-Math.PI/2; ring.position.y=.8; pawn.add(ring);
+  const ring2=new T.Mesh(new T.RingGeometry(18,20,48),ringMat.clone()); ring2.rotation.x=-Math.PI/2; ring2.position.y=.9; pawn.add(ring2);
+  const disc=new T.Mesh(new T.CircleGeometry(18,40),new T.MeshBasicMaterial({color:0x1C3FA8,transparent:true,opacity:.18,depthWrite:false})); disc.rotation.x=-Math.PI/2; disc.position.y=.7; pawn.add(disc);
   scene.add(pawn);
   window.pawn3d={
     set(lng,lat){ pawn.position.set((lng-lon0)*kx,0,-(lat-lat0)*ky); pawn.visible=true; map.triggerRepaint(); },
-    color(hex){ pmat.color.set(hex); map.triggerRepaint(); },
+    color(hex){ beamMat.color.set(hex); orbMat.color.set(hex); ringMat.color.set(hex); ring2.material.color.set(hex); disc.material.color.set(hex); map.triggerRepaint(); },
     hide(){ pawn.visible=false; map.triggerRepaint(); },
-    k(z){ return (innerWidth < 700 ? .5 : .62)*Math.max(1,Math.pow(2,(16.6-z)*.6)); },
-    H:37
+    k(z){ return Math.max(1,Math.pow(2,(16.2-z)*.75)); },
+    H:118
   };
   let renderer=null;
   const layer={id:"monuments",type:"custom",renderingMode:"3d",
     onAdd(map,gl){ renderer=new T.WebGLRenderer({canvas:map.getCanvas(),context:gl,antialias:true}); renderer.autoClear=false; },
     render(gl,matrix){
       if(map.getZoom()<12.4) return;
-      if(pawn.visible){ const z=map.getZoom(); const k=window.pawn3d.k(z); pawn.scale.setScalar(k); }
+      if(pawn.visible){ const z=map.getZoom(); const k=window.pawn3d.k(z); pawn.scale.setScalar(k); const tt=performance.now()/1000; const pz=1+0.9*((tt*0.8)%1); ring2.scale.set(pz,pz,1); ring2.material.opacity=.8*(1-((tt*0.8)%1)); orb.position.y=114+Math.sin(tt*2)*4; orbHalo.position.y=orb.position.y; beamMat.opacity=.5+.1*Math.sin(tt*2.5); map.triggerRepaint(); }
       const rot=new T.Matrix4().makeRotationAxis(new T.Vector3(1,0,0),Math.PI/2);
       const l=new T.Matrix4().makeTranslation(origin.x,origin.y,origin.z).scale(new T.Vector3(s,-s,s)).multiply(rot);
       camera.projectionMatrix=new T.Matrix4().fromArray(matrix).multiply(l);

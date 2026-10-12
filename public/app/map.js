@@ -169,7 +169,7 @@ function renderMarks() {
   });
   for (const p of parkMarks) { const show = z >= p.minz && z < 17.5; if (show && !p.on) { p.mk.addTo(map); p.on = true; } else if (!show && p.on) { p.mk.remove(); p.on = false; } }
   for (const m of monMarks) {
-    const show = z >= (m.r === "M" ? 11.4 : 14); m.el.classList.toggle("far", z < (m.r === "M" ? (innerWidth < 700 ? 14.5 : 13.8) : 15.5)); if (show && !m.on) { m.mk.addTo(map); m.on = true; } else if (!show && m.on) { m.mk.remove(); m.on = false; }
+    const show = z >= (m.r === "M" ? (innerWidth < 700 ? 13.3 : 11.4) : 14); m.el.classList.toggle("far", z < (m.r === "M" ? (innerWidth < 700 ? 14.5 : 13.8) : 15.5)); if (show && !m.on) { m.mk.addTo(map); m.on = true; } else if (!show && m.on) { m.mk.remove(); m.on = false; }
     if (show && !m.ph) { const c = card(m.g); if (c) { m.ph = true; if (c.ph) m.el.querySelector("i").setAttribute("style", phStyle(c)); } }
   }
 }

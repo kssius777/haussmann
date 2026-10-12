@@ -127,8 +127,8 @@ function showLand(L) {
   const lines = [];
   if (L?.toll > 0) lines.push(`<span class="ln bad">Vous lui payez son loyer : <b>${fmtE(L.toll)}</b></span>`);
   if (L?.bonus > 0) lines.push(`<span class="ln good">Bonus : une journée de loyer offerte, <b>+${fmtE(L.bonus)}</b></span>`);
-  if (L?.salary > 0) lines.push(`<span class="ln good">💼 Salaire du tour : <b>+${fmtE(L.salary)}</b></span>`);
-  if (L?.chance) { const ch = L.chance; const [nm] = CHANCE[ch.k] || ["Chance"]; lines.push(`<span class="ln ${BAD.has(ch.k) ? "bad" : "good"}">🃏 Case Chance ! Carte tirée : <b>${esc(nm)}</b> → ${esc(chanceText(ch))}</span>`); }
+  if (L?.salary > 0) lines.push(`<span class="ln good">💼 Salaire du tour <b>+${fmtE(L.salary)}</b></span>`);
+  if (L?.chance) { const ch = L.chance; const [nm] = CHANCE[ch.k] || ["Chance"]; lines.push(`<span class="ln ${BAD.has(ch.k) ? "bad" : "good"}">🃏 <b>${esc(nm)}</b> · ${esc(chanceText(ch))}</span>`); }
   const word = n => lotWord(c, n), tot = c.lots;
   const info = isP ? `${fmtN(free)} parts libres` : tot > 1 ? `Immeuble de ${tot} ${word(tot)} · <b>${free} libre${free > 1 ? "s" : ""}</b>` : "";
   let btns = "";
@@ -143,10 +143,10 @@ function showLand(L) {
     } else {
       btns = cr
         ? `<button class="btn block blue2" data-lbuy="${g}"><span>Acheter ${unit} à crédit</span><small>${fmtE(down(c.v))} maintenant · +${fmtE(Math.round(c.rent * .3))} / jour pour vous</small></button>
-           <p class="crx">10 % maintenant. La banque avance le reste (${fmtE(c.v - down(c.v))}), remboursé <b>tout seul</b> par 70 % du loyer. Après, tout le loyer est à vous.</p>`
+           <p class="crx">Le reste (${fmtE(c.v - down(c.v))}) se rembourse <b>tout seul</b> avec 70 % du loyer.</p>`
         : `<button class="btn block green" data-lbuy="${g}"><span>Acheter ${unit} · ${fmtE(c.v)}</span><small>+${fmtE(c.rent)} / jour</small></button>`;
       const links = [];
-      if (cr && cashOK) links.push(`<button data-paymode="0">ou payer comptant (${fmtE(c.v)}) : tout le loyer tout de suite</button>`);
+      if (cr && cashOK) links.push(`<button data-paymode="0">ou payer comptant · ${fmtE(c.v)}</button>`);
       if (!cr && creditOK) links.push(`<button data-paymode="1">ou à crédit : ${fmtE(down(c.v))} maintenant</button>`);
       if (allFree && (cr ? cash >= down(total) && total - down(total) <= cap : cash >= total)) links.push(`<button data-lbuild="${g}">${cr ? `tout l'immeuble à crédit · ${fmtE(down(total))} maintenant` : `tout l'immeuble · ${fmtE(total)}`} (+60 % de loyer)</button>`);
       if (links.length) btns += `<div class="llinks">${links.join("")}</div>`;
@@ -171,14 +171,14 @@ function showBuyRolls() {
 
 // ---- téléportation ------------------------------------------------------------
 function openTeleport() {
-  const hs = holdings().sort((a, b) => b.c.v * unitsOf(b) - a.c.v * unitsOf(a));
-  if (!hs.length) return toast("Vous n'avez pas encore de bien où vous téléporter");
-  setMovebar(`<div class="mvh"><span class="pin">✨</span><div><b>Se téléporter sur un de ses biens</b><span>${ST.state.profile.tp} restante${ST.state.profile.tp > 1 ? "s" : ""} aujourd'hui · vous pourrez y acheter les logements encore libres</span></div><button class="x" data-mvclose aria-label="Fermer">×</button></div>
-    <div class="chs tpl">${hs.slice(0, 30).map(h => `<button class="chc" data-tpgo="${h.g}"><span class="th">${photo(h.c)}</span><span class="t"><b>${esc(title(h.c))}</b><span class="tag">${ord(h.c.arr)} arr. · ${esc(itemLabel(h.c, { t: "own", ks: h.ks, n: h.n }))}${freeOf(h.g) > 0 ? ` · <span class="green">${freeOf(h.g)} libre${freeOf(h.g) > 1 ? "s" : ""}</span>` : ""}</span></span><span class="go">›</span></button>`).join("")}</div>`, "tp");
+  // téléportation aléatoire sur un de ses biens (de préférence un immeuble où il reste des logements libres)
+  const hs = holdings().filter(h => h.g !== pawnPos()); if (!hs.length) return toast("Vous n'avez pas encore de bien où vous téléporter");
+  const pool = hs.filter(h => freeOf(h.g) > 0); const pick = (pool.length ? pool : hs)[Math.floor(Math.random() * (pool.length ? pool : hs).length)];
+  doTeleport(pick.g);
 }
 async function doTeleport(g) {
   try { setState(await rpc("teleport", { p_card: g })); } catch (e) { return toast(e.message, "bad"); }
-  lastLanding = null; setMovebar(""); hidePreview(); await placePawn(true); renderDice(); toast("Téléportation réussie ✨", "good"); showLand();
+  lastLanding = null; setMovebar(""); hidePreview(); sfx("coin"); await placePawn(true); renderDice(); showLand();
 }
 
 // ---- le dé : un vrai cube en 3D qui roule puis s'arrête sur la bonne face ----

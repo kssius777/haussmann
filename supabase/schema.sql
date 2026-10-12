@@ -413,7 +413,7 @@ alter table profiles add column if not exists heading float8;                   
 alter table profiles add column if not exists land int;                                -- immeuble où le pion s'est arrêté : achetable à la banque
 
 create or replace function pawn_cfg() returns jsonb language sql immutable as $$ select '{
-  "maxRolls":10, "rollEveryMin":30, "tpPerDay":3, "buyRadius":150, "tollCap":0.2, "spawn":300354, "chanceEvery":8, "stepMul":4, "dieMax":6, "rollsPrice":50000, "rollsPack":5, "salary":20000
+  "maxRolls":10, "rollEveryMin":30, "tpPerDay":3, "buyRadius":150, "tollCap":0.2, "spawn":400761, "chanceEvery":8, "stepMul":4, "dieMax":6, "rollsPrice":50000, "rollsPack":5, "salary":20000
 }'::jsonb $$;
 
 -- distance en mètres entre deux immeubles (null si coordonnées inconnues)

@@ -880,3 +880,40 @@ input{font:inherit;color:inherit}
 .agv b{display:block;font-size:14.5px}
 .plabel{font:800 12px/1 var(--f);color:#2F6B2F;text-shadow:0 1px 0 #fff,0 -1px 0 #fff,1px 0 0 #fff,-1px 0 0 #fff,0 0 6px #fff;letter-spacing:.04em;text-transform:uppercase;pointer-events:none;white-space:nowrap;opacity:.9}
 .mmark{z-index:3}
+/* la position : étiquette « Vous » en haut du faisceau */
+.pawn.is3d em{margin-bottom:var(--ph,60px);background:var(--blue);font-size:12px;padding:3px 10px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+/* téléphone : carte de la case compacte, tout tient sans défiler */
+@media (max-width:699px){
+  #movebar.k-land{padding:10px 12px 12px;max-height:min(58vh,440px);border-radius:20px 20px 16px 16px}
+  .land{grid-template-columns:92px minmax(0,1fr);gap:10px}
+  .land .lc .hc{--w:92px}
+  .land .lr{gap:5px;padding-right:26px}
+  .land .lh{font-size:16px}
+  .land .linfo{font-size:12.5px;line-height:1.25}
+  #movebar .land .ln{padding:4px 8px;font-size:12px;border-radius:8px;line-height:1.25}
+  .land .lb{gap:6px}
+  .land .lb .btn{min-height:44px;font-size:14px}
+  .land .lb .btn small{font-size:11px}
+  .crx{font-size:11.5px;padding:5px 8px;line-height:1.3}
+  .llinks button{font-size:12.5px;padding:2px}
+  .nomoney{padding:8px 10px;font-size:12px} .nomoney b{font-size:13.5px}
+  .land>.x{width:28px;height:28px;line-height:28px;font-size:16px}
+}
+/* téléphone : bandeau des maires et collection responsives */
+@media (max-width:699px){
+  .maptop{gap:6px}
+  .score{flex:1 1 auto;min-width:0;max-width:none;width:auto;margin-right:0}
+  .score .t{overflow:hidden}
+  .score .t b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  .score .t span{display:none}
+  .colh{display:grid;gap:6px}
+  .colh .seg.mini{width:100%;height:36px}
+  .colh .seg.mini button{flex:1;font-size:12px;padding:0 6px;white-space:nowrap}
+  .chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;flex-wrap:nowrap}
+  .chips .chip{flex:0 0 auto}
+  .kpis.k4 .kpi b{font-size:18px}
+  .agh{padding:8px 10px;gap:8px}
+  .agh>b{font-size:15px;padding:7px 8px}
+  .agh strong{font-size:13px} .agh small,.agv small{font-size:11px}
+  .agv b{font-size:13px}
+}
