@@ -1320,3 +1320,17 @@ body.landopen #strip{display:none}
 /* patrimoine : l'étiquette « crédit » ne cache plus le nom de la rue */
 .cw{position:relative}
 .cw .tagc{top:auto;bottom:22%;left:8px}
+/* listes de cartes (Patrimoine, rangée de la carte) : pas d'animations ni de gros halos, sinon iPhone
+   manque de mémoire graphique et la page reste blanche ; les cartes hors écran ne sont pas dessinées */
+.grid-cards .hc .foil,.grid-cards .hc .fr::after,#strip .hc .foil,#strip .hc .fr::after{animation:none!important}
+.grid-cards .hc.tL .foil,.grid-cards .hc.tM .foil{background-size:100% 100%}
+.grid-cards .hc .fr,#strip .hc .fr{box-shadow:0 2px 8px rgba(20,40,70,.14)!important}
+.grid-cards>.cw{content-visibility:auto;contain-intrinsic-size:auto 220px}
+#p-assets .page,#p-assets{will-change:auto}
+/* logo : une vraie plaque de rue parisienne (émail bleu, filet blanc, cadre vert), « 8ᵉ Arrᵗ » comme le boulevard Haussmann */
+.plaque-mini{display:inline-grid!important;justify-items:center;gap:1px;background:linear-gradient(180deg,#2547A6,#1B3888)!important;color:#fff!important;
+  font:800 13px/1 var(--f)!important;letter-spacing:.06em!important;padding:4px 12px 5px!important;border-radius:6px!important;
+  border:1.5px solid #fff!important;outline:2.5px solid #1F6B4A!important;outline-offset:0!important;box-shadow:0 2px 6px rgba(0,0,0,.18)!important;text-transform:uppercase}
+.plaque-mini::before{content:"8ᵉ Arrᵗ";font:600 8px/1 var(--f);letter-spacing:.04em;text-transform:none;opacity:.95}
+.plaque-mini.big{font-size:26px!important;padding:8px 22px 10px!important;border-width:2.5px!important;outline-width:4px!important;border-radius:10px!important}
+.plaque-mini.big::before{font-size:13px}

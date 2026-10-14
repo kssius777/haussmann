@@ -62,13 +62,17 @@ function renderWallet() {
 }
 
 // ---------------- PATRIMOINE ----------------
-let assetF = "all", assetArr = 0, assetSort = "v", assetN = 30, distAll = false;
+let assetF = "all", assetArr = 0, assetSort = "v", assetN = innerWidth < 700 ? 18 : 30, distAll = false;
 function worthNow() { const s = ST.state; return liveCash() + (+s.value || 0) - (+s.debt || 0) - (+s.loans || 0); }
 function logWorth() {
   try { const d = new Date().toISOString().slice(0, 10); const h = JSON.parse(localStorage.getItem("hm_hist") || "{}"); h[d] = Math.round(worthNow());
     const keys = Object.keys(h).sort().slice(-30); const o = {}; keys.forEach(k => o[k] = h[k]); localStorage.setItem("hm_hist", JSON.stringify(o)); return o; } catch (e) { return {}; }
 }
 async function renderAssets() {
+  try { await renderAssets0(); }
+  catch (e) { console.error(e); $("#p-assets").innerHTML = `<div class="wrap"><h1 class="h1">Patrimoine</h1><p class="sub">Le chargement a échoué : ${esc(String(e?.message || e))}</p><button class="btn" onclick="renderAssets()">Réessayer</button></div>`; }
+}
+async function renderAssets0() {
   const s = ST.state; if (!s?.profile) return;
   const val = h => h.c.v * unitsOf(h);
   const hs = holdings();
@@ -318,7 +322,7 @@ function buyActions(c, g, owners, free, isP) {
   if (far) return farHTML(far, g);
   const total = c.v * c.lots, allFree = !isP && owners.size === 0 && c.lots > 1, [cr, tg] = payToggle(c.v, c.rent), need = p => cr ? Math.ceil(p * .1) : p;
   return tg + `<button class="btn block buy" data-act="bank" ${cash < need(c.v) ? "disabled" : ""}><span>${isP ? "Acheter 1 part" : `Acheter 1 ${c.lk === "l" ? "logement" : "local"}`} · ${fmtE(need(c.v))}</span>${buySub(cr)}</button>
-    ${allFree && cash >= need(total) ? `<button class="btn block light" data-act="bbuild">Tout l'immeuble · ${fmtE(need(total))} <small class="muted">(+60 % de loyer)</small></button>` : ""}
+    ${allFree && cash >= need(total) && (!cr || total - need(total) <= (ST.state?.loan_cap ?? 1e12)) ? `<button class="btn block light" data-act="bbuild">Tout l'immeuble · ${fmtE(need(total))} <small class="muted">(+60 % de loyer)</small></button>` : ""}
     ${!cr && cash < c.v ? `<small class="muted">Il vous manque ${fmtE(c.v - cash)}.</small>` : ""}`;
 }
 $("#p-detail").addEventListener("click", async e => {
