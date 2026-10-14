@@ -68,7 +68,9 @@ async def main():
             except Exception: print("ACHAT KO:", await E("document.querySelector('#toast')?.innerText"), await E("document.querySelector('#movebar').innerText.slice(0,300)")); raise
             await pg.wait_for_timeout(500); await pg.screenshot(path=T + "05f_bought.png"); check("achat en un clic sur la case où l'on tombe", True)
         await pg.click("#movebar [data-mvclose]"); await W("document.querySelector('#movebar').hidden")
+        await E("localStorage.setItem('hm_hist', JSON.stringify({'2026-01-01':900000,'2026-01-02':1100000})); 1")   # 2 jours d'historique : la courbe s'affiche
         await pg.click("#tabs [data-tab=assets]"); await W("document.querySelector('#p-assets .kpi')")
+        check("patrimoine : courbe d'évolution affichée", await E("!!document.querySelector('#p-assets .box svg')"))
         await pg.wait_for_timeout(500); await pg.screenshot(path=T + "07_assets.png")
         await E("document.querySelector('#p-assets').scrollTop=700"); await pg.wait_for_timeout(300); await pg.screenshot(path=T + "07b_assets.png")
         check("patrimoine : collection affichée", await E("document.querySelectorAll('#p-assets .grid-cards .hc').length") > 3)

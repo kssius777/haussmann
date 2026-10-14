@@ -1334,3 +1334,6 @@ body.landopen #strip{display:none}
 .plaque-mini::before{content:"8ᵉ Arrᵗ";font:600 8px/1 var(--f);letter-spacing:.04em;text-transform:none;opacity:.95}
 .plaque-mini.big{font-size:26px!important;padding:8px 22px 10px!important;border-width:2.5px!important;outline-width:4px!important;border-radius:10px!important}
 .plaque-mini.big::before{font-size:13px}
+/* de loin : « Vous » posé sur un point, plus d'étiquette qui flotte dans le vide */
+.pawn.is3d.far::after{content:"";position:absolute;left:50%;bottom:-6px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:var(--act);border:3px solid #fff;box-shadow:0 0 0 6px rgba(37,99,235,.25),0 2px 6px rgba(0,0,0,.3)}
+.pawn.is3d.far em{margin-bottom:14px}

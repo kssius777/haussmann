@@ -249,10 +249,11 @@ function initPawnUI() {
 function pawnOff() {
   const el = $("#pawnoff"); if (!pawnMk || !el) return;
   if (panelKind === "land" && innerWidth < 900) { el.hidden = true; return; }
-  if (window.pawn3d) {   // l'étiquette « Vous » flotte au-dessus du pion 3D
-    const z = map.getZoom(), mpp = 40075016 * Math.cos(48.86 * Math.PI / 180) / (512 * Math.pow(2, z));
+  if (window.pawn3d) {   // l'étiquette « Vous » flotte au-dessus de la montgolfière ; de loin (la 3D n'est plus dessinée) : un point bleu sur la carte
+    const z = map.getZoom(), far = z < 12.4, mpp = 40075016 * Math.cos(48.86 * Math.PI / 180) / (512 * Math.pow(2, z));
     const px = pawn3d.H * pawn3d.k(z) / mpp * Math.sin(map.getPitch() * Math.PI / 180);
-    pawnMk.getElement().style.setProperty("--ph", Math.round(Math.max(18, px) + 6) + "px");
+    const el0 = pawnMk.getElement(); el0.classList.toggle("far", far);
+    el0.style.setProperty("--ph", far ? "4px" : Math.round(Math.max(18, px) + 6) + "px");
   }
   const W = map.getContainer().clientWidth, H = map.getContainer().clientHeight, pt = map.project(pawnMk.getLngLat());
   const top = 110, bot = H - (($(".mapbottom")?.offsetHeight || 80) + 24), left = 30, right = W - 30;

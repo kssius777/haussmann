@@ -68,6 +68,13 @@ function logWorth() {
   try { const d = new Date().toISOString().slice(0, 10); const h = JSON.parse(localStorage.getItem("hm_hist") || "{}"); h[d] = Math.round(worthNow());
     const keys = Object.keys(h).sort().slice(-30); const o = {}; keys.forEach(k => o[k] = h[k]); localStorage.setItem("hm_hist", JSON.stringify(o)); return o; } catch (e) { return {}; }
 }
+function sparkSVG(vals) {   // petite courbe d'évolution du patrimoine (30 derniers jours)
+  if (vals.length < 2) return "";
+  const W = 320, H = 70, mn = Math.min(...vals), mx = Math.max(...vals), sp = mx - mn || 1;
+  const pts = vals.map((v, i) => [i * W / (vals.length - 1), H - 6 - (v - mn) / sp * (H - 12)]);
+  const d = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${d}L${W} ${H}L0 ${H}Z" fill="rgba(37,99,235,.10)"/><path d="${d}" fill="none" stroke="#2563EB" stroke-width="2.5" stroke-linejoin="round"/></svg>`;
+}
 async function renderAssets() {
   try { await renderAssets0(); }
   catch (e) { console.error(e); $("#p-assets").innerHTML = `<div class="wrap"><h1 class="h1">Patrimoine</h1><p class="sub">Le chargement a échoué : ${esc(String(e?.message || e))}</p><button class="btn" onclick="renderAssets()">Réessayer</button></div>`; }
