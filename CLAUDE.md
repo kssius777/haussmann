@@ -39,6 +39,7 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
   Libre → on peut l'acheter à la banque (c'est le seul endroit où l'on achète à la banque). À un autre joueur → on lui paie
   une journée de ses loyers ici (max 20 % de sa trésorerie). À soi → une journée de loyer en bonus. 1 case sur 8 environ : carte Chance.
   Le pion va vers un immeuble lointain atteignable en n pas et suit le plus court chemin (pas de boucle).
+  Choisir sa direction : 4 points bleus autour de la montgolfière (« vers Notre-Dame »…), `showAim()` dans pawn.js ; le dé est lancé avec `roll(p_dir)` (radians, 0 = est), le serveur suit cette direction pour ce lancer (`aim`).
   10 lancers max, +1 toutes les 30 min ; on peut acheter 5 lancers (50 000 €, prix doublé à chaque achat du jour). 3 téléportations par jour vers ses propres biens (on peut y acheter les logements libres).
 - **Crédit immobilier** (achat à la banque) : apport 10 %, la banque prête le reste ; 70 % du loyer de base du bien
   rembourse le crédit automatiquement (impossible d'être en défaut) ; capacité d'emprunt = 5 M€ + 20 jours de loyers − crédits en cours ;
@@ -56,3 +57,5 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
 - Cliquer un immeuble ou un monument ouvre le même panneau que la case (`showLand(null, g)`, `landView`) : à droite sur ordinateur, en bas sur téléphone. Changer d'onglet ferme ce panneau.
 - Page d'accueil « vitrine » noire (landing.js, `.landing.v2`), sans le bloc d'explication Google.
 - Patrimoine : « Où sont vos biens » (barres par arrondissement, clic = filtre), collection triable et paginée.
+- « Mes biens » sur la carte : carte épurée (classe `mymode`) : seulement les numéros d'arrondissement et les points bleus.
+- Noms des quartiers, canaux et îles sur la carte (`PLACES` dans map.js).

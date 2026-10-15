@@ -18,7 +18,8 @@ alter table profiles add column if not exists tp int not null default 3;        
 alter table profiles add column if not exists tp_day date;
 alter table profiles add column if not exists dice smallint[];                         -- dés lancés, en attente du déplacement
 alter table profiles add column if not exists moves int[];                             -- (ancienne version, inutilisé)
-alter table profiles add column if not exists heading float8;                          -- direction de marche du pion (radians)
+alter table profiles add column if not exists heading float8;
+alter table profiles add column if not exists aim boolean default false;  -- le joueur a choisi sa direction pour le prochain lancer                          -- direction de marche du pion (radians)
 alter table profiles add column if not exists land int;                                -- immeuble où le pion s'est arrêté : achetable à la banque
 
 create or replace function pawn_cfg() returns jsonb language sql immutable as $$ select '{
@@ -83,9 +84,11 @@ create or replace function _square(u uuid, t int) returns jsonb language sql sta
 -- puis le pion suit le PLUS COURT chemin pour y aller.
 create or replace function _walk(u uuid, start int, n int) returns int[] language plpgsql as $$
 #variable_conflict use_column
-declare hd float8; sx float8; sy float8; t int; cur int; path int[] := '{}'; dmax int; tx float8; ty float8;
+declare hd float8; sx float8; sy float8; t int; cur int; path int[] := '{}'; dmax int; tx float8; ty float8; am boolean;
 begin
-  select coalesce(heading, random() * 2 * pi()) + (random() - 0.5) * 1.8 into hd from profiles where id = u;
+  -- direction choisie par le joueur (aim) : on la suit de près ; sinon on continue à peu près tout droit
+  select case when coalesce(aim, false) then heading + (random() - 0.5) * 0.4 else coalesce(heading, random() * 2 * pi()) + (random() - 0.5) * 1.8 end,
+         coalesce(aim, false) into hd, am from profiles where id = u;
   select cx * 0.7324, cy * 1.10574 into sx, sy from cards where id = start;
   create temp table if not exists _wk(node int primary key, d int, par int) on commit drop;
   truncate _wk; insert into _wk select * from _reach(start, n);
@@ -93,14 +96,15 @@ begin
   select r.node into t from _wk r join cards c on c.id = r.node
     where r.d = dmax
     order by sqrt(power(c.cx * 0.7324 - sx, 2) + power(c.cy * 1.10574 - sy, 2))
-             * (0.55 + 0.45 * cos(atan2(c.cy * 1.10574 - sy, c.cx * 0.7324 - sx) - hd))
+             * (case when am then power(greatest(0.02, 0.5 + 0.5 * cos(atan2(c.cy * 1.10574 - sy, c.cx * 0.7324 - sx) - hd)), 3)
+                     else 0.55 + 0.45 * cos(atan2(c.cy * 1.10574 - sy, c.cx * 0.7324 - sx) - hd) end)
              * (0.85 + random() * 0.3) desc
     limit 1;
   if t is null then return array[start]; end if;
   cur := t;
   while cur is not null loop path := cur || path; select par into cur from _wk where node = cur; end loop;
   select cx * 0.7324, cy * 1.10574 into tx, ty from cards where id = t;
-  update profiles set heading = atan2(ty - sy, tx - sx) where id = u;   -- la prochaine fois, à peu près la même direction
+  update profiles set heading = atan2(ty - sy, tx - sx), aim = false where id = u;   -- la prochaine fois, à peu près la même direction
   return path;
 end $$;
 
@@ -212,5 +216,13 @@ begin
 end $$;
 
 revoke all on function roll(), teleport(int) from public;
+-- Lancer le dé dans une direction choisie (angle en radians : 0 = est, π/2 = nord)
+create or replace function roll(p_dir float8) returns json
+language plpgsql security definer set search_path = public as $$
+begin
+  update profiles set heading = p_dir, aim = true where id = _need_me();
+  return roll();
+end $$;
+grant execute on function roll(float8) to anon, authenticated;
 grant execute on function roll(), teleport(int) to anon, authenticated;
 revoke all on function _dist(int,int), _is_chance(int), _regen(uuid), _reach(int,int), _near_or_fail(uuid,int), pawn_cfg(), _square(uuid,int), _walk(uuid,int,int) from public, anon, authenticated;

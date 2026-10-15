@@ -62,6 +62,18 @@ p0 = db.rpc(A, "state")["rolls_price"]; db.rpc(A, "buy_rolls"); st = db.rpc(A, "
 check("acheter 5 lancers avec l'argent du jeu, prix qui double", st["profile"]["rolls"] == 5 and st["rolls_price"] == p0 * 2, (p0, st["rolls_price"]))
 nch = db.sql("select count(*) from (select id from cards order by id limit 1200) x where _is_chance(id)")[0][0]
 check("cases Chance réparties sur la carte (≈ 1 sur 8)", 100 < nch < 210, nch)
+# choisir sa direction : vers l'est puis vers l'ouest, le pion part bien de ce côté
+D = uuid.uuid4(); db.sql("insert into auth.users(id) values (%s)", str(D)); db.rpc(D, "join_game", p_pseudo="Dir" + str(D)[:4], p_party=None)
+ok_e = ok_w = 0
+for i in range(8):
+    db.sql("update profiles set rolls=10 where id=%s", str(D)); p0 = db.rpc(D, "state")["profile"]["pos"]
+    want = 0.0 if i % 2 == 0 else 3.14159
+    x = db.rpc(D, "roll", p_dir=want); t2 = x["landing"]["card"]
+    dx = db.sql("select (b.cx - a.cx) from cards a, cards b where a.id=%s and b.id=%s", p0, t2)[0][0]
+    if i % 2 == 0: ok_e += dx > 0
+    else: ok_w += dx < 0
+check("choisir sa direction : le pion part du côté choisi", ok_e >= 3 and ok_w >= 3, (ok_e, ok_w))
+check("la direction choisie ne vaut que pour un lancer", db.sql("select aim from profiles where id=%s", str(D))[0][0] is False)
 db.sql("update profiles set rent_at=now()-interval '2 days 4 hours' where id=%s", str(A)); db.rpc(A, "state")
 lab = db.sql("select label from ledger where owner=%s and kind='rent_away' order by at desc limit 1", str(A))
 check("loyers d'absence : une ligne à part avec la durée", bool(lab) and "2 j 4 h" in lab[0][0], lab)

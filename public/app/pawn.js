@@ -19,7 +19,7 @@ function initPawnLayers() {
   map.addSource("walked", { type: "geojson", data: FC([]) });
   map.addLayer({ id: "walked-case", type: "line", source: "walked", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#fff", "line-width": 10, "line-opacity": .9 } });
   map.addLayer({ id: "walked", type: "line", source: "walked", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#0F1B2D", "line-width": 5, "line-dasharray": [1.2, 1.2] } });
-  map.on("move", pawnOff); placePawn(true);
+  map.on("move", pawnOff); placePawn(true); setTimeout(showAim, 1500);
 }
 async function placePawn(fly) {
   const p = pawnPos(); if (p == null || !map) return; await ensureCards([p]);
@@ -63,6 +63,7 @@ function setMovebar(html, kind) {
   if (!html) { m.hidden = true; m.innerHTML = ""; if (landView) { landView = false; sel = null; paintAll(); if (typeof stripKind !== "undefined" && stripKind) $("#strip").hidden = false; } } else { m.hidden = false; m.innerHTML = html; }
   $("#dicebar").classList.toggle("off", moving);
   document.body.classList.toggle("landopen", panelKind === "land");
+  if (panelKind === "land" || moving) aimMarks.forEach(m => m.remove()), (aimMarks = []); else setTimeout(showAim, 50);
   if (panelKind === "land") $("#pawnoff").hidden = true;
 }
 function renderDice() {
@@ -83,7 +84,9 @@ async function doRoll() {
   if (moving) return;
   if ((ST.state?.profile?.rolls ?? 0) <= 0) return showBuyRolls();
   const b = $("#b-roll"); b.disabled = true; hidePreview(); hideHint(); setMovebar("");
-  let r; try { r = await rpc("roll"); } catch (e) { toast(e.message, "bad"); renderDice(); return; }
+  let r; const dir = aimDir; clearAim();
+  try { r = dir == null ? await rpc("roll") : await rpc("roll", { p_dir: dir }).catch(e => /function|schema|p_dir/i.test(e.message) ? rpc("roll") : Promise.reject(e)); }
+  catch (e) { toast(e.message, "bad"); renderDice(); showAim(); return; }
   if (!r.path) { toast("Le jeu est en cours de mise à jour : réessayez dans quelques minutes.", "bad"); renderDice(); return; }
   moving = true; renderDice(); sfx("dice");
   await animDice(r.die); setDieIcon(r.die);
@@ -278,3 +281,30 @@ function pawnOff() {
   el.querySelector("span").textContent = "Vous · " + fmtDist(d);
 }
 function hidePreviewOnly() { const pv = $("#preview"); if (pv && !pv.hidden) { pv.hidden = true; sel = null; paintAll(); } }
+
+
+// ---- choisir sa direction : 4 points autour de la montgolfière, « vers Notre-Dame », etc. -------------------
+// toucher un point choisit la direction du prochain lancer (le dé décide toujours de la distance)
+let aimDir = null, aimMarks = [];
+function clearAim() { aimMarks.forEach(m => m.remove()); aimMarks = []; aimDir = null; }
+function showAim() {
+  aimMarks.forEach(m => m.remove()); aimMarks = [];
+  if (!map || !mapReady || moving || panelKind === "land" || cur() !== "map" || pawnPos() == null || !centersOf(ai(pawnPos()))) return;
+  if (map.getZoom() < 13.6 || (typeof stripKind !== "undefined" && stripKind) || $("#b-roll")?.disabled || (ST.state?.profile?.rolls ?? 0) <= 0) return;
+  const [lon, lat] = centerOf(pawnPos()), b = map.getBearing() * Math.PI / 180, kx = 111320 * Math.cos(lat * Math.PI / 180), ky = 110574;
+  const D = 330, mons = IDX.mons.filter(m => m[2] === "M" || m[2] === "L");
+  for (let i = 0; i < 4; i++) {
+    const a = Math.PI / 2 - b - i * Math.PI / 2;   // haut, droite, bas, gauche de l'écran → angle géographique (0 = est)
+    const ll = [lon + D * Math.cos(a) / kx, lat + D * Math.sin(a) / ky];
+    // un repère connu dans cette direction (moins de 2 km, à ±40°)
+    let best = null, bd = 1e9;
+    for (const m of mons) { const dx = (m[3] - lon) * kx, dy = (m[4] - lat) * ky, d = Math.hypot(dx, dy); if (d < 250 || d > 2000) continue;
+      let da = Math.abs(Math.atan2(dy, dx) - a); da = Math.min(da, 2 * Math.PI - da); if (da < .7 && d < bd) { bd = d; best = m; } }
+    const el = document.createElement("button"); el.className = "aim" + (aimDir != null && Math.abs(aimDir - a) < .01 ? " on" : "");
+    el.innerHTML = `<i></i>${best ? `<span>vers ${esc(shortName(best[1]))}</span>` : ""}`;
+    el.setAttribute("aria-label", best ? "Aller vers " + shortName(best[1]) : "Choisir cette direction");
+    el.addEventListener("click", ev => { ev.stopPropagation(); const again = aimDir != null && Math.abs(aimDir - a) < .01; aimDir = again ? null : a; showAim();
+      if (!again) toast(best ? `Direction : vers ${shortName(best[1])}. Lancez le dé !` : "Direction choisie. Lancez le dé !"); });
+    aimMarks.push(new maplibregl.Marker({ element: el }).setLngLat(ll).addTo(map));
+  }
+}

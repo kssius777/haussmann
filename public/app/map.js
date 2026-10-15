@@ -138,7 +138,7 @@ function buildMap(base) {
       a.marker = new maplibregl.Marker({ element: el }).setLngLat(a.center).addTo(map);
     });
     buildMonMarkers(); buildParkLabels();
-    map.on("zoom", renderMarks); map.on("moveend", renderTags);
+    map.on("zoom", renderMarks); map.on("moveend", renderTags); map.on("rotateend", () => showAim()); map.on("zoomend", () => { if (!aimMarks.length || map.getZoom() < 13.6) showAim(); });
     // la boussole n'apparaît que si la carte a été tournée ; elle remet le nord en haut
     map.on("rotate", () => { const b = map.getBearing(); $("#t-north").hidden = Math.abs(b) < 2; $("#needle").style.transform = `rotate(${-b}deg)`; });
     ARR.forEach((A, i) => { if (A?.cards) addArrToMap(i); });   // arrondissements chargés avant la carte (ex. celui du pion)
@@ -148,9 +148,11 @@ function buildMap(base) {
 }
 // les grands parcs et places, écrits sur la carte
 const PARKS = [["Bois de Vincennes", 2.4350, 48.8280, 11], ["Bois de Boulogne", 2.2490, 48.8620, 11], ["Jardin du Luxembourg", 2.3370, 48.8465, 13], ["Jardin des Tuileries", 2.3270, 48.8635, 13], ["Parc des Buttes-Chaumont", 2.3830, 48.8800, 13], ["Parc Monceau", 2.3090, 48.8795, 13.5], ["Parc Montsouris", 2.3380, 48.8225, 13], ["Jardin des Plantes", 2.3600, 48.8430, 13], ["Parc de la Villette", 2.3910, 48.8930, 12.5], ["Parc de Bercy", 2.3830, 48.8345, 13.5], ["Champ-de-Mars", 2.2980, 48.8560, 13], ["Place de la Concorde", 2.3210, 48.8656, 13.5], ["Place de la Bastille", 2.3690, 48.8530, 13.5], ["Place de la République", 2.3640, 48.8675, 13.5], ["Place de la Nation", 2.3960, 48.8485, 13.5], ["Cimetière du Père-Lachaise", 2.3935, 48.8610, 12.5], ["Parc André-Citroën", 2.2750, 48.8410, 13.5], ["Parc Georges-Brassens", 2.2990, 48.8320, 14], ["Les Invalides", 2.3125, 48.8560, 13], ["Champs-Élysées", 2.3070, 48.8700, 13]];
+const PLACES = [["La Seine", 2.2975, 48.8605, 12.5, "w"], ["La Seine", 2.3655, 48.8470, 13, "w"], ["Canal Saint-Martin", 2.3655, 48.8712, 13.4, "w"], ["Bassin de la Villette", 2.3772, 48.8856, 13.4, "w"], ["Canal de l'Ourcq", 2.3905, 48.8902, 13.6, "w"], ["Île de la Cité", 2.3445, 48.8547, 14, "w"], ["Île Saint-Louis", 2.3572, 48.8518, 14, "w"],
+  ["Montmartre", 2.3405, 48.8868, 12.6, "q"], ["Le Marais", 2.3600, 48.8590, 12.6, "q"], ["Quartier latin", 2.3445, 48.8490, 12.6, "q"], ["Saint-Germain-des-Prés", 2.3335, 48.8538, 12.8, "q"], ["Belleville", 2.3825, 48.8720, 12.6, "q"], ["Pigalle", 2.3375, 48.8822, 13.2, "q"], ["Les Halles", 2.3460, 48.8618, 13.2, "q"], ["Opéra", 2.3320, 48.8712, 13.2, "q"], ["Montparnasse", 2.3240, 48.8425, 12.8, "q"], ["Batignolles", 2.3195, 48.8865, 13, "q"], ["Butte-aux-Cailles", 2.3505, 48.8275, 13.2, "q"], ["Bercy", 2.3860, 48.8340, 13, "q"], ["Trocadéro", 2.2875, 48.8620, 13, "q"], ["Bastille", 2.3700, 48.8540, 13.2, "q"], ["Oberkampf", 2.3740, 48.8650, 13.4, "q"], ["Saint-Michel", 2.3440, 48.8530, 14, "q"]];
 let parkMarks = [];
 function buildParkLabels() {
-  parkMarks = PARKS.map(([n, lon, lat, minz]) => { const el = document.createElement("div"); el.className = "plabel"; el.textContent = n; return { mk: new maplibregl.Marker({ element: el }).setLngLat([lon, lat]), minz, on: false }; });
+  parkMarks = [...PARKS, ...PLACES].map(([n, lon, lat, minz, k]) => { const el = document.createElement("div"); el.className = "plabel" + (k ? " " + k : ""); el.textContent = n; return { mk: new maplibregl.Marker({ element: el }).setLngLat([lon, lat]), minz, on: false }; });
 }
 // noms courts pour les étiquettes de la carte
 const SHORT = { "Centre national d'art et de culture Georges-Pompidou": "Centre Pompidou", "cathédrale Notre-Dame de Paris": "Notre-Dame", "basilique du Sacré-Cœur de Montmartre": "Sacré-Cœur", "arc de triomphe de l'Étoile": "Arc de Triomphe", "palais de l'Élysée": "Élysée", "Paris-Nord": "Gare du Nord", "grande mosquée de Paris": "Grande Mosquée", "palais du Luxembourg": "Sénat (Luxembourg)", "Musée du Louvre": "Louvre", "église de la Madeleine": "La Madeleine", "palais Garnier": "Opéra Garnier", "catacombes de Paris": "Catacombes", "Palais Omnisports de Paris-Bercy": "Accor Arena (Bercy)", "Paris-Lyon": "Gare de Lyon", "Muséum national d'histoire naturelle": "Muséum", "hôtel de ville de Paris": "Hôtel de Ville", "conciergerie de Paris": "Conciergerie", "Paris-Est": "Gare de l'Est", "Paris-Montparnasse": "Gare Montparnasse", "Paris-Saint-Lazare": "Gare Saint-Lazare", "Paris-Austerlitz": "Gare d'Austerlitz" };
@@ -267,7 +269,7 @@ function initMapUI() {
 }
 
 // petit message d'aide sur la carte, jusqu'au premier achat ou aperçu
-function showHint() { try { if (localStorage.getItem("hm_hint")) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "🎲 Lancez le dé : votre personnage marche dans Paris et s'arrête sur un immeuble. S'il est libre, vous pouvez l'acheter !"; $("#p-map").appendChild(h); }
+function showHint() { try { if (localStorage.getItem("hm_hint")) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "🎲 Touchez un point bleu pour choisir votre direction, puis lancez le dé : votre montgolfière s'arrête sur un immeuble. S'il est libre, achetez-le !"; $("#p-map").appendChild(h); }
 function hideHint() { $("#maphint")?.remove(); try { localStorage.setItem("hm_hint", "1"); } catch (e) { } }
 function celebrate(c) { toast(`Félicitations ! ${title(c)} est à vous. Loyer : +${fmtE(c.rent)}/jour`, "good"); if (window.confetti) confetti("#0EA5A0", 30); }
 
@@ -282,12 +284,12 @@ function setStripPins(items) {
 function showStrip(kind) {
   const el = $("#strip"); if (!el) return;
   $$("#filter button").forEach(x => x.setAttribute("aria-selected", x.dataset.m === (kind === "all" ? "all" : kind)));
-  if (kind === "all" || kind === stripKind) { stripKind = ""; el.hidden = true; el.innerHTML = ""; setStripPins(null); $$("#filter button").forEach(x => x.setAttribute("aria-selected", x.dataset.m === "all")); return; }
+  if (kind === "all" || kind === stripKind) { stripKind = ""; el.hidden = true; el.innerHTML = ""; setStripPins(null); document.body.classList.remove("mymode"); applyMode(); showAim(); $$("#filter button").forEach(x => x.setAttribute("aria-selected", x.dataset.m === "all")); return; }
   stripKind = kind;
   const items = kind === "mine" ? holdings().sort((a, b) => b.c.v * unitsOf(b) - a.c.v * unitsOf(a)).map(h => ({ g: h.g, c: h.c, item: { t: "own", ks: h.ks, n: h.n } }))
     : [...ST.sale].map(g => ({ g, c: card(g) })).filter(x => x.c);
   if (!items.length) { stripKind = ""; el.hidden = true; return toast(kind === "mine" ? "Vous n'avez encore aucun bien : lancez le dé ou ouvrez un booster !" : "Rien à vendre en ce moment."); }
-  el.hidden = false; setStripPins(items);
+  el.hidden = false; setStripPins(items); document.body.classList.add("mymode"); map.setPaintProperty("arrfill", "fill-opacity", 0); clearAim(); showAim();
   // on cadre la carte sur ces biens (sans trop dézoomer)
   { const pts = items.map(x => centerOf(x.g)), lo = pts.map(p => p[0]), la = pts.map(p => p[1]);
     map.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], { padding: { top: 90, bottom: 260, left: 40, right: 40 }, maxZoom: 15.5, duration: 900 }); }
