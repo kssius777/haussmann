@@ -59,7 +59,8 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
 - Vue dézoomée (zoom < 13,4) : arrondissements colorés selon le parti du maire, emblème du parti dans l'étiquette d'arrondissement, légende « Qui gouverne Paris » en haut à gauche (`renderPartyLegend` dans map.js, clic → onglet Paris).
 - Cliquer un immeuble ou un monument ouvre le même panneau que la case (`showLand(null, g)`, `landView`) : à droite sur ordinateur, en bas sur téléphone. Changer d'onglet ferme ce panneau.
 - Page d'accueil « vitrine » noire (landing.js, `.landing.v2`), sans le bloc d'explication Google.
-- Patrimoine : « Où sont vos biens » (barres par arrondissement, clic = filtre), collection triable et paginée.
+- Patrimoine : la collection (triable, paginée) vient juste après les chiffres ; puis « Où sont vos biens » (barres par arrondissement, clic = filtre), endettement, courbe.
+- Fiche d'un bien possédé : « Vendre… » / « Hypothéquer… » ouvrent un formulaire en deux temps (`ownSheet` dans pages.js : nombre de logements, prix avec repères valeur / +10 % / +25 %, ce qu'on recevra ; hypothèque : argent reçu vs loyer perdu, puis Confirmer). Seuls les logements en vente ou hypothéqués ont une ligne. Marché → « Les miennes » liste les biens vendables (`sellList`), un toucher ouvre la fiche avec le formulaire de vente.
 - « Mes biens » sur la carte : carte épurée (classe `mymode`) : seulement les numéros d'arrondissement et les points bleus.
 - Noms des quartiers, canaux et îles sur la carte (`PLACES` dans map.js).
 - Tutoriel en jouant (fin de main.js, `tutTick`, localStorage `hm_tut` : 1 lancer · 2 la case · 3 après l'achat · 4 boosters · 5 mairies · 99 fini) : une bulle noire pointe ce qu'il faut toucher, seulement pour les nouveaux joueurs ; « Passer le tutoriel » à tout moment. e2e.py le passe (hm_tut=99).

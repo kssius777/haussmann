@@ -104,19 +104,12 @@ async function renderAssets0() {
     <p class="eyebrow">Patrimoine net</p><h1 class="h1 num big" id="worth">${fmtE(worthNow())}</h1>
     <p class="sub" style="margin:0 0 4px">Trésorerie + valeur de vos biens − ce que vous devez à la banque</p>
     ${rank ? `<button class="rankpill" data-push="results">🏆 Classement : vous êtes <b>${rank === 1 ? "1er" : rank + "e"}</b> sur ${ST.board.length} joueur${ST.board.length > 1 ? "s" : ""}</button>` : ""}
-    ${hv.length > 1 ? `<div class="box" style="padding:10px 12px 4px;margin:8px 0 6px">${sparkSVG(hv)}<div class="sub" style="margin:2px 0 6px;font-size:12px">Évolution sur ${hv.length} jours</div></div>` : ""}
     <div class="kpis k4">
       <div class="kpi"><span>Trésorerie</span><b class="num" id="cash2">${fmtE(liveCash())}</b><small class="muted">disponible</small></div>
       <div class="kpi"><span>Loyers / jour</span><b class="green num">+${fmtE(netRate())}</b><small class="muted">${s.loan_rate > 0 ? `+ ${fmtE(s.loan_rate)} remboursent vos crédits` : s.taxes > 0 ? `après ${fmtE(s.taxes)} de taxe des maires` : "versés en continu"}</small></div>
       <div class="kpi"><span>Valeur des biens</span><b class="num">${fmtE(+s.value || 0)}</b><small class="muted">${nLots} logement${nLots > 1 ? "s" : ""}</small></div>
       <div class="kpi ${loans || debt ? "warn" : ""}"><span>Dettes</span><b class="num">${fmtE(loans + debt)}</b><small class="muted">${loans ? `${s.credits || 0} crédit${(s.credits || 0) > 1 ? "s" : ""} en cours` : "aucun crédit"}${debt ? ` · hypothèques ${fmtE(debt)}` : ""}</small></div>
     </div>
-    ${loans || debt ? (() => { const val = +s.value || 0, ratio = val ? Math.round((loans + debt) / val * 100) : 0, cap = Math.max(0, +s.loan_cap || 0), used = loans, pct = used + cap ? Math.round(used / (used + cap) * 100) : 0;
-      return `<div class="debt"><div class="dh"><b>Taux d'endettement : ${ratio} %</b><span>${ratio < 50 ? "sain" : ratio < 80 ? "élevé" : "très élevé"}</span></div>
-        <p>Vos dettes représentent ${ratio} % de la valeur de vos biens. Les crédits se remboursent tout seuls avec 70 % du loyer des biens achetés à crédit.</p>
-        <div class="dbar"><i style="width:${pct}%"></i></div>
-        <div class="dl"><span>Déjà emprunté : <b>${fmtE(used)}</b></span><span>Vous pouvez encore emprunter : <b>${fmtE(cap)}</b></span></div></div>`; })() : ""}
-    ${dist.length ? `<h2 class="h2">Où sont vos biens</h2><div class="dist">${(distAll ? dist : dist.slice(0, 5)).map(distRow).join("")}${dist.length > 5 ? `<button class="dmore" data-dall>${distAll ? "Réduire" : `Voir les ${dist.length} arrondissements`}</button>` : ""}</div>` : ""}
     <h2 class="h2">Ma collection <span class="muted" style="font:700 14px var(--f)">${hs.length} carte${hs.length > 1 ? "s" : ""}</span></h2>
     <div class="chips"><button class="chip plain" data-af="all" aria-pressed="${assetF === "all"}">Tout</button>
       ${ORDER.split("").reverse().map(r => counts[r] ? `<button class="chip" data-af="${r}" aria-pressed="${assetF === r}">${rarSq(r)}${counts[r]}</button>` : "").join("")}
@@ -128,6 +121,13 @@ async function renderAssets0() {
     ${!hs.length ? `<div class="empty">Vous n'avez encore aucun bien.<br><br><button class="btn" data-go="booster">Ouvrir un booster</button></div>`
       : !list.length ? `<div class="empty">Rien dans cette catégorie.</div>`
       : `<div class="grid-cards">${list.slice(0, assetN).map(cardBtn).join("")}</div>${list.length > assetN ? `<button class="btn light gmore" data-gmore>Afficher plus (${list.length - assetN})</button>` : ""}`}
+    ${loans || debt ? (() => { const val = +s.value || 0, ratio = val ? Math.round((loans + debt) / val * 100) : 0, cap = Math.max(0, +s.loan_cap || 0), used = loans, pct = used + cap ? Math.round(used / (used + cap) * 100) : 0;
+      return `<div class="debt"><div class="dh"><b>Taux d'endettement : ${ratio} %</b><span>${ratio < 50 ? "sain" : ratio < 80 ? "élevé" : "très élevé"}</span></div>
+        <p>Vos dettes représentent ${ratio} % de la valeur de vos biens. Les crédits se remboursent tout seuls avec 70 % du loyer des biens achetés à crédit.</p>
+        <div class="dbar"><i style="width:${pct}%"></i></div>
+        <div class="dl"><span>Déjà emprunté : <b>${fmtE(used)}</b></span><span>Vous pouvez encore emprunter : <b>${fmtE(cap)}</b></span></div></div>`; })() : ""}
+    ${dist.length ? `<h2 class="h2">Où sont vos biens</h2><div class="dist">${(distAll ? dist : dist.slice(0, 5)).map(distRow).join("")}${dist.length > 5 ? `<button class="dmore" data-dall>${distAll ? "Réduire" : `Voir les ${dist.length} arrondissements`}</button>` : ""}</div>` : ""}
+    ${hv.length > 1 ? `<div class="box" style="padding:10px 12px 4px;margin:18px 0 6px">${sparkSVG(hv)}<div class="sub" style="margin:2px 0 6px;font-size:12px">Évolution sur ${hv.length} jours</div></div>` : ""}
   </div>`;
   function cardBtn(h) { return `<button data-push="b" data-arg="${h.g}" class="cw">${cardHTML(h.c, { w: "100%", item: { t: "own", ks: h.ks, n: h.n } })}${onLoan(h) ? `<span class="tagc loan">🏦 crédit</span>` : mortd(h) ? `<span class="tagc mort">🔒 hypothéqué</span>` : ""}</button>`; }
   if (!ST.board) rpc("leaderboard").then(b => { ST.board = b; if (cur() === "assets") renderAssets(); }).catch(() => { });
@@ -141,7 +141,14 @@ $("#p-assets").addEventListener("click", e => {
 $("#p-assets").addEventListener("change", e => { if (e.target.id === "asort") { assetSort = e.target.value; renderAssets(); } });
 
 // ---------------- MARCHÉ ----------------
-let marketTab = "all";
+let marketTab = "all", sellAll = false;
+function sellList() {   // mes biens qu'on peut mettre en vente : un toucher ouvre la fiche, formulaire de vente déjà ouvert
+  const hs = holdings().filter(h => !ST.loan.has(h.g) && (h.c.lk === "p" ? !ST.mort.has(h.g + ":-1") : h.ks.some(k => !ST.mort.has(h.g + ":" + k)))).sort((a, b) => b.c.v * unitsOf(b) - a.c.v * unitsOf(a));
+  if (!hs.length) return `<div class="empty">Aucun bien à vendre pour l'instant : les biens achetés à crédit se vendent une fois le crédit remboursé.</div>`;
+  const shown = sellAll ? hs : hs.slice(0, 12);
+  return `<h2 class="h3">Mettre un de mes biens en vente</h2><div class="rows">${shown.map(h => `<button class="lrow" data-sellg="${h.g}"><div class="th">${photo(h.c)}</div><div class="t"><b>${esc(title(h.c))}</b><span>${esc(ownSentence(h.c, h.ks, h.n))} · ${ord(h.c.arr)} arr.</span></div><div class="v"><b class="num">${fmtE(h.c.v * unitsOf(h))}</b><span class="btn sm amber">Vendre</span></div></button>`).join("")}</div>
+    ${hs.length > shown.length ? `<button class="btn light gmore" data-sellall>Voir les ${hs.length} biens</button>` : ""}`;
+}
 async function renderMarket() {
   const el = $("#p-market");
   if (!ST.market) el.innerHTML = `<div class="wrap"><h1 class="h1">Marché</h1><p class="sub">Chargement…</p></div>`;
@@ -156,12 +163,14 @@ async function renderMarket() {
   const sales = ST.market.sales.map(s => { const c = card(s.card); return c ? `<button class="lrow" data-push="b" data-arg="${s.card}"><div class="th">${photo(c)}</div><div class="t"><b>${esc(title(c))}</b><span>${s.k != null ? lotName(c, s.k) : s.n + " parts"} · acheté par ${esc(s.buyer || "?")} · ${ago(s.at)}</span></div><div class="v num"><b>${fmtE(s.price)}</b></div></button>` : ""; }).join("");
   el.innerHTML = `<div class="wrap"><h1 class="h1">Marché</h1><p class="sub">Les biens mis en vente par les joueurs. Le vendeur reçoit le prix moins 5 % de commission.</p>
     <div class="seg" role="tablist"><button data-mt="all" aria-selected="${marketTab === "all"}">Annonces · ${others.length}</button><button data-mt="mine" aria-selected="${marketTab === "mine"}">Les miennes · ${mineL.length}</button><button data-mt="sales" aria-selected="${marketTab === "sales"}">Ventes</button></div>
-    ${marketTab === "all" ? (others.length ? `<div class="rows">${rows(others, false)}</div>` : `<div class="empty"><b>Aucune annonce pour l'instant.</b><br><span class="muted">Les joueurs peuvent vendre leurs biens ici, 5 % de commission. Soyez le premier !</span><br><br><button class="btn sm light" data-go="assets">Vendre un de mes biens</button></div>${sales ? `<h2 class="h3">Dernières ventes</h2><div class="rows">${sales}</div>` : ""}`) : ""}
-    ${marketTab === "mine" ? (mineL.length ? `<div class="rows">${rows(mineL, true)}</div>` : `<div class="empty">Pour vendre un bien, ouvrez sa fiche depuis votre Patrimoine puis « Mettre en vente ».</div>`) : ""}
+    ${marketTab === "all" ? (others.length ? `<div class="rows">${rows(others, false)}</div>` : `<div class="empty"><b>Aucune annonce pour l'instant.</b><br><span class="muted">Les joueurs peuvent vendre leurs biens ici, 5 % de commission. Soyez le premier !</span><br><br><button class="btn sm light" data-mt="mine">Vendre un de mes biens</button></div>${sales ? `<h2 class="h3">Dernières ventes</h2><div class="rows">${sales}</div>` : ""}`) : ""}
+    ${marketTab === "mine" ? (mineL.length ? `<div class="rows">${rows(mineL, true)}</div>` : "") + sellList() : ""}
     ${marketTab === "sales" ? (sales ? `<div class="rows">${sales}</div>` : `<div class="empty">Pas encore de vente entre joueurs.</div>`) : ""}</div>`;
 }
 $("#p-market").addEventListener("click", async e => {
   const t = e.target.closest("[data-mt]"); if (t) { marketTab = t.dataset.mt; return renderMarket(); }
+  const sg = e.target.closest("[data-sellg]"); if (sg) { sellNext = +sg.dataset.sellg; sel = null; return push("b", sellNext); }
+  if (e.target.closest("[data-sellall]")) { sellAll = true; return renderMarket(); }
   const b = e.target.closest("[data-buy]"); if (b) { b.disabled = true; await act("buy_listing", { p_id: +b.dataset.buy }, "Achat conclu !"); return renderMarket(); }
   const u = e.target.closest("[data-unlist]"); if (u) { u.disabled = true; await act("unlist", { p_id: +u.dataset.unlist }, "Annonce retirée"); return renderMarket(); }
 });
@@ -254,10 +263,11 @@ async function resultsPage() {
 }
 
 // ---------------- FICHE IMMEUBLE ----------------
-let selLot = null, saleMode = false, bInfo = null, bCredit = null;
+let sellNext = null;
+let selLot = null, saleMode = false, bInfo = null, bCredit = null, ownSheet = null, ownN = 1, ownPrice = 0;
 async function buildingPage(g) {
   await ensureCards([g]); const c = card(g); if (!c) return dhead("Immeuble") + `<div class="wrap"><p class="sub">Introuvable.</p></div>`;
-  if (sel !== g) { sel = g; selLot = null; saleMode = false; bCredit = null; }
+  if (sel !== g) { sel = g; selLot = null; saleMode = false; bCredit = null; ownSheet = sellNext === g ? "sale" : null; ownN = 1; ownPrice = 0; } sellNext = null;
   try { bInfo = await rpc("building", { p_card: g }); } catch (e) { bInfo = { lots: [], parts: [], listings: [], sales: [] }; }
   const owners = new Map(bInfo.lots.map(([k, o, ps, m]) => [k, { o, ps, m }]));
   const isP = c.lk === "p"; const myKs = ST.mine.get(g) || []; const myN = ST.mineParts.get(g) || 0;
@@ -270,20 +280,51 @@ async function buildingPage(g) {
   let mine = "";
   if (myKs.length || myN) {
     const h = { g, c, ks: myKs, n: myN };
-    const rows = isP ? "" : myKs.map(k => {
+    const lotsL = c.lk === "l";
+    const wd = (n, x) => n > 1 ? `${n} ${x}s` : `1 ${x}`;
+    // seulement les logements qui demandent une action (en vente, hypothéqués) : pas une ligne par logement
+    const rows = isP ? "" : myKs.filter(k => listed.has(k) || ST.mort.get(g + ":" + k)).map(k => {
       const l = listed.get(k), m = ST.mort.get(g + ":" + k);
-      const where = c.lk === "l" ? `${lotName(c, k)} · ${ord(floorOfLot(c, k))} étage` : `${lotName(c, k)} · rez-de-chaussée`;
-      let actions;
-      if (loan) actions = `<span class="pill">🏦 à crédit</span>`;
-      else if (l) actions = `<span class="pill" style="background:var(--sale);color:#fff">En vente ${fmtE(l.price)}</span><button class="btn sm ghost" data-act="unlist" data-id="${l.id}">Retirer</button>`;
-      else if (m) actions = `<span class="pill">🔒 Hypothéqué</span><button class="btn sm green" data-act="lift" data-k="${k}" ${liveCash() < liftCost(m) ? "disabled" : ""}>Rembourser ${fmtE(liftCost(m))}</button>`;
-      else if (saleMode === k) actions = `<input class="inp num" id="price" style="height:34px;width:120px" inputmode="numeric" type="number" min="1" step="1000" value="${Math.round(c.v * 1.1 / 1000) * 1000}" aria-label="Prix de vente"><button class="btn sm amber" data-act="list" data-k="${k}">Publier</button><button class="btn sm ghost" data-act="cancelsale">×</button>`;
-      else actions = `<button class="btn sm amber" data-act="sale" data-k="${k}">Vendre</button><button class="btn sm light" data-act="mort" data-k="${k}">Hypothéquer</button>`;
+      const where = lotsL ? `${lotName(c, k)} · ${ord(floorOfLot(c, k))} étage` : `${lotName(c, k)} · rez-de-chaussée`;
+      const actions = l ? `<span class="pill" style="background:var(--sale);color:#fff">En vente ${fmtE(l.price)}</span><button class="btn sm ghost" data-act="unlist" data-id="${l.id}">Retirer</button>`
+        : `<span class="pill">🔒 Hypothéqué</span><button class="btn sm green" data-act="lift" data-k="${k}" ${liveCash() < liftCost(m) ? "disabled" : ""}>Rembourser ${fmtE(liftCost(m))}</button>`;
       return `<div class="myrow"><b>${where}</b><div class="acts">${actions}</div></div>`;
     }).join("");
+    // ce qu'on peut encore vendre ou hypothéquer
+    const freeKs = isP ? [] : myKs.filter(k => !listed.has(k) && !ST.mort.get(g + ":" + k));
+    const pMort = isP && ST.mort.has(g + ":-1"), pListed = isP ? bInfo.listings.filter(l => l.seller === ME).reduce((t, l) => t + l.n, 0) : 0;
+    const avail = isP ? (pMort ? 0 : myN - pListed) : freeKs.length;
+    const unit = isP ? "part" : lotsL ? "logement" : "local";
+    const unitV = c.v, unitR = c.rent;
+    if (ownSheet && (loan || !avail)) ownSheet = null;
+    const nSel = Math.max(1, Math.min(avail, ownN || 1));
+    let sheet = "";
+    if (ownSheet === "sale") {
+      const price = ownPrice || Math.round(unitV * 1.1 / 1000) * 1000;
+      const presets = [[unitV, "Sa valeur"], [Math.round(unitV * 1.1 / 1000) * 1000, "+10 %"], [Math.round(unitV * 1.25 / 1000) * 1000, "+25 %"]];
+      sheet = `<div class="osheet"><div class="osh"><b>Mettre en vente au Marché</b><button class="x" data-act="osclose" aria-label="Annuler">×</button></div>
+        ${avail > 1 ? `<div class="ostep"><span>Combien de ${unit}s ?</span><div class="stepper"><button data-act="osn" data-k="-1" ${nSel <= 1 ? "disabled" : ""}>−</button><b class="num">${nSel}</b><button data-act="osn" data-k="1" ${nSel >= avail ? "disabled" : ""}>+</button></div><small>sur ${avail}</small></div>` : ""}
+        <div class="ostep col"><span>Prix par ${unit}</span>
+          <div class="oprice"><input class="inp num" id="price" inputmode="numeric" type="number" min="1" step="1000" value="${price}" aria-label="Prix de vente"><span>€</span></div>
+          <div class="ochips">${presets.map(([v, l]) => `<button data-act="ospreset" data-k="${v}" aria-pressed="${v === price}">${l}<small>${fmtE(v)}</small></button>`).join("")}</div></div>
+        <p class="onote">Sa valeur (${fmtE(unitV)}) est estimée d'après les vraies ventes du quartier. Plus vous vendez cher, plus il faudra attendre un acheteur.</p>
+        <div class="osum"><span>Vous recevrez quand un joueur achète</span><b class="num" id="osget">${fmtE(Math.floor(price * .95) * nSel)}</b><small>prix − 5 % de commission${nSel > 1 ? ` · pour ${nSel} ${unit}s` : ""} · annonce retirable à tout moment</small></div>
+        <button class="btn block amber" data-act="oslist">Publier l'annonce${nSel > 1 ? ` · ${nSel} ${unit}s` : ""}</button></div>`;
+    } else if (ownSheet === "mort") {
+      const nM = isP ? avail : nSel, gain = Math.floor(unitV * .5) * nM, lost = Math.round(unitR * nM);
+      sheet = `<div class="osheet"><div class="osh"><b>Hypothéquer : de l'argent tout de suite</b><button class="x" data-act="osclose" aria-label="Annuler">×</button></div>
+        ${!isP && avail > 1 ? `<div class="ostep"><span>Combien de ${unit}s ?</span><div class="stepper"><button data-act="osn" data-k="-1" ${nSel <= 1 ? "disabled" : ""}>−</button><b class="num">${nSel}</b><button data-act="osn" data-k="1" ${nSel >= avail ? "disabled" : ""}>+</button></div><small>sur ${avail}</small></div>` : ""}
+        <div class="omort"><div><span>La banque vous verse</span><b class="green num">+${fmtE(gain)}</b><small>la moitié de la valeur</small></div><div><span>En échange, plus de loyer</span><b class="num" style="color:#B91C1C">−${fmtE(lost)} / jour</b><small>tant que ce n'est pas remboursé</small></div></div>
+        <p class="onote">Le bien reste à vous. Pour le récupérer, vous remboursez la somme + 0,5 % par jour, quand vous voulez.</p>
+        <button class="btn block" data-act="osmort">Confirmer · recevoir ${fmtE(gain)}</button></div>`;
+    }
+    const status = isP ? (pMort ? "🔒 hypothéquées" : pListed ? `${wd(pListed, "part")} en vente` : "")
+      : [myKs.filter(k => listed.has(k)).length && `${wd(myKs.filter(k => listed.has(k)).length, unit)} en vente`, myKs.filter(k => ST.mort.get(g + ":" + k)).length && `${wd(myKs.filter(k => ST.mort.get(g + ":" + k)).length, unit)} hypothéqué${myKs.filter(k => ST.mort.get(g + ":" + k)).length > 1 ? "s" : ""}`].filter(Boolean).join(" · ");
     const days = loan ? Math.ceil(loan / Math.max(1, c.rent * unitsOf(h) * .7)) : 0;
-    mine = `<div class="box mine-box"><div class="mb-h"><span>Vous possédez</span><b>${esc(ownSentence(c, myKs, myN))}</b><small class="num">+${fmtE(baseRent(h))} / jour${fullTitle(h) ? " · immeuble complet +60 %" : myKs.some(k => fullFloor(c, myKs, k)) ? " · étage complet +25 %" : ""}</small></div>
+    mine = `<div class="box mine-box"><div class="mb-h"><span>Vous possédez</span><b>${esc(ownSentence(c, myKs, myN))}</b><small class="num">+${fmtE(baseRent(h))} / jour${fullTitle(h) ? " · immeuble complet +60 %" : myKs.some(k => fullFloor(c, myKs, k)) ? " · étage complet +25 %" : ""}${status ? " · " + status : ""}</small></div>
       ${loan ? `<div class="loanbox"><b>🏦 Crédit en cours : reste ${fmtE(loan)}</b><span>Il se rembourse tout seul avec 70 % du loyer (encore ~${days} jours). Remboursé, vous touchez tout le loyer et pouvez vendre ou hypothéquer.</span><button class="btn sm green" data-act="repay" ${liveCash() < loan ? "disabled" : ""}>Rembourser maintenant · ${fmtE(loan)}</button></div>` : ""}
+      ${!loan && avail && !sheet ? `<div class="oacts"><button class="btn amber" data-act="osopen" data-k="sale">Vendre…</button><button class="btn light" data-act="osopen" data-k="mort">Hypothéquer…</button></div>` : ""}
+      ${sheet}
       ${rows ? `<div class="myrows">${rows}</div>` : ""}</div>`;
   }
   const offers = bInfo.listings.filter(l => l.seller !== ME);
@@ -347,6 +388,25 @@ $("#p-detail").addEventListener("click", async e => {
   const pick = e.target.closest("[data-pick]"); if (pick) { selLot = +pick.dataset.k; saleMode = false; return renderDetail(false); }
   const btn = e.target.closest("[data-act]"); if (!btn) return; const a = btn.dataset.act;
   const k = btn.dataset.k != null ? +btn.dataset.k : null; const id = +btn.dataset.id;
+  if (a === "osopen") { ownSheet = btn.dataset.k; ownN = 1; ownPrice = 0; return renderDetail(false); }
+  if (a === "osclose") { ownSheet = null; return renderDetail(false); }
+  if (a === "osn") { ownPrice = +($("#price")?.value || 0) || ownPrice; ownN = Math.max(1, (ownN || 1) + k); return renderDetail(false); }
+  if (a === "ospreset") { ownPrice = k; return renderDetail(false); }
+  if (a === "oslist" || a === "osmort") {
+    const myKs = (ST.mine.get(g) || []).slice(), isP = c.lk === "p", price = +($("#price")?.value || 0);
+    if (a === "oslist" && !(price > 0)) return toast("Indiquez un prix", "bad");
+    btn.disabled = true;
+    const listedK = new Set((bInfo?.listings || []).filter(l => l.seller === ME && l.k != null).map(l => l.k));
+    const ks = myKs.filter(k => !listedK.has(k) && !ST.mort.get(g + ":" + k)).sort((x, y) => y - x).slice(0, Math.max(1, ownN));
+    let done = 0;
+    try {
+      if (a === "oslist") { if (isP) { setState(await rpc("list_item", { p_card: g, p_k: null, p_n: Math.max(1, ownN), p_price: price * Math.max(1, ownN) })); done = ownN; } else for (const kk of ks) { setState(await rpc("list_item", { p_card: g, p_k: kk, p_n: 1, p_price: price })); done++; } }
+      else { if (isP) { setState(await rpc("mortgage", { p_card: g, p_k: null })); done = 1; } else for (const kk of ks) { setState(await rpc("mortgage", { p_card: g, p_k: kk })); done++; } }
+    } catch (err) { toast(err.message, "bad"); }
+    await Promise.all([refreshHold(), refreshMap()]).catch(() => { }); renderWallet(); paintAll();
+    if (done) toast(a === "oslist" ? "Annonce publiée au Marché" : "Hypothèque accordée : l'argent est sur votre compte", "good");
+    ownSheet = null; return renderDetail(false);
+  }
   if (a === "sale") { saleMode = k; return renderDetail(false); }
   if (a === "cancelsale") { saleMode = false; return renderDetail(false); }
   if (a === "unpick") { selLot = null; return renderDetail(false); }
@@ -464,3 +524,10 @@ async function partyClick(e) {
   if (e.target.closest("#mute")) { try { localStorage.setItem("hm_sound", localStorage.getItem("hm_sound") === "1" ? "0" : "1"); } catch (x) { } return renderDetail(false); }
 }
 function afterDetail(top) { }
+// prix de vente : « vous recevrez » suit ce qu'on tape
+$("#p-detail").addEventListener("input", e => {
+  if (e.target.id !== "price" || !$("#osget")) return;
+  const p = +e.target.value || 0, n = Math.max(1, +($(".osheet .stepper b")?.textContent || 1)); ownPrice = p;
+  $("#osget").textContent = fmtE(Math.floor(p * .95) * n);
+  $$(".ochips button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.k === p));
+});
