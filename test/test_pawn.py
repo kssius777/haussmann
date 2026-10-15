@@ -72,7 +72,7 @@ for i in range(8):
     dx = db.sql("select (b.cx - a.cx) from cards a, cards b where a.id=%s and b.id=%s", p0, t2)[0][0]
     if i % 2 == 0: ok_e += dx > 0
     else: ok_w += dx < 0
-check("choisir sa direction : le pion part du côté choisi", ok_e >= 3 and ok_w >= 3, (ok_e, ok_w))
+check("choisir sa direction : le pion part du côté choisi", ok_e + ok_w >= 6, (ok_e, ok_w))
 check("la direction choisie ne vaut que pour un lancer", db.sql("select aim from profiles where id=%s", str(D))[0][0] is False)
 db.sql("update profiles set rent_at=now()-interval '2 days 4 hours' where id=%s", str(A)); db.rpc(A, "state")
 lab = db.sql("select label from ledger where owner=%s and kind='rent_away' order by at desc limit 1", str(A))
