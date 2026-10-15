@@ -53,8 +53,8 @@ async def main():
         await pg.click("[data-r=map]"); await W("!document.querySelector('#p-map').hidden")
         await pg.wait_for_timeout(2500); await pg.screenshot(path=T + "05_map.png")
         check("carte : maires affichés", await E("ST.mayors.filter(Boolean).length") > 0, await E("document.querySelector('#score').innerText.slice(0,120)"))
-        await pg.click("#t-filter"); await pg.click("[data-m=mine]"); await pg.wait_for_timeout(1800); await pg.screenshot(path=T + "06_map_mine.png")
-        await pg.click("#t-filter"); await pg.click("[data-m=all]")
+        await pg.click("[data-m=mine]"); await pg.wait_for_timeout(1800); await pg.screenshot(path=T + "06_map_mine.png")
+        await pg.click("[data-m=all]")
         # le pion et les dés
         await W("document.querySelector('.pawn') && !document.querySelector('#b-roll').disabled"); await pg.wait_for_timeout(1200); await pg.screenshot(path=T + "05b_pawn.png")
         check("pion posé sur la carte, 10 lancers", await E("ST.state.profile.rolls===10 && ST.state.profile.pos!=null"), await E("ST.state.profile.pos"))

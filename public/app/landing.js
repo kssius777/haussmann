@@ -14,7 +14,7 @@ async function landingHTML() {
   const steps = [
     ["Ouvrez des boosters", "4 vrais biens parisiens et 1 carte Chance par booster. 5 offerts, puis un par jour."],
     ["Lancez le dé", "Votre montgolfière survole Paris et se pose sur un immeuble. Libre : achetez-le. À un rival : payez son loyer."],
-    ["Encaissez vos loyers", "Vos biens rapportent en continu, même quand vous n'êtes pas là."],
+    ["Encaissez vos loyers", "Chaque carte achetée rapporte un loyer, versé en continu, même quand vous n'êtes pas là."],
     ["Devenez maire", "Le plus gros propriétaire d'un arrondissement en prend la mairie et touche 8 % des loyers du quartier."]
   ];
   const gOk = await googleReady();
@@ -26,7 +26,7 @@ async function landingHTML() {
       <div class="ltop"><section class="lhero">
         <p class="eyebrow">Jeu gratuit · ordinateur et mobile</p>
         <h1>Tout Paris<br>est à prendre.</h1>
-        <p class="lead">Les 77 835 vrais immeubles de Paris, en cartes à collectionner, sur une carte 3D de la ville.</p>
+        <p class="lead"><b>77 835 cartes à collectionner</b> : tous les vrais immeubles de Paris. Achetez-les et touchez leurs loyers, même quand vous ne jouez pas.</p>
         ${cta}
         <p class="small">Gratuit, sans carte bancaire · 1 M€ virtuel et 5 boosters offerts</p>
       </section>
@@ -35,7 +35,7 @@ async function landingHTML() {
     <section class="lsec"><p class="eyebrow">Comment ça marche</p><h2>Quatre gestes, tout Paris.</h2>
       <div class="lsteps2">${steps.map(([t, d], i) => `<div><span class="n">${String(i + 1).padStart(2, "0")}</span><b>${t}</b><p>${d}</p></div>`).join("")}</div></section>
     <section class="lsec"><p class="eyebrow">Les vrais chiffres</p><h2>Des prix tirés des vraies ventes.</h2>
-      <div class="lstats2"><div><b>77 835</b><span>immeubles</span></div><div><b>1,1 M</b><span>logements</span></div><div><b>22</b><span>monuments en 3D</span></div><div><b>20</b><span>mairies à conquérir</span></div></div>
+      <div class="lstats2"><div><b>77 835</b><span>cartes à collectionner</span></div><div><b>24 h/24</b><span>vos loyers tombent tout seuls</span></div><div><b>22</b><span>monuments en 3D</span></div><div><b>20</b><span>mairies à conquérir</span></div></div>
       <p class="sub">Un appartement du 7<sup>e</sup> vaut plus cher qu'un du 19<sup>e</sup>, comme dans la réalité : les valeurs viennent des ventes immobilières publiées par l'État.</p></section>
     <section class="lsec"><p class="eyebrow">Cinq partis, une seule mairie</p><h2>Choisissez votre camp.</h2>
       <div class="lparties">${PARTY_ORDER.map(k => `<div>${emblemSVG(k, 46)}<b style="color:${PARTIES[k].c}">${esc(PARTIES[k].n)}</b><span>${esc(PARTIES[k].side)}</span></div>`).join("")}</div></section>

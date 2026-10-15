@@ -126,15 +126,15 @@ async function travel(r) {   // le pion marche jusqu'à la case, puis la case s'
 
 // ---- après le dé : choisir sa destination parmi 2 à 4 immeubles ---------------------------
 let destMarks = [], destOpts = [], destSel = null;
-function clearDest() { destMarks.forEach(m => m.remove()); destMarks = []; destOpts = []; destSel = null; $("#pick")?.remove(); const d = $("#destcard"); if (d) { d.hidden = true; d.innerHTML = ""; } document.body.classList.remove("picking", "picksel"); }
+function clearDest() { destMarks.forEach(m => m.remove()); destMarks = []; map?.getSource("destlines")?.setData(FC([])); map?.off("move", aimArrows); destOpts = []; destSel = null; $("#pick")?.remove(); const d = $("#destcard"); if (d) { d.hidden = true; d.innerHTML = ""; } document.body.classList.remove("picking", "picksel"); }
 function destInfo(o) {   // [classe, icône, mot court sous le point, phrase complète]
-  if (o.chance) return ["chance", "?", "Chance", "Carte Chance : une surprise, bonne ou mauvaise."];
+  if (o.chance) return ["chance", "?", "Carte Chance", "Carte Chance : une surprise, bonne ou mauvaise."];
   if (o.mine > 0) return ["mine", "★", "Chez vous", "Chez vous : vous touchez une journée de loyer en bonus."];
   const who = o.owners?.length ? o.owners.slice(0, 2).join(", ") + (o.owners.length > 2 ? "…" : "") : "";
-  if (who) return ["theirs", "", "Chez " + o.owners[0], `Chez ${who} : vous lui payez une journée de loyer.` + (o.free > 0 ? ` ${o.free} ${card(o.card) ? lotWord(card(o.card), o.free) : "logement"} à acheter.` : "")];
+  if (who) return ["theirs", "", "Loyer à " + o.owners[0], `Chez ${who} : vous lui payez une journée de loyer.` + (o.free > 0 ? ` ${o.free} ${card(o.card) ? lotWord(card(o.card), o.free) : "logement"} à acheter.` : "")];
   const c = card(o.card), w = n => c ? lotWord(c, n) : n > 1 ? "logements" : "logement";
-  if (o.free > 0) return ["free", "", "Libre", `${o.free} ${w(o.free)} ${o.free > 1 ? "libres" : "libre"} : vous pourrez acheter.`];
-  return ["theirs", "", "Occupé", "Tout est déjà pris : loyer à payer."];
+  if (o.free > 0) return ["free", "", "À acheter", `${o.free} ${w(o.free)} ${o.free > 1 ? "libres" : "libre"} : vous pourrez acheter.`];
+  return ["theirs", "", "Loyer à payer", "Tout est déjà pris : loyer à payer."];
 }
 function declutterDest() { }
 async function showDest(die, opts) {
@@ -144,17 +144,30 @@ async function showDest(die, opts) {
   opts.forEach((o, i) => {
     const [k, ic, short] = destInfo(o), ll = centerOf(o.card); pts.push(ll);
     const el = document.createElement("div"); el.className = "destm";   // maplibre place l'élément avec transform : l'animation est sur le bouton intérieur
-    el.innerHTML = `<button class="dpin d-${k}" style="animation-delay:${i * 70}ms" aria-label="${esc(short)}"><i>${ic}</i><span>${esc(short)}</span></button>`;
+    el.innerHTML = `<button class="dpin d-${k}" style="animation-delay:${i * 70}ms" aria-label="${esc(short)}"><i><svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 12h13M12 5l7 7-7 7" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>${esc(short)}</span></button>`;
     el.addEventListener("click", ev => { ev.stopPropagation(); goTo(o.card); });   // toucher un point = la montgolfière y va ; on achète une fois arrivé
-    destMarks.push(new maplibregl.Marker({ element: el, anchor: "bottom" }).setLngLat(ll).addTo(map));
+    destMarks.push(new maplibregl.Marker({ element: el, anchor: "top", offset: [0, -23] }).setLngLat(ll).addTo(map));
   });
+  // un trait pointillé de la montgolfière vers chaque destination, et des flèches qui pointent dans le sens du trajet
+  if (pawnPos() != null) {
+    const from = centerOf(pawnPos());
+    if (!map.getSource("destlines")) { map.addSource("destlines", { type: "geojson", data: FC([]) });
+      map.addLayer({ id: "destlines", type: "line", source: "destlines", layout: { "line-cap": "round" }, paint: { "line-color": ["get", "c"], "line-width": 4, "line-opacity": .85, "line-dasharray": [1, 1.6] } }); }
+    const COL = { free: "#16A34A", theirs: "#E2557A", mine: "#2563EB", chance: "#7C3AED" };
+    map.getSource("destlines").setData(FC(opts.map(o => ({ type: "Feature", properties: { c: COL[destInfo(o)[0]] }, geometry: { type: "LineString", coordinates: [from, centerOf(o.card)] } }))));
+    map.on("move", aimArrows); setTimeout(aimArrows, 50);
+  }
   const p = document.createElement("div"); p.id = "pick";
-  p.innerHTML = `<span class="pd">${dieSVG(die, DSIDE[die][0], DSIDE[die][1], 26)}</span><span>Vous avez fait <b>${die}</b> · Touchez où aller</span>`;
+  p.innerHTML = `<span class="pd">${dieSVG(die, DSIDE[die][0], DSIDE[die][1], 26)}</span><span>Vous avez fait <b>${die}</b> · Touchez une flèche pour y aller</span>`;
   $("#p-map").appendChild(p); document.body.classList.add("picking");
   if (pawnPos() != null) pts.push(centerOf(pawnPos()));
   const lo = pts.map(x => x[0]), la = pts.map(x => x[1]), mobile = innerWidth < 900;
-  map.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], { padding: { top: mobile ? 130 : 130, bottom: mobile ? 230 : 160, left: mobile ? 50 : 140, right: mobile ? 50 : 140 }, maxZoom: 16.2, pitch: 40, duration: 700 });
+  map.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], { padding: { top: mobile ? 120 : 130, bottom: mobile ? 190 : 160, left: mobile ? 45 : 140, right: mobile ? 45 : 140 }, maxZoom: 16.2, pitch: 30, duration: 700 });
   if (typeof tutTick === "function") tutTick();
+}
+function aimArrows() {   // chaque flèche pointe de la montgolfière vers sa destination, à l'écran
+  if (!destMarks.length || pawnPos() == null) return; const a = map.project(centerOf(pawnPos()));
+  destMarks.forEach((m, i) => { const b = map.project(destOpts[i] ? centerOf(destOpts[i].card) : m.getLngLat()); const svg = m.getElement().querySelector("svg"); if (svg) svg.style.transform = `rotate(${Math.atan2(b.y - a.y, b.x - a.x)}rad)`; });
 }
 function selectDest(i) {
   const o = destOpts[i]; if (!o) return; destSel = i;

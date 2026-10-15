@@ -82,7 +82,7 @@ function tutSet(n) { try { localStorage.setItem("hm_tut", String(n)); } catch (e
 function tutTick() {
   const st = tutGet(); let k = "", anchor = null, html = "", ok = false;
   const idle = cur() === "map" && $("#reveal").hidden && $("#onb").hidden && !moving;
-  if (st === 1 && idle && destMarks.length) { if (destSel == null) { k = "1p"; anchor = "#pick"; html = "<b>Où voulez-vous aller ?</b>Touchez un point : votre montgolfière s'y pose. Vert : libre. Rose : chez un joueur (vous payez son loyer)."; } }
+  if (st === 1 && idle && destMarks.length) { if (destSel == null) { k = "1p"; anchor = "#pick"; html = "<b>Où voulez-vous aller ?</b>Touchez une flèche : votre montgolfière y vole. Vert : à acheter. Rose : chez un joueur, vous payez son loyer."; } }
   else if (st === 1 && idle && !panelKind) { k = "1"; anchor = "#b-roll"; html = "<b>Lancez le dé 🎲</b>Puis choisissez sur la carte l'immeuble où votre montgolfière va se poser."; }
   else if (st === 1 && panelKind === "land" && !landView) tutSet(2);
   else if (st === 2 && panelKind === "land" && !landView && !moving) {

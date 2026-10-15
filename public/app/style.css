@@ -1529,3 +1529,41 @@ body.picksel .dicebar{display:none!important}
   body.landopen .land .lr{margin-top:auto;display:grid;gap:10px}
 }
 .dpin i:empty::after{content:"";width:12px;height:12px;border-radius:50%;background:#fff}
+/* destinations : flèches */
+.dpin i{width:46px;height:46px;font-size:0}
+.dpin i svg{transition:transform .1s linear}
+.dpin span{font-size:12px;padding:3px 9px}
+.d-free .dpin span,.dpin.d-free span{color:#15803D}.dpin.d-theirs span{color:#BE185D}.dpin.d-mine span{color:#1D4ED8}.dpin.d-chance span{color:#6D28D9}
+.dpin.d-chance i::after,.dpin.d-mine i::after{content:none}
+/* téléphone : filtre Tout / Mes biens / À vendre toujours visible en haut à gauche */
+@media (max-width:699px){
+  #t-filter{display:none!important}
+  #filter{display:flex!important;flex-direction:row;top:10px;left:10px;right:auto;border-radius:999px;padding:3px;gap:2px;transform:none}
+  #filter button{height:32px;padding:0 10px;font-size:12.5px;justify-content:center}
+  #filter button span{display:none}
+  body.picking #filter,body.landopen #filter{display:none!important}
+  #partyleg{top:56px}
+}
+/* téléphone : moins de défilement */
+@media (max-width:699px){
+  /* Patrimoine : chiffres compacts pour voir la collection dès le premier écran */
+  #p-assets .h1.big{font-size:28px;margin:0}
+  #p-assets .eyebrow{margin-bottom:2px}
+  #p-assets .sub{font-size:12px}
+  #p-assets .rankpill{margin:6px 0 0}
+  #p-assets .kpis.k4{gap:6px;margin-top:8px}
+  #p-assets .kpi{padding:8px 10px;border-radius:12px}
+  #p-assets .kpi span{font-size:11px}
+  #p-assets .kpi b{font-size:16px;margin-top:1px}
+  #p-assets .kpi small{display:none}
+  #p-assets .h2{margin-top:14px}
+  /* fiche immeuble : carte plus petite, les infos et les boutons remontent */
+  .bp{gap:10px}
+  .bp-card .hc{--w:min(190px,50vw)}
+  .bp .h1{font-size:22px}
+  /* booster */
+  #p-booster .sachet{--pw:min(230px,58vw)}
+  /* case ou immeuble regardé : la carte se règle sur la hauteur de l'écran */
+  body.landopen .land .lc{--cw:clamp(120px,calc((100dvh - var(--bar-h) - 300px) / 1.45),min(70vw,280px))}
+  body.landopen #movebar.k-land:has(.farbuy) .land .lc{--cw:clamp(110px,calc((100dvh - var(--bar-h) - 350px) / 1.45),min(64vw,260px))}
+}
