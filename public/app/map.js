@@ -130,7 +130,7 @@ function buildMap(base) {
     map.on("click", "mfill", e => { const f = e.features[0]; if (f) onBuildingTap(f.id); });
     map.on("click", e => { if (e.defaultPrevented) return;
       // un toucher sur la carte ferme la case ouverte (comme la croix)
-      if (panelKind === "land" && !moving) { justBought = null; setMovebar(""); closeSearch(); return; }
+      if (panelKind === "land" && !moving) { justBought = null; if (landView) { landView = false; sel = null; paintAll(); if (stripKind) $("#strip").hidden = false; } setMovebar(""); closeSearch(); return; }
       if (!map.queryRenderedFeatures(e.point).some(f => /^(bd|rf)\d|^mfill$/.test(f.layer.id))) hidePreview(); closeSearch(); });
     IDX.arr.forEach((a, i) => {
       const el = document.createElement("button"); el.className = "amark"; el.innerHTML = `<b>${ord(a.n)}</b><span id="am${i}"></span>`;
@@ -225,28 +225,12 @@ function centerOf(g) { const c = card(g); const A = ARR[ai(g)]; const r = decode
 function flyTo(g) { if (!map || !mapReady) return; const m = IDX.models.find(x => x.g === g); map.flyTo({ center: m ? [m.lon, m.lat] : centerOf(g), zoom: m ? Math.max(15.6, 16.8 - m.h / 150) : 17, pitch: 58, duration: 1300 }); }
 function showOnMap(g) { go("map"); setTimeout(() => { flyTo(g); previewBuilding(g); }, 80); }
 
+// aperçu d'un immeuble : le même panneau que la case (à droite sur ordinateur, en bas sur téléphone)
 async function previewBuilding(g) {
-  await ensureCards([g]); const c = card(g); if (!c) return; sel = g; paintAll(); closeSearch();
-  if (!moving && panelKind !== "") setMovebar("");
-  const ks = ST.mine.get(g), np = ST.mineParts.get(g); const o = ST.own.get(g);
-  const isP = c.lk === "p"; const taken = isP ? (o?.parts || 0) : (o?.n || 0); const free = c.lots - taken;
-  const mine = ks ? itemLabel(c, { t: "own", ks, n: 0 }) : np ? itemLabel(c, { t: "own", ks: [], n: np }) : null;
-  const unit = isP ? "la part" : c.lk === "l" ? "le logement" : "le local";
-  const pv = $("#preview"); pv.hidden = false;
-  let status = mine ? `<span class="pill" style="background:var(--mine);color:#fff">À vous · ${esc(mine)}</span>`
-    : free > 0 ? `<span class="pill" style="background:#DCFCE7;color:#15803D">${isP ? `${fmtN(free)} parts disponibles` : `${free} libre${free > 1 ? "s" : ""} sur ${c.lots}`}</span>`
-    : `<span class="pill">Tout est déjà pris</span>`;
-  if (ST.sale.has(g)) status += `<span class="pill" style="background:var(--sale);color:#fff">En vente</span>`;
-  const canBuy = free > 0, cash = liveCash(), far = notLanded(g);
-  const buyBtn = canBuy ? (far ? "" : `<button class="btn sm green" data-pvbuy="${g}" ${cash < c.v ? "disabled" : ""}>Acheter · ${fmtE(c.v)}</button>`) : "";
-  pv.innerHTML = `<div class="th">${photo(c)}</div><div class="t"><b>${esc(title(c))}</b><span>${ord(c.arr)} arr. · ${esc(kindLabel(c))} ${rarSq(c.r, 18)}</span>
-    <div class="meta">${status}</div>
-    <div class="meta num"><b>${fmtE(c.v)}</b><span class="muted">${unit}</span><b class="green">+${fmtE(c.rent)}/jour</b></div>
-    <div class="pvbtns">${buyBtn}<button class="btn sm ${canBuy ? "light" : ""}" data-open="${g}">${canBuy ? "Détails" : "Voir l'immeuble"}</button></div>
-    ${canBuy && far ? `<small class="muted">🎲 Pour l'acheter à la banque, tombez dessus avec le dé. Ou trouvez-le dans un booster, ou au Marché.</small>` : canBuy && cash < c.v ? `<small class="muted">Il vous manque ${fmtE(c.v - cash)}. Les loyers arrivent tout seuls, ou ouvrez un booster.</small>` : ""}</div><button class="x" data-closepv aria-label="Fermer">×</button>`;
-  hideHint();
+  await ensureCards([g]); if (!card(g)) return; closeSearch(); hideHint();
+  if (g === landPos()) { landView = false; showLand(); } else showLand(null, g);
 }
-function hidePreview() { if (!moving && panelKind !== "land") setMovebar(""); const pv = $("#preview"); if (pv && !pv.hidden) { pv.hidden = true; sel = null; paintAll(); if (stripKind) $("#strip").hidden = false; } }
+function hidePreview() { if (!moving && (panelKind !== "land" || landView)) { if (landView) { landView = false; sel = null; paintAll(); if (stripKind) $("#strip").hidden = false; } setMovebar(""); } const pv = $("#preview"); if (pv && !pv.hidden) { pv.hidden = true; sel = null; paintAll(); if (stripKind) $("#strip").hidden = false; } }
 function closeSearch() { $("#search").hidden = true; }
 
 function initMapUI() {

@@ -15,7 +15,7 @@ function go(t) {
   tab = t;
   for (const x of TABS) { const el = $("#p-" + x); const on = x === t; if (on && el.hidden) { el.hidden = false; el.classList.remove("enter"); void el.offsetWidth; el.classList.add("enter"); } else el.hidden = !on; }
   $$("#tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === t));
-  if (t === "map") { if (map) { map.resize(); pumpGeo(); if (paintAll.pending) setTimeout(paintAll, 0); renderTags(); } } else hidePreview?.();
+  if (t === "map") { if (map) { map.resize(); pumpGeo(); if (paintAll.pending) setTimeout(paintAll, 0); renderTags(); } } else { hidePreview?.(); if (!moving && panelKind) { justBought = null; setMovebar(""); } }   // changer d'onglet ferme la case ouverte
   renderTab(t);
 }
 function renderTab(t) {

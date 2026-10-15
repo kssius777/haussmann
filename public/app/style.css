@@ -1355,3 +1355,40 @@ body.landopen #strip{display:none}
 /* épingles « Mes biens » sur la carte */
 .spin{width:16px;height:16px;border-radius:50%;background:var(--act);border:3px solid #fff;box-shadow:0 0 0 4px rgba(37,99,235,.25),0 2px 6px rgba(0,0,0,.3);cursor:pointer}
 .spin.sale{background:var(--sale);box-shadow:0 0 0 4px rgba(245,165,36,.3),0 2px 6px rgba(0,0,0,.3)}
+/* =====================================================================
+   page d'accueil premium : vitrine noire, cartes en éventail, typographie large
+   ===================================================================== */
+.landing.v2{max-width:none;padding:0;background:#F6F7F8}
+.landing.v2 .lhero2{position:relative;overflow:hidden;background:radial-gradient(80% 70% at 75% 40%,rgba(60,100,255,.32),transparent 70%),linear-gradient(180deg,#07090F,#0E1424);color:#fff;padding:0 20px 40px}
+.landing.v2 .glow{position:absolute;inset:auto -20% -40% 30%;height:60%;background:radial-gradient(closest-side,rgba(242,193,78,.18),transparent);pointer-events:none}
+.landing.v2 .lhead{max-width:1100px;margin:0 auto;padding:16px 0;display:flex;justify-content:space-between;align-items:center}
+.landing.v2 .ltop{max-width:1100px;margin:0 auto;display:grid;gap:26px;padding-top:20px}
+.landing.v2 .lhero .eyebrow{color:rgba(255,255,255,.6)}
+.landing.v2 .lhero h1{font:800 clamp(44px,9vw,84px)/.98 var(--f);letter-spacing:-.04em;margin:12px 0 16px;color:#fff}
+.landing.v2 .lead{font-size:clamp(16px,2.2vw,19px);line-height:1.5;color:rgba(255,255,255,.78);max-width:520px;margin:0 0 22px}
+.landing.v2 .small{font-size:13px;color:rgba(255,255,255,.55);margin:12px 0 0}
+.landing.v2 .lcta{display:grid;gap:10px;max-width:380px}
+.btn.goldb{background:linear-gradient(180deg,#FFE08A,#E8B23A)!important;color:#1A1300!important;min-height:52px;font-size:16px;box-shadow:0 10px 30px rgba(232,178,58,.35)!important}
+.btn.ghostw{background:rgba(255,255,255,.08)!important;color:#fff!important;border:1px solid rgba(255,255,255,.22)!important;min-height:48px}
+.landing.v2 .lhead .btn.ghostw{min-height:36px}
+.landing.v2 .fan{padding:10px 0 0}
+.landing.v2 .lsec{max-width:1100px;margin:0 auto;padding:46px 20px 6px}
+.landing.v2 .lsec h2{font:800 clamp(28px,5vw,44px)/1.05 var(--f);letter-spacing:-.03em;margin:6px 0 20px}
+.lsteps2{display:grid;gap:12px}
+.lsteps2>div{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px}
+.lsteps2 .n{font:300 34px/1 var(--f);color:var(--act);letter-spacing:-.02em}
+.lsteps2 b{display:block;font-size:18px;margin:10px 0 6px}
+.lsteps2 p{margin:0;color:var(--ink2);font-size:14.5px;line-height:1.45}
+.lstats2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:14px}
+.lstats2>div{background:#0B0C10;color:#fff;border-radius:18px;padding:18px}
+.lstats2 b{display:block;font:700 30px/1 var(--f);letter-spacing:-.03em}
+.lstats2 span{font-size:13px;color:rgba(255,255,255,.65)}
+.lfinal{margin:50px 0 0;padding:48px 20px;text-align:center;background:linear-gradient(180deg,#0E1424,#07090F);color:#fff;display:grid;justify-items:center;gap:20px}
+.lfinal h2{font:800 clamp(28px,5vw,44px)/1.05 var(--f);letter-spacing:-.03em;margin:0}
+.lfinal .lcta{width:min(100%,380px)}
+.landing.v2 .lfoot{max-width:1100px;margin:0 auto;padding:20px;font-size:12px;color:var(--muted)}
+@media (min-width:760px){.lsteps2{grid-template-columns:repeat(4,1fr)}.lstats2{grid-template-columns:repeat(4,1fr)}}
+@media (min-width:960px){.landing.v2 .ltop{grid-template-columns:1fr 1fr;align-items:center;min-height:calc(100vh - 100px);padding-top:0}}
+.farbuy{padding:10px 12px;border-radius:12px;background:#F3F6FF;color:#1E3A8A;font-size:13px;font-weight:600;line-height:1.35;text-align:left}
+body.landopen #strip{display:none}
+.landing.v2 .lhead{position:relative;background:transparent!important;box-shadow:none!important;border:0!important;backdrop-filter:none!important}

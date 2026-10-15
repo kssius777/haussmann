@@ -40,8 +40,9 @@ function paintTargets() {
   if (g != null && map.getSource("b" + ai(g))) { map.setFeatureState({ source: "b" + ai(g), id: g }, { tgt: 1 }); landPainted = g; }
 }
 function onBuildingTap(g) {
-  if (panelKind === "land") { if (!moving) { justBought = null; setMovebar(""); } return; }   // 1er toucher : on ferme la case
-  if (panelKind) setMovebar(""); previewBuilding(g);
+  if (moving) return;
+  if (panelKind === "land" && !landView) { justBought = null; setMovebar(""); return; }   // 1er toucher : on ferme la case où l'on est tombé
+  previewBuilding(g);
 }
 
 // centres des immeubles (pour les maquettes des cartes)
@@ -59,7 +60,7 @@ function mineOf(g) { return (ST.mine.get(g)?.length || 0) + (ST.mineParts.get(g)
 function setMovebar(html, kind) {
   const m = $("#movebar"); panelKind = html ? kind || "" : "";
   m.className = panelKind ? "k-" + panelKind : "";
-  if (!html) { m.hidden = true; m.innerHTML = ""; } else { m.hidden = false; m.innerHTML = html; }
+  if (!html) { m.hidden = true; m.innerHTML = ""; if (landView) { landView = false; sel = null; paintAll(); if (typeof stripKind !== "undefined" && stripKind) $("#strip").hidden = false; } } else { m.hidden = false; m.innerHTML = html; }
   $("#dicebar").classList.toggle("off", moving);
   document.body.classList.toggle("landopen", panelKind === "land");
   if (panelKind === "land") $("#pawnoff").hidden = true;
@@ -119,10 +120,13 @@ function walk(line, ms) {   // le pion suit le trajet, la ligne parcourue se des
 
 // ---- la case où l'on tombe -----------------------------------------------------------
 // L : ce que le serveur a renvoyé à l'arrivée (loyer payé, bonus, Chance) ; sans L, on réaffiche la case actuelle
-function showLand(L) {
-  const g = landPos(); if (g == null) { placePawn(true); return toast("Lancez le dé pour avancer"); }
-  if (L && L.card !== g) L = null;
-  L = L || (lastLanding && lastLanding.card === g ? lastLanding : null);
+// gv : afficher un autre immeuble que la case (clic sur la carte, sur un monument…) — même panneau, mais on ne peut pas l'acheter à la banque
+let landView = false;
+function showLand(L, gv) {
+  const view = gv != null && gv !== landPos();
+  const g = view ? gv : landPos(); if (g == null) { placePawn(true); return toast("Lancez le dé pour avancer"); }
+  if (view || (L && L.card !== g)) L = null;
+  if (!view) L = L || (lastLanding && lastLanding.card === g ? lastLanding : null);
   const c = card(g); if (!c) return;
   hidePreviewOnly();
   const free = freeOf(g), mine = mineOf(g), cash = liveCash(), isP = c.lk === "p";
@@ -130,8 +134,9 @@ function showLand(L) {
   const taken = isP ? (ST.own.get(g)?.parts || 0) : (ST.own.get(g)?.n || 0), others = Math.max(0, taken - mine), tot = c.lots;
   const word = n => lotWord(c, n);
   let head, cls;
-  const jb = justBought && justBought.g === g;
-  if (jb) { head = justBought.whole ? "✓ Acheté ! Tout l'immeuble est à vous" : `✓ Acheté ! ${isP ? "Une part" : tot > 1 ? "Un " + word(1) : "Il"} est à vous`; cls = "home"; }
+  const jb = !view && justBought && justBought.g === g;
+  if (view) { head = mine > 0 ? (free > 0 ? "À vous en partie" : "À vous") : free > 0 ? (isP ? "Parts disponibles" : "Libre") : owners.length ? "Déjà pris" : "Tout est vendu"; cls = mine > 0 ? "home" : free > 0 ? "free" : ""; }
+  else if (jb) { head = justBought.whole ? "✓ Acheté ! Tout l'immeuble est à vous" : `✓ Acheté ! ${isP ? "Une part" : tot > 1 ? "Un " + word(1) : "Il"} est à vous`; cls = "home"; }
   else if (L?.toll > 0) { head = `Chez ${L.payees.map(p => esc(p.pseudo)).join(", ")}`; cls = "bad"; }
   else if (mine > 0 && free > 0) { head = "Vous êtes chez vous"; cls = "home"; }
   else if (mine > 0) { head = "Tout l'immeuble est à vous"; cls = "home"; }
@@ -159,11 +164,16 @@ function showLand(L) {
     }
     landCreditNow = cr;
   }
+  if (view) {
+    const listed = ST.sale.has(g);
+    btns = `${free > 0 ? `<div class="farbuy">🎲 Pour l'acheter à la banque, tombez dessus avec le dé.${listed ? "" : " Ou trouvez-le dans un booster."}</div>` : ""}<button class="btn block ${listed ? "buy" : "light"}" data-lopen="${g}"><span>${listed ? "En vente au Marché · voir l'offre" : "Voir la fiche de l'immeuble"}</span></button>`;
+  }
   if (jb) btns = `<button class="btn block buy" data-mvclose><span>Continuer</span><small>+${fmtE(Math.round(c.rent * (landCreditNow ? .3 : 1)))} / jour de loyer en plus</small></button>${free > 0 && !justBought.whole ? `<button class="btn block light more" data-lbuy="${g}">Acheter ${isP ? "une autre part" : "un autre " + word(1)} ici · ${fmtE(landCreditNow ? Math.ceil(c.v * CREDIT_DOWN) : c.v)}</button>` : ""}`;
   setMovebar(`<div class="land${lines.length ? " hasln" : ""}"><div class="grab"></div><div class="lc" data-lopen="${g}">${cardHTML(c)}</div>
     <div class="lr"><b class="lh ${cls}">${head}</b>${lines.length ? `<div class="lns">${lines.join("")}</div>` : ""}${occ}<div class="lb">${btns}</div></div>
     <button class="x" data-mvclose aria-label="Fermer">×</button></div>`, "land");
   $("#movebar").classList.add("r" + c.r);
+  landView = view; sel = view ? g : null; if (view) paintAll();
   $("#movebar").scrollTop = 0;
   if (L?.chance && window.confetti && !BAD.has(L.chance.k)) confetti("#A855F7", 24);
 }
@@ -258,7 +268,7 @@ function pawnOff() {
     el0.style.setProperty("--ph", far ? "4px" : Math.round(Math.max(18, px) + 6) + "px");
   }
   const W = map.getContainer().clientWidth, H = map.getContainer().clientHeight, pt = map.project(pawnMk.getLngLat());
-  const top = 110, bot = H - (($(".mapbottom")?.offsetHeight || 80) + 24), left = 30, right = W - 30;
+  const top = 110, bot = H - (($(".mapbottom")?.offsetHeight || 80) + 24), left = 30, right = W - 30 - (panelKind === "land" && innerWidth >= 900 ? 400 : 0);
   if (pt.x > left && pt.x < right && pt.y > top && pt.y < bot) { el.hidden = true; return; }
   const cx = W / 2, cy = (top + bot) / 2, dx = pt.x - cx, dy = pt.y - cy;
   const k = Math.min((right - 50 - cx) / Math.abs(dx || 1e-6), (bot - 20 - cy) / Math.abs(dy || 1e-6));

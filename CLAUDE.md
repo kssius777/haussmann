@@ -53,4 +53,6 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
 - Thème « Blanc pur » (choisi par le propriétaire) : Paris en maquette blanche (couleurs dans `MC` de map.js), police Inter Tight partout, interface noir et blanc, bleu vif `--act` (#2563EB) pour le dé et les achats ; tes biens en bleu, ceux des autres en rose pâle, à vendre en orange. Booster = sachet métallisé (`packHTML`, classes `.sachet`). Cartes : cadre, ciel, bandeau étoilé et reflets selon la rareté ; époque en étiquette sur la maquette.
 - Case et fiche immeuble : même plan des logements (`occHTML`, à vous / à d'autres / libres) et même choix « À crédit / Comptant » avec le loyer de chaque option. Sur téléphone, la case s'ouvre en grand (carte en grand, bouton d'achat toujours visible en bas).
 - Carte : le filtre « Mes biens » / « À vendre » ouvre une rangée de cartes en bas (`showStrip` dans map.js) ; toucher une carte emmène à l'immeuble. La carte garde ses couleurs.
+- Cliquer un immeuble ou un monument ouvre le même panneau que la case (`showLand(null, g)`, `landView`) : à droite sur ordinateur, en bas sur téléphone. Changer d'onglet ferme ce panneau.
+- Page d'accueil « vitrine » noire (landing.js, `.landing.v2`), sans le bloc d'explication Google.
 - Patrimoine : « Où sont vos biens » (barres par arrondissement, clic = filtre), collection triable et paginée.

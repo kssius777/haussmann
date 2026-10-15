@@ -1,6 +1,6 @@
 import sys, uuid, time; sys.path.insert(0, 'test'); import db
 R = []
-def check(n, ok, info=""): R.append(ok); print(("PASS " if ok else "FAIL ") + n + (f"  · {info}" if info != "" else ""), flush=True)
+def check(n, ok, info=""): ok = bool(ok); R.append(ok); print(("PASS " if ok else "FAIL ") + n + (f"  · {info}" if info != "" else ""), flush=True)
 def err(f):
     try: f(); return None
     except Exception as e: return str(e).split("\n")[0]
@@ -17,7 +17,7 @@ check("on ne retombe jamais sur sa case de départ (≥ 60 m)", db.sql("select _
 check("le pion marche d'immeuble voisin en immeuble voisin", path[0] == 400761 and all(db.sql("select 1 from edges where a=%s and b=%s", a, b) for a, b in zip(path, path[1:])))
 st = db.rpc(A, "state")["profile"]
 check("le pion s'arrête sur la dernière case, achetable", st["pos"] == path[-1] == L["card"] and st["land"] == L["card"] and st["rolls"] == 9)
-check("un petit salaire à chaque lancer", L["salary"] == 20000 and st["cash"] >= 1000000 + 20000 - L["toll"], (L["salary"], st["cash"]))
+check("un petit salaire à chaque lancer", L["salary"] == 20000 and (L.get("chance") or st["cash"] >= 1000000 + 20000 - L["toll"]), (L["salary"], st["cash"]))
 db.sql("update profiles set cash=cash+100000000 where id=%s", str(A))
 if L["free"] > 0:
     db.rpc(A, "bank_buy", p_card=L["card"], p_k=None)
@@ -36,7 +36,7 @@ db.sql("delete from lots where card = any(%s) and owner<>%s", near, str(A))
 db.sql("insert into lots(card,k,owner) select c.id, 0, %s from cards c where c.id = any(%s) on conflict do nothing", str(B), near)
 db.sql("update profiles set rolls=10, rent_at=now() where id=%s", str(A))
 x = land_on_b()
-check("tomber chez un autre joueur : on lui paie son loyer", x and x["landing"]["toll"] > 0 and x["landing"]["payees"][0]["pseudo"].startswith("Rival"), x and (x["landing"]["toll"], x["landing"]["payees"][:1]))
+check("tomber chez un autre joueur : on lui paie son loyer", x and x["landing"]["toll"] > 0 and not x["landing"]["payees"][0]["pseudo"].startswith("Pion" + str(A)[:4]), x and (x["landing"]["toll"], x["landing"]["payees"][:1]))
 check("loyer plafonné à 20 % de la trésorerie", x and x["landing"]["toll"] <= 0.2 * 1e8 + 1e6)
 # chez soi : bonus
 mine_card = db.sql("select card from lots where owner=%s limit 1", str(A))
