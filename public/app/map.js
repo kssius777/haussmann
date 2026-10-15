@@ -90,7 +90,7 @@ function updateArrFill() {
 function applyMode() {
   if (!mapReady) return; const e = colorExprs(mode);
   for (let i = 0; i < 20; i++) { if (map.getLayer("rf" + i)) map.setPaintProperty("rf" + i, "fill-extrusion-color", e.roof); if (map.getLayer("bd" + i)) map.setPaintProperty("bd" + i, "fill-extrusion-color", e.body); }
-  map.setPaintProperty("arrfill", "fill-opacity", mode === "all" ? ["interpolate", ["linear"], ["zoom"], 11, .5, 12.8, .26, 14, .06, 15, 0] : ["interpolate", ["linear"], ["zoom"], 11, .18, 14, 0]);
+  map.setPaintProperty("arrfill", "fill-opacity", mode === "all" ? ["interpolate", ["linear"], ["zoom"], 11, .62, 12.6, .5, 13.6, .18, 14.4, .04, 15, 0] : ["interpolate", ["linear"], ["zoom"], 11, .18, 14, 0]);
   renderTags(); renderMarks();
 }
 
@@ -110,7 +110,7 @@ function buildMap(base) {
       sources: { water: { type: "geojson", data: polysGeo(base.water) }, parks: { type: "geojson", data: polysGeo(base.parks) }, major: { type: "geojson", data: linesGeo(base.major) }, arr: { type: "geojson", data: outline }, mfill: { type: "geojson", data: mfill } },
       layers: [
         { id: "bg", type: "background", paint: { "background-color": "#ECEDEF" } },
-        { id: "arrfill", type: "fill", source: "arr", paint: { "fill-color": partyFill(), "fill-opacity": ["interpolate", ["linear"], ["zoom"], 11, .5, 12.8, .26, 14, .06, 15, 0] } },
+        { id: "arrfill", type: "fill", source: "arr", paint: { "fill-color": partyFill(), "fill-opacity": ["interpolate", ["linear"], ["zoom"], 11, .62, 12.6, .5, 13.6, .18, 14.4, .04, 15, 0] } },
         { id: "parks", type: "fill", source: "parks", paint: { "fill-color": "#CFE5C2", "fill-opacity": 1 } },
         { id: "water", type: "fill", source: "water", paint: { "fill-color": "#A9CCE8" } },
         { id: "major-case", type: "line", source: "major", paint: { "line-color": "#DFE1E5", "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "k"], 3, 1.6, .6], 18, ["match", ["get", "k"], 3, 34, 20]] } },
@@ -130,7 +130,7 @@ function buildMap(base) {
     map.on("click", "mfill", e => { const f = e.features[0]; if (f) onBuildingTap(f.id); });
     map.on("click", e => { if (e.defaultPrevented) return;
       // un toucher sur la carte ferme la case ouverte (comme la croix)
-      if (panelKind === "land" && !moving) { justBought = null; if (landView) { landView = false; sel = null; paintAll(); if (stripKind) $("#strip").hidden = false; } setMovebar(""); closeSearch(); return; }
+      if (panelKind === "land" && !moving) { justBought = null; if (landView) { landView = false; sel = null; paintAll(); if (stripKind && stripKind !== "mine") $("#strip").hidden = false; } setMovebar(""); closeSearch(); return; }
       if (!map.queryRenderedFeatures(e.point).some(f => /^(bd|rf)\d|^mfill$/.test(f.layer.id))) hidePreview(); closeSearch(); });
     IDX.arr.forEach((a, i) => {
       const el = document.createElement("button"); el.className = "amark"; el.innerHTML = `<b>${ord(a.n)}</b><span id="am${i}"></span>`;
@@ -173,13 +173,26 @@ function buildMonMarkers() {
     return { g, r, mk, el, on: false };
   });
 }
+// vue dézoomée : quel parti tient chaque mairie (légende en haut de la carte)
+function renderPartyLegend(z) {
+  let el = $("#partyleg"); if (!el) { el = document.createElement("div"); el.id = "partyleg"; el.onclick = () => go("paris"); $("#p-map").appendChild(el); }
+  const show = z < 13.4 && mode === "all" && !document.body.classList.contains("mymode") && !document.body.classList.contains("picking");
+  el.hidden = !show; if (!show) return;
+  const n = {}; ST.mayors.forEach(m => m && PARTIES[m.party] && (n[m.party] = (n[m.party] || 0) + 1));
+  const free = 20 - Object.values(n).reduce((a, b) => a + b, 0);
+  const html = PARTY_ORDER.filter(k => n[k]).sort((a, b) => n[b] - n[a]).map(k => `<span style="--pc:${PARTIES[k].c}">${emblemSVG(k, 16)}<b>${esc(PARTIES[k].n)}</b><em>${n[k]}</em></span>`).join("")
+    + (free > 0 ? `<span class="free"><i></i><b>Sans maire</b><em>${free}</em></span>` : "");
+  if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = `<p>Qui gouverne Paris</p><div>${html}</div>`; }
+}
 function renderMarks() {
   if (!mapReady) return; const z = map.getZoom();
   IDX.arr.forEach((a, i) => {
     const el = a.marker?.getElement(); if (!el) return; el.style.display = z < 14 && mode === "all" ? "" : "none";
     const m = ST.mayors[i]; el.style.setProperty("--pc", m ? PARTIES[m.party]?.c || "#64748B" : "#94A3B8");
     const s = document.getElementById("am" + i); if (s) s.innerHTML = m ? `${emblemSVG(m.party, 15)}${esc(m.pseudo)}` : "Siège libre";
+    const bb = el.querySelector("b"), key = (m?.party || "") + a.n; if (bb && bb.dataset.k !== key) { bb.dataset.k = key; bb.innerHTML = (m && PARTIES[m.party] ? emblemSVG(m.party, 16) : "") + ord(a.n); }
   });
+  renderPartyLegend(z);
   for (const p of parkMarks) { const show = z >= p.minz && z < 17.5; if (show && !p.on) { p.mk.addTo(map); p.on = true; } else if (!show && p.on) { p.mk.remove(); p.on = false; } }
   for (const m of monMarks) {
     const show = z >= (m.r === "M" ? (innerWidth < 700 ? 13.3 : 11.4) : 14); m.el.classList.toggle("far", z < (m.r === "M" ? (innerWidth < 700 ? 14.5 : 13.8) : 15.5)); if (show && !m.on) { m.mk.addTo(map); m.on = true; } else if (!show && m.on) { m.mk.remove(); m.on = false; }
@@ -238,7 +251,7 @@ async function previewBuilding(g) {
   await ensureCards([g]); if (!card(g)) return; closeSearch(); hideHint();
   if (g === landPos()) { landView = false; showLand(); } else showLand(null, g);
 }
-function hidePreview() { if (!moving && (panelKind !== "land" || landView)) { if (landView) { landView = false; sel = null; paintAll(); if (stripKind) $("#strip").hidden = false; } setMovebar(""); } const pv = $("#preview"); if (pv && !pv.hidden) { pv.hidden = true; sel = null; paintAll(); if (stripKind) $("#strip").hidden = false; } }
+function hidePreview() { if (!moving && (panelKind !== "land" || landView)) { if (landView) { landView = false; sel = null; paintAll(); if (stripKind && stripKind !== "mine") $("#strip").hidden = false; } setMovebar(""); } const pv = $("#preview"); if (pv && !pv.hidden) { pv.hidden = true; sel = null; paintAll(); if (stripKind && stripKind !== "mine") $("#strip").hidden = false; } }
 function closeSearch() { $("#search").hidden = true; }
 
 function initMapUI() {
@@ -295,10 +308,10 @@ function showStrip(kind) {
   const items = kind === "mine" ? holdings().sort((a, b) => b.c.v * unitsOf(b) - a.c.v * unitsOf(a)).map(h => ({ g: h.g, c: h.c, item: { t: "own", ks: h.ks, n: h.n } }))
     : [...ST.sale].map(g => ({ g, c: card(g) })).filter(x => x.c);
   if (!items.length) { stripKind = ""; el.hidden = true; return toast(kind === "mine" ? "Vous n'avez encore aucun bien : lancez le dé ou ouvrez un booster !" : "Rien à vendre en ce moment."); }
-  el.hidden = false; setStripPins(items); document.body.classList.add("mymode"); map.setPaintProperty("arrfill", "fill-opacity", 0);
+  el.hidden = kind === "mine"; setStripPins(items); document.body.classList.add("mymode"); map.setPaintProperty("arrfill", "fill-opacity", 0);
   // on cadre la carte sur ces biens (sans trop dézoomer)
   { const pts = items.map(x => centerOf(x.g)), lo = pts.map(p => p[0]), la = pts.map(p => p[1]);
-    map.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], { padding: { top: 90, bottom: 260, left: 40, right: 40 }, maxZoom: 15.5, duration: 900 }); }
+    map.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], { padding: { top: 90, bottom: kind === "mine" ? 150 : 260, left: 40, right: 40 }, maxZoom: 15.5, duration: 900 }); }
   el.innerHTML = `<div class="sh"><b>${kind === "mine" ? `Mes biens · ${items.length}` : `À vendre · ${items.length}`}</b><span>Touchez une carte pour y aller</span><button class="x" data-sclose aria-label="Fermer">×</button></div>
     <div class="sr">${items.slice(0, 60).map(x => `<button data-sg="${x.g}">${cardHTML(x.c, { w: "96px", item: x.item })}<small>${ord(x.c.arr)} arr.</small></button>`).join("")}</div>`;
 }

@@ -60,7 +60,7 @@ function mineOf(g) { return (ST.mine.get(g)?.length || 0) + (ST.mineParts.get(g)
 function setMovebar(html, kind) {
   const m = $("#movebar"); panelKind = html ? kind || "" : "";
   m.className = panelKind ? "k-" + panelKind : "";
-  if (!html) { m.hidden = true; m.innerHTML = ""; if (landView) { landView = false; sel = null; paintAll(); if (typeof stripKind !== "undefined" && stripKind) $("#strip").hidden = false; } } else { m.hidden = false; m.innerHTML = html; }
+  if (!html) { m.hidden = true; m.innerHTML = ""; if (landView) { landView = false; sel = null; paintAll(); if (typeof stripKind !== "undefined" && stripKind && stripKind !== "mine") $("#strip").hidden = false; } } else { m.hidden = false; m.innerHTML = html; }
   $("#dicebar").classList.toggle("off", moving);
   document.body.classList.toggle("landopen", panelKind === "land");
   if (panelKind === "land") $("#pawnoff").hidden = true;

@@ -1462,3 +1462,16 @@ body.picking .mmark,body.picking .pricetag,body.picking .amark{opacity:.2!import
 #pick b{font-weight:700}
 #pick .pd{display:grid;background:#fff;border-radius:10px;padding:1px}
 @media (max-width:420px){#pick{font-size:13px;padding:7px 12px 7px 8px}}
+/* vue dézoomée : partis au pouvoir */
+.amark b{display:inline-flex;align-items:center;gap:4px}
+.amark b svg{flex:none;filter:drop-shadow(0 0 1px rgba(255,255,255,.6))}
+#partyleg{position:absolute;left:12px;top:12px;z-index:20;background:rgba(255,255,255,.95);border-radius:14px;padding:8px 10px;box-shadow:0 4px 16px rgba(0,0,0,.14);cursor:pointer;max-width:calc(100% - 150px)}
+#partyleg p{margin:0 0 5px;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#6B7080}
+#partyleg div{display:grid;gap:4px}
+#partyleg span{display:flex;align-items:center;gap:6px;font-size:12.5px;line-height:1.1}
+#partyleg span b{font-weight:700;color:#0B0C10;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#partyleg span em{margin-left:auto;padding-left:6px;font-style:normal;font-weight:800;color:var(--pc,#94A3B8)}
+#partyleg .free i{width:14px;height:14px;margin:1px;border-radius:50%;border:2px dashed #94A3B8}
+#partyleg .free b{color:#6B7080;font-weight:600}
+@media (min-width:900px){#partyleg{top:84px;left:16px}}
+.dmain.empty,.dmain:disabled{background:none!important;box-shadow:none!important;filter:none!important;opacity:1!important}
