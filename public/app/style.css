@@ -1337,3 +1337,21 @@ body.landopen #strip{display:none}
 /* de loin : « Vous » posé sur un point, plus d'étiquette qui flotte dans le vide */
 .pawn.is3d.far::after{content:"";position:absolute;left:50%;bottom:-6px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:var(--act);border:3px solid #fff;box-shadow:0 0 0 6px rgba(37,99,235,.25),0 2px 6px rgba(0,0,0,.3)}
 .pawn.is3d.far em{margin-bottom:14px}
+/* le résultat du dé reste lisible : le dé se pose, puis le chiffre apparaît en grand */
+#dice3d{flex-direction:column;gap:14px}
+#dice3d:not([hidden]){display:flex;align-items:center;justify-content:center}
+#dice3d .dnum{font:800 64px/1 var(--f);color:#0B0C10;opacity:0;transform:scale(.6);transition:opacity .2s,transform .3s cubic-bezier(.2,1.4,.4,1);text-shadow:0 2px 0 #fff,0 0 18px rgba(255,255,255,.9)}
+#dice3d.shown .dnum{opacity:1;transform:scale(1)}
+/* taux d'endettement */
+.debt{margin:10px 0 0;padding:14px;border-radius:16px;background:#fff;border:1px solid var(--line);display:grid;gap:8px}
+.debt .dh{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.debt .dh b{font-size:16px;font-weight:800}
+.debt .dh span{font-size:12px;font-weight:800;padding:3px 9px;border-radius:999px;background:#FEF3C7;color:#92400E}
+.debt p{margin:0;font-size:13px;color:var(--ink2);line-height:1.4}
+.debt .dbar{height:10px;border-radius:99px;background:#E8F0FF;overflow:hidden}
+.debt .dbar i{display:block;height:100%;background:linear-gradient(90deg,#2563EB,#7FA6FF);border-radius:99px}
+.debt .dl{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.debt .dl b{color:var(--ink)}
+/* épingles « Mes biens » sur la carte */
+.spin{width:16px;height:16px;border-radius:50%;background:var(--act);border:3px solid #fff;box-shadow:0 0 0 4px rgba(37,99,235,.25),0 2px 6px rgba(0,0,0,.3);cursor:pointer}
+.spin.sale{background:var(--sale);box-shadow:0 0 0 4px rgba(245,165,36,.3),0 2px 6px rgba(0,0,0,.3)}

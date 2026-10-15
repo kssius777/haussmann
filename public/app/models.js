@@ -145,7 +145,7 @@ window.addMonuments=function(map,models){
     onAdd(map,gl){ renderer=new T.WebGLRenderer({canvas:map.getCanvas(),context:gl,antialias:true}); renderer.autoClear=false; },
     render(gl,matrix){
       if(map.getZoom()<12.4) return;
-      if(pawn.visible){ const z=map.getZoom(); const k=window.pawn3d.k(z); pawn.scale.setScalar(k); animPawn(); map.triggerRepaint(); }
+      if(pawn.visible){ const z=map.getZoom(); const k=window.pawn3d.k(z); pawn.scale.setScalar(k); animPawn(); if(performance.now()<moveUntil+1200) map.triggerRepaint(); }   /* on ne redessine en boucle que pendant le vol (sinon le téléphone rame) */
       const rot=new T.Matrix4().makeRotationAxis(new T.Vector3(1,0,0),Math.PI/2);
       const l=new T.Matrix4().makeTranslation(origin.x,origin.y,origin.z).scale(new T.Vector3(s,-s,s)).multiply(rot);
       camera.projectionMatrix=new T.Matrix4().fromArray(matrix).multiply(l);

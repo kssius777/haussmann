@@ -213,7 +213,7 @@ function renderScore() {
   const lead = Object.entries(s).sort((a, b) => b[1] - a[1])[0];
   const w = ST.state?.week;
   const lk = lead && lead[1] ? lead[0] : null;
-  $("#score").innerHTML = `<div class="t">${lk ? `${emblemSVG(lk, 16)}<b style="color:${PARTIES[lk].c}">${esc(PARTIES[lk].n)}</b><span>mène</span>` : `<span>🏛 ${tot ? "Hôtel de Ville" : "Aucun maire élu"}</span>`}<em>${tot}/20 maires</em></div>
+  $("#score").innerHTML = `<div class="t">${lk ? `${emblemSVG(lk, 16)}<b style="color:${PARTIES[lk].c}">${esc(PARTIES[lk].n)}</b><span>mène</span>` : `<span>🏛 ${tot ? "Hôtel de Ville" : "Aucun maire élu"}</span>`}<em>${lk ? `${s[lk]} mairie${s[lk] > 1 ? "s" : ""} sur 20` : `${tot} maire${tot > 1 ? "s" : ""} élu${tot > 1 ? "s" : ""}`}</em></div>
     <div class="seats">${PARTY_ORDER.map(k => s[k] ? `<i style="width:${s[k] * 5}%;background:${PARTIES[k].c}"></i>` : "").join("")}${none ? `<i style="width:${none * 5}%;background:#94A3B8"></i>` : ""}</div>`;
 }
 async function loadAllProgressive() {
@@ -288,16 +288,25 @@ function hideHint() { $("#maphint")?.remove(); try { localStorage.setItem("hm_hi
 function celebrate(c) { toast(`Félicitations ! ${title(c)} est à vous. Loyer : +${fmtE(c.rent)}/jour`, "good"); if (window.confetti) confetti("#0EA5A0", 30); }
 
 // ---- rangée de cartes en bas de la carte : mes biens / à vendre ----------------------------
-let stripKind = "";
+let stripKind = "", stripPins = [];
+function setStripPins(items) {
+  stripPins.forEach(m => m.remove()); stripPins = [];
+  for (const x of items || []) { const el = document.createElement("button"); el.className = "spin" + (stripKind === "sale" ? " sale" : ""); el.setAttribute("aria-label", title(x.c));
+    el.addEventListener("click", ev => { ev.stopPropagation(); flyTo(x.g); previewBuilding(x.g); });
+    stripPins.push(new maplibregl.Marker({ element: el }).setLngLat(centerOf(x.g)).addTo(map)); }
+}
 function showStrip(kind) {
   const el = $("#strip"); if (!el) return;
   $$("#filter button").forEach(x => x.setAttribute("aria-selected", x.dataset.m === (kind === "all" ? "all" : kind)));
-  if (kind === "all" || kind === stripKind) { stripKind = ""; el.hidden = true; el.innerHTML = ""; $$("#filter button").forEach(x => x.setAttribute("aria-selected", x.dataset.m === "all")); return; }
+  if (kind === "all" || kind === stripKind) { stripKind = ""; el.hidden = true; el.innerHTML = ""; setStripPins(null); $$("#filter button").forEach(x => x.setAttribute("aria-selected", x.dataset.m === "all")); return; }
   stripKind = kind;
   const items = kind === "mine" ? holdings().sort((a, b) => b.c.v * unitsOf(b) - a.c.v * unitsOf(a)).map(h => ({ g: h.g, c: h.c, item: { t: "own", ks: h.ks, n: h.n } }))
     : [...ST.sale].map(g => ({ g, c: card(g) })).filter(x => x.c);
   if (!items.length) { stripKind = ""; el.hidden = true; return toast(kind === "mine" ? "Vous n'avez encore aucun bien : lancez le dé ou ouvrez un booster !" : "Rien à vendre en ce moment."); }
-  el.hidden = false;
+  el.hidden = false; setStripPins(items);
+  // on cadre la carte sur ces biens (sans trop dézoomer)
+  { const pts = items.map(x => centerOf(x.g)), lo = pts.map(p => p[0]), la = pts.map(p => p[1]);
+    map.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], { padding: { top: 90, bottom: 260, left: 40, right: 40 }, maxZoom: 15.5, duration: 900 }); }
   el.innerHTML = `<div class="sh"><b>${kind === "mine" ? `Mes biens · ${items.length}` : `À vendre · ${items.length}`}</b><span>Touchez une carte pour y aller</span><button class="x" data-sclose aria-label="Fermer">×</button></div>
     <div class="sr">${items.slice(0, 60).map(x => `<button data-sg="${x.g}">${cardHTML(x.c, { w: "96px", item: x.item })}<small>${ord(x.c.arr)} arr.</small></button>`).join("")}</div>`;
 }

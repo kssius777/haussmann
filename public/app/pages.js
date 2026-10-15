@@ -111,6 +111,11 @@ async function renderAssets0() {
       <div class="kpi"><span>Valeur des biens</span><b class="num">${fmtE(+s.value || 0)}</b><small class="muted">${nLots} logement${nLots > 1 ? "s" : ""}</small></div>
       <div class="kpi ${loans || debt ? "warn" : ""}"><span>Dettes</span><b class="num">${fmtE(loans + debt)}</b><small class="muted">${loans ? `${s.credits || 0} crédit${(s.credits || 0) > 1 ? "s" : ""} en cours` : "aucun crédit"}${debt ? ` · hypothèques ${fmtE(debt)}` : ""}</small></div>
     </div>
+    ${loans || debt ? (() => { const val = +s.value || 0, ratio = val ? Math.round((loans + debt) / val * 100) : 0, cap = Math.max(0, +s.loan_cap || 0), used = loans, pct = used + cap ? Math.round(used / (used + cap) * 100) : 0;
+      return `<div class="debt"><div class="dh"><b>Taux d'endettement : ${ratio} %</b><span>${ratio < 50 ? "sain" : ratio < 80 ? "élevé" : "très élevé"}</span></div>
+        <p>Vos dettes représentent ${ratio} % de la valeur de vos biens. Les crédits se remboursent tout seuls avec 70 % du loyer des biens achetés à crédit.</p>
+        <div class="dbar"><i style="width:${pct}%"></i></div>
+        <div class="dl"><span>Déjà emprunté : <b>${fmtE(used)}</b></span><span>Vous pouvez encore emprunter : <b>${fmtE(cap)}</b></span></div></div>`; })() : ""}
     ${dist.length ? `<h2 class="h2">Où sont vos biens</h2><div class="dist">${(distAll ? dist : dist.slice(0, 5)).map(distRow).join("")}${dist.length > 5 ? `<button class="dmore" data-dall>${distAll ? "Réduire" : `Voir les ${dist.length} arrondissements`}</button>` : ""}</div>` : ""}
     <h2 class="h2">Ma collection <span class="muted" style="font:700 14px var(--f)">${hs.length} carte${hs.length > 1 ? "s" : ""}</span></h2>
     <div class="chips"><button class="chip plain" data-af="all" aria-pressed="${assetF === "all"}">Tout</button>
