@@ -27,7 +27,6 @@ async function startGame(first) {
   go("map"); renderWallet(); initPawnUI(); renderDice();
   try { if (first) { if (localStorage.getItem("hm_tut") == null) localStorage.setItem("hm_tut", "1"); } else if (localStorage.getItem("hm_tut") == null) localStorage.setItem("hm_tut", "99"); } catch (e) { }
   setInterval(tutTick, 700);
-  setInterval(() => { if (cur() === "map" && !aimMarks.length) showAim(); }, 2000);   // les points de direction réapparaissent dès que possible
   setInterval(() => {
     renderWallet();
     const w = $("#worth"); if (w && cur() === "assets") w.textContent = fmtE(worthNow());
@@ -83,7 +82,8 @@ function tutSet(n) { try { localStorage.setItem("hm_tut", String(n)); } catch (e
 function tutTick() {
   const st = tutGet(); let k = "", anchor = null, html = "", ok = false;
   const idle = cur() === "map" && $("#reveal").hidden && $("#onb").hidden && !moving;
-  if (st === 1 && idle && !panelKind) { k = "1"; anchor = "#b-roll"; html = "<b>Lancez le dé 🎲</b>Votre montgolfière va se poser sur un immeuble de Paris. Astuce : touchez d'abord un point bleu pour choisir la direction."; }
+  if (st === 1 && idle && destMarks.length) { k = "1p"; anchor = "#pick"; html = "<b>Choisissez où aller</b>Vert : un logement libre à acheter. Rose : chez un autre joueur, vous payez son loyer. Bleu : chez vous, bonus. Touchez une étiquette."; }
+  else if (st === 1 && idle && !panelKind) { k = "1"; anchor = "#b-roll"; html = "<b>Lancez le dé 🎲</b>Puis choisissez sur la carte l'immeuble où votre montgolfière va se poser."; }
   else if (st === 1 && panelKind === "land" && !landView) tutSet(2);
   else if (st === 2 && panelKind === "land" && !landView && !moving) {
     if (justBought) return tutSet(3);

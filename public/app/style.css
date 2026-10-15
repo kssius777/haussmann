@@ -1405,11 +1405,6 @@ body.landopen #strip{display:none}
 #dice3d .dland{animation:dieLand .5s cubic-bezier(.2,1.6,.4,1);filter:drop-shadow(0 16px 22px rgba(15,27,45,.3))}
 #dice3d .dland .dsvg{width:150px;height:150px}
 /* choisir sa direction : 4 points autour de la montgolfière */
-.aim{display:grid;justify-items:center;gap:4px;cursor:pointer;background:none;border:0;padding:6px}
-.aim i{width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.95);border:3px solid var(--act);box-shadow:0 0 0 6px rgba(37,99,235,.18),0 3px 8px rgba(0,0,0,.25);animation:aimPulse 2s ease-in-out infinite}
-.aim span{font-size:11.5px;font-weight:700;color:#0B0C10;background:rgba(255,255,255,.95);padding:2px 8px;border-radius:999px;box-shadow:0 2px 6px rgba(0,0,0,.15);white-space:nowrap}
-.aim.on i{background:var(--act);border-color:#fff;box-shadow:0 0 0 8px rgba(37,99,235,.3),0 3px 10px rgba(0,0,0,.3)}
-.aim.on span{background:var(--act);color:#fff}
 @keyframes aimPulse{50%{box-shadow:0 0 0 10px rgba(37,99,235,.08),0 3px 8px rgba(0,0,0,.25)}}
 /* noms de l'eau et des quartiers */
 .plabel.w{background:none!important;box-shadow:none!important;border:0!important;color:#2F6FA8!important;font-style:italic;font-weight:600;text-shadow:0 0 3px #fff,0 0 6px #fff}
@@ -1447,3 +1442,23 @@ body.mymode .mmark,body.mymode .plabel,body.mymode .pricetag,body.mymode .amark 
 #maphint{bottom:calc(var(--tab-h) + env(safe-area-inset-bottom,0px) + 128px)!important}
 @media (min-width:900px){#maphint{bottom:140px!important}}
 .dmain .dsvg{margin-top:-4px}
+/* après le dé : destinations à choisir */
+.dest{display:flex;align-items:center;gap:7px;padding:5px 11px 5px 5px;border:0;border-radius:999px;background:#fff;color:#0B0C10;font:inherit;cursor:pointer;
+  box-shadow:0 0 0 2px var(--dc),0 6px 16px rgba(0,0,0,.22);position:relative;margin-bottom:9px;animation:destIn .35s ease-out both;max-width:172px;text-align:left}
+.dest::after{content:"";position:absolute;left:50%;bottom:-8px;width:12px;height:12px;background:#fff;transform:translateX(-50%) rotate(45deg);box-shadow:2px 2px 0 0 var(--dc);border-radius:0 0 3px 0}
+.dest i{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--dc);color:#fff;font-style:normal;font-weight:800;font-size:15px}
+.dest span{display:grid;line-height:1.2;min-width:0}
+.dest b{font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dest em{font-size:11px;font-style:normal;color:#5b6070;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dest:hover,.dest:active{filter:brightness(.97)}
+
+.destm{z-index:6}
+body.picking .mmark,body.picking .pricetag,body.picking .amark{opacity:.2!important;pointer-events:none!important}
+.dest.d-free{--dc:#16A34A}.dest.d-theirs{--dc:#E2557A}.dest.d-mine{--dc:var(--act)}.dest.d-chance{--dc:#7C3AED}
+@keyframes destIn{from{opacity:0;transform:translateY(8px) scale(.9)}to{opacity:1;transform:none}}
+#pick{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 74px);width:max-content;max-width:calc(100% - 32px);z-index:30;display:flex;align-items:center;gap:10px;
+  background:#0B0C10;color:#fff;padding:8px 16px 8px 10px;border-radius:999px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:pickIn .3s ease-out both;line-height:1.25}
+@keyframes pickIn{from{opacity:0;margin-top:-8px}to{opacity:1;margin-top:0}}
+#pick b{font-weight:700}
+#pick .pd{display:grid;background:#fff;border-radius:10px;padding:1px}
+@media (max-width:420px){#pick{font-size:13px;padding:7px 12px 7px 8px}}

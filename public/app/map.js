@@ -138,7 +138,7 @@ function buildMap(base) {
       a.marker = new maplibregl.Marker({ element: el }).setLngLat(a.center).addTo(map);
     });
     buildMonMarkers(); buildParkLabels();
-    map.on("zoom", renderMarks); map.on("moveend", renderTags); map.on("rotateend", () => showAim()); map.on("zoomend", () => { if (!aimMarks.length || map.getZoom() < 13.6) showAim(); });
+    map.on("zoom", renderMarks); map.on("zoomend", () => typeof declutterDest === "function" && declutterDest()); map.on("rotateend", () => typeof declutterDest === "function" && declutterDest()); map.on("moveend", renderTags);
     // la boussole n'apparaît que si la carte a été tournée ; elle remet le nord en haut
     map.on("rotate", () => { const b = map.getBearing(); $("#t-north").hidden = Math.abs(b) < 2; $("#needle").style.transform = `rotate(${-b}deg)`; });
     ARR.forEach((A, i) => { if (A?.cards) addArrToMap(i); });
@@ -275,7 +275,7 @@ function initMapUI() {
 }
 
 // petit message d'aide sur la carte, jusqu'au premier achat ou aperçu
-function showHint() { try { if (localStorage.getItem("hm_hint") || +(localStorage.getItem("hm_tut") || 99) < 99) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "🎲 Touchez un point bleu pour choisir votre direction, puis lancez le dé : votre montgolfière s'arrête sur un immeuble. S'il est libre, achetez-le !"; $("#p-map").appendChild(h); }
+function showHint() { try { if (localStorage.getItem("hm_hint") || +(localStorage.getItem("hm_tut") || 99) < 99) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "🎲 Lancez le dé, puis choisissez l'immeuble où votre montgolfière se pose. S'il est libre, achetez-le !"; $("#p-map").appendChild(h); }
 function hideHint() { $("#maphint")?.remove(); try { localStorage.setItem("hm_hint", "1"); } catch (e) { } }
 function celebrate(c) { toast(`Félicitations ! ${title(c)} est à vous. Loyer : +${fmtE(c.rent)}/jour`, "good"); if (window.confetti) confetti("#0EA5A0", 30); }
 
@@ -290,12 +290,12 @@ function setStripPins(items) {
 function showStrip(kind) {
   const el = $("#strip"); if (!el) return;
   $$("#filter button").forEach(x => x.setAttribute("aria-selected", x.dataset.m === (kind === "all" ? "all" : kind)));
-  if (kind === "all" || kind === stripKind) { stripKind = ""; el.hidden = true; el.innerHTML = ""; setStripPins(null); document.body.classList.remove("mymode"); applyMode(); showAim(); $$("#filter button").forEach(x => x.setAttribute("aria-selected", x.dataset.m === "all")); return; }
+  if (kind === "all" || kind === stripKind) { stripKind = ""; el.hidden = true; el.innerHTML = ""; setStripPins(null); document.body.classList.remove("mymode"); applyMode(); $$("#filter button").forEach(x => x.setAttribute("aria-selected", x.dataset.m === "all")); return; }
   stripKind = kind;
   const items = kind === "mine" ? holdings().sort((a, b) => b.c.v * unitsOf(b) - a.c.v * unitsOf(a)).map(h => ({ g: h.g, c: h.c, item: { t: "own", ks: h.ks, n: h.n } }))
     : [...ST.sale].map(g => ({ g, c: card(g) })).filter(x => x.c);
   if (!items.length) { stripKind = ""; el.hidden = true; return toast(kind === "mine" ? "Vous n'avez encore aucun bien : lancez le dé ou ouvrez un booster !" : "Rien à vendre en ce moment."); }
-  el.hidden = false; setStripPins(items); document.body.classList.add("mymode"); map.setPaintProperty("arrfill", "fill-opacity", 0); clearAim(); showAim();
+  el.hidden = false; setStripPins(items); document.body.classList.add("mymode"); map.setPaintProperty("arrfill", "fill-opacity", 0);
   // on cadre la carte sur ces biens (sans trop dézoomer)
   { const pts = items.map(x => centerOf(x.g)), lo = pts.map(p => p[0]), la = pts.map(p => p[1]);
     map.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], { padding: { top: 90, bottom: 260, left: 40, right: 40 }, maxZoom: 15.5, duration: 900 }); }

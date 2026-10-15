@@ -4,13 +4,23 @@ def check(n, ok, info=""): ok = bool(ok); R.append(ok); print(("PASS " if ok els
 def err(f):
     try: f(); return None
     except Exception as e: return str(e).split("\n")[0]
+# lancer le dé puis choisir une destination (par défaut la première proposée, ou celle dans la direction q)
+def roll_go(u, q=None, pick=None):
+    r = db.rpc(u, "roll")
+    if "options" not in r: return r
+    opts = r["options"]; o = next((x for x in opts if q is not None and x["dir"] == q), None) or (pick(opts) if pick else opts[0])
+    x = db.rpc(u, "go_to", p_card=o["card"]); x["options"] = opts; return x
 A, B = uuid.uuid4(), uuid.uuid4()
 for u in (A, B): db.sql("insert into auth.users(id) values (%s)", str(u))
 s = db.rpc(A, "join_game", p_pseudo="Pion" + str(A)[:4], p_party=None); db.rpc(B, "join_game", p_pseudo="Rival" + str(B)[:4], p_party="poing")
 p = s["profile"]; check("nouveau joueur : pion posé devant Notre-Dame, 10 lancers, 3 téléportations", p["pos"] == 400761 and p["rolls"] == 10 and p["tp"] == 3, (p["pos"], p["rolls"], p["tp"]))
 far = db.sql("select id from cards where lk='l' and id not in (select card from lots) and _dist(400761, id) > 2000 limit 1")[0][0]
 check("avant de lancer : pas d'achat à la banque", "tomber dessus" in (err(lambda: db.rpc(A, "bank_buy", p_card=far, p_k=None)) or ""))
-t = time.time(); r = db.rpc(A, "roll"); dt = time.time() - t
+t = time.time(); r0 = db.rpc(A, "roll"); dt = time.time() - t
+check("le dé propose plusieurs destinations (une par direction)", 1 <= len(r0["options"]) <= 4 and len({o["card"] for o in r0["options"]}) == len(r0["options"]), [o["dir"] for o in r0["options"]])
+check("relancer sans choisir repropose les mêmes destinations (pas de lancer perdu)", [o["card"] for o in db.rpc(A, "roll")["options"]] == [o["card"] for o in r0["options"]] and db.rpc(A, "state")["profile"]["rolls"] == 9)
+check("impossible d'aller ailleurs que sur une destination proposée", "Lancez" in (err(lambda: db.rpc(A, "go_to", p_card=r0["options"][0]["card"] + 1 if r0["options"][0]["card"] + 1 not in [o["card"] for o in r0["options"]] else 1)) or ""))
+r = db.rpc(A, "go_to", p_card=r0["options"][-1]["card"]); r["die"] = r0["die"]
 path, L = r["path"], r["landing"]
 check(f"lancer ({dt*1000:.0f} ms) : dé {r['die']} → {len(path)-1} pas", 1 <= r["die"] <= 6 and 1 <= len(path) - 1 <= r["die"] * 4)
 check("on ne retombe jamais sur sa case de départ (≥ 60 m)", db.sql("select _dist(%s,%s)", path[0], path[-1])[0][0] >= 59)
@@ -27,7 +37,7 @@ check("achat ailleurs refusé", "tomber dessus" in (err(lambda: db.rpc(A, "bank_
 db.sql("update profiles set pos=400761, heading=0 where id=%s", str(A))
 def land_on_b():
     for _ in range(12):
-        x = db.rpc(A, "roll"); t2 = x["landing"]["card"]
+        x = roll_go(A); t2 = x["landing"]["card"]
         if not db.sql("select 1 from lots where card=%s and owner=%s", t2, str(A)): return x
     return None
 # donne à B tous les immeubles proches pour être sûr de payer
@@ -53,7 +63,7 @@ check("les lancers se rechargent (1 toutes les 30 min)", db.rpc(A, "state")["pro
 C = uuid.uuid4(); db.sql("insert into auth.users(id) values (%s)", str(C)); db.rpc(C, "join_game", p_pseudo="Ile" + str(C)[:4], p_party=None)
 far_ = 0; same = 0; prev = 300658
 for _ in range(15):
-    db.sql("update profiles set rolls=10 where id=%s", str(C)); x = db.rpc(C, "roll"); t2 = x["landing"]["card"]
+    db.sql("update profiles set rolls=10 where id=%s", str(C)); x = roll_go(C); t2 = x["landing"]["card"]
     same += (t2 == prev); prev = t2; far_ = max(far_, db.sql("select _dist(400761,%s)", t2)[0][0])
 check("autour de Notre-Dame : le pion s'éloigne (pas de boucle)", far_ > 400 and same == 0, f"{far_:.0f} m au plus loin")
 # acheter des lancers
@@ -67,13 +77,12 @@ D = uuid.uuid4(); db.sql("insert into auth.users(id) values (%s)", str(D)); db.r
 ok_e = ok_w = 0
 for i in range(8):
     db.sql("update profiles set rolls=10 where id=%s", str(D)); p0 = db.rpc(D, "state")["profile"]["pos"]
-    want = 0.0 if i % 2 == 0 else 3.14159
-    x = db.rpc(D, "roll", p_dir=want); t2 = x["landing"]["card"]
+    x = roll_go(D, q=0 if i % 2 == 0 else 2); t2 = x["landing"]["card"]
     dx = db.sql("select (b.cx - a.cx) from cards a, cards b where a.id=%s and b.id=%s", p0, t2)[0][0]
     if i % 2 == 0: ok_e += dx > 0
     else: ok_w += dx < 0
-check("choisir sa direction : le pion part du côté choisi", ok_e + ok_w >= 6, (ok_e, ok_w))
-check("la direction choisie ne vaut que pour un lancer", db.sql("select aim from profiles where id=%s", str(D))[0][0] is False)
+check("choisir sa destination après le dé : vers l'est ou vers l'ouest", ok_e + ok_w >= 6, (ok_e, ok_w))
+check("après le déplacement, plus de destination en attente", db.sql("select pend from profiles where id=%s", str(D))[0][0] is None)
 db.sql("update profiles set rent_at=now()-interval '2 days 4 hours' where id=%s", str(A)); db.rpc(A, "state")
 lab = db.sql("select label from ledger where owner=%s and kind='rent_away' order by at desc limit 1", str(A))
 check("loyers d'absence : une ligne à part avec la durée", bool(lab) and "2 j 4 h" in lab[0][0], lab)
