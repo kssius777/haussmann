@@ -58,7 +58,7 @@ async def main():
         # le pion et les dés
         await W("document.querySelector('.pawn') && !document.querySelector('#b-roll').disabled"); await pg.wait_for_timeout(1200); await pg.screenshot(path=T + "05b_pawn.png")
         check("pion posé sur la carte, 10 lancers", await E("ST.state.profile.rolls===10 && ST.state.profile.pos!=null"), await E("ST.state.profile.pos"))
-        await pg.click("#b-roll"); await W("document.querySelector('#dice3d .dice:not(.rolling)')"); await pg.screenshot(path=T + "05c_dice.png")
+        await pg.click("#b-roll"); await W("document.querySelector('#dice3d .dland')"); await pg.screenshot(path=T + "05c_dice.png")
         await pg.wait_for_timeout(1700); await pg.screenshot(path=T + "05d_walking.png")
         await W("document.querySelector('#movebar .land')", 30000); await pg.wait_for_timeout(900); await pg.screenshot(path=T + "05e_landed.png")
         check("dé lancé : le pion marche et s'arrête sur un immeuble", await E("ST.state.profile.rolls===9 && ST.state.profile.land===ST.state.profile.pos && ST.state.profile.pos!==300658"), await E("document.querySelector('#movebar').innerText.replace(/\\n/g,' · ').slice(0,160)"))

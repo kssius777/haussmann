@@ -384,7 +384,14 @@ begin
   select coalesce(sum(amt), 0) into t from u2;
   net := net - t; cr := cr + t::bigint;
   update profiles set cash = greatest(0, cash + floor(net)::bigint), rent_at = now() where id=p;
-  perform _log(p, 'rent', floor(gross)::bigint, 'Loyers');
+  -- absence de plus d'une heure : une ligne à part, « Loyers pendant votre absence · 2 j 4 h »
+  if secs >= 3600 then
+    perform _log(p, 'rent_away', floor(gross)::bigint, 'Loyers pendant votre absence · ' ||
+      case when secs >= 86400 then floor(secs/86400)::int || ' j ' || floor(mod(secs::numeric, 86400)/3600)::int || ' h'
+           else floor(secs/3600)::int || ' h ' || lpad(floor(mod(secs::numeric, 3600)/60)::int::text, 2, '0') end);
+  else
+    perform _log(p, 'rent', floor(gross)::bigint, 'Loyers');
+  end if;
   if taxes >= 1 then perform _log(p, 'tax', -floor(taxes)::bigint, 'Taxe des maires'); end if;
   if cr > 0 then perform _log(p, 'credit', -cr, 'Remboursement des crédits'); end if;
 end $$;

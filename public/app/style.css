@@ -1392,3 +1392,15 @@ body.landopen #strip{display:none}
 .farbuy{padding:10px 12px;border-radius:12px;background:#F3F6FF;color:#1E3A8A;font-size:13px;font-weight:600;line-height:1.35;text-align:left}
 body.landopen #strip{display:none}
 .landing.v2 .lhead{position:relative;background:transparent!important;box-shadow:none!important;border:0!important;backdrop-filter:none!important}
+/* le dé : on ne montre que le dé, posé bien en face, qui rebondit légèrement en se posant */
+#dice3d .dnum{display:none}
+#dice3d.shown .dice .die{animation:dieLand .45s cubic-bezier(.2,1.6,.4,1)}
+@keyframes dieLand{0%{scale:1.25}100%{scale:1}}
+.dice .die.n1{transform:rotateX(0) rotateY(0)} .dice .die.n2{transform:rotateY(-90deg)} .dice .die.n3{transform:rotateY(180deg)}
+.dice .die.n4{transform:rotateY(90deg)} .dice .die.n5{transform:rotateX(-90deg)} .dice .die.n6{transform:rotateX(90deg)}
+.dice .die{width:110px;height:110px}
+.dice .die .f1{transform:translateZ(55px)} .dice .die .f2{transform:rotateY(90deg) translateZ(55px)} .dice .die .f3{transform:rotateY(180deg) translateZ(55px)}
+.dice .die .f4{transform:rotateY(-90deg) translateZ(55px)} .dice .die .f5{transform:rotateX(90deg) translateZ(55px)} .dice .die .f6{transform:rotateX(-90deg) translateZ(55px)}
+.dice .die>i>b{width:18px;height:18px}
+#dice3d .dland{animation:dieLand .5s cubic-bezier(.2,1.6,.4,1);filter:drop-shadow(0 16px 22px rgba(15,27,45,.3))}
+#dice3d .dland .dsvg{width:150px;height:150px}

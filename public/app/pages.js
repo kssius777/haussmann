@@ -390,7 +390,7 @@ document.addEventListener("click", e => { const b = e.target.closest("[data-arrm
 
 // ---------------- BOUTIQUE, PROFIL ----------------
 // ---------------- MON ARGENT : historique ----------------
-const LK = { rent: ["🏠", "Loyers"], tax: ["🏛️", "Taxe des maires"], tax_in: ["👑", "Taxe de maire reçue"], salary: ["💼", "Salaire du tour"], toll_paid: ["💸", "Loyer de passage payé"], toll_in: ["💰", "Loyer de passage reçu"], buy: ["🔑", "Achat"], sale: ["🤝", "Vente"], chance: ["🃏", "Carte Chance"], booster: ["📦", "Booster"], rolls: ["🎲", "Lancers"], mortgage: ["🏦", "Hypothèque"], lift: ["🏦", "Hypothèque remboursée"], repay: ["🏦", "Crédit remboursé"], bonus: ["🏠", "Bonus"], credit: ["🏦", "Remboursement des crédits"] };
+const LK = { rent: ["🏠", "Loyers"], rent_away: ["🌙", "Loyers pendant votre absence"], tax: ["🏛️", "Taxe des maires"], tax_in: ["👑", "Taxe de maire reçue"], salary: ["💼", "Salaire du tour"], toll_paid: ["💸", "Loyer de passage payé"], toll_in: ["💰", "Loyer de passage reçu"], buy: ["🔑", "Achat"], sale: ["🤝", "Vente"], chance: ["🃏", "Carte Chance"], booster: ["📦", "Booster"], rolls: ["🎲", "Lancers"], mortgage: ["🏦", "Hypothèque"], lift: ["🏦", "Hypothèque remboursée"], repay: ["🏦", "Crédit remboursé"], bonus: ["🏠", "Bonus"], credit: ["🏦", "Remboursement des crédits"] };
 async function moneyPage() {
   let rows = []; try { rows = await rpc("my_ledger"); } catch (e) { }
   await ensureCards(rows.filter(r => r.card != null).map(r => r.card));
@@ -398,7 +398,7 @@ async function moneyPage() {
   for (const r of rows) { const d = new Date(r.at); const key = d.toDateString(); if (!days.has(key)) days.set(key, { d, items: [], tot: 0 }); const g = days.get(key); g.items.push(r); g.tot += +r.amount; }
   const dayLabel = d => { const t = new Date(), y = new Date(Date.now() - 864e5); return d.toDateString() === t.toDateString() ? "Aujourd'hui" : d.toDateString() === y.toDateString() ? "Hier" : d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }); };
   const line = r => { const [ic, dft] = LK[r.kind] || ["•", r.kind]; const c = r.card != null ? card(r.card) : null; const a = +r.amount;
-    return `<${c ? `button data-push="b" data-arg="${r.card}"` : "div"} class="ml"><span class="ic">${ic}</span><span class="t"><b>${esc(r.label || dft)}</b>${c ? `<small>${esc(title(c))}</small>` : ""}</span><b class="num ${a >= 0 ? "green" : "red"}">${a >= 0 ? "+" : "−"}${fmtE(Math.abs(a))}</b></${c ? "button" : "div"}>`; };
+    return `<${c ? `button data-push="b" data-arg="${r.card}"` : "div"} class="ml"><span class="ic">${ic}</span><span class="t"><b>${esc((r.label || dft).split(" · ")[0])}</b>${(r.label || "").includes(" · ") ? `<small>pendant ${esc(r.label.split(" · ")[1])}</small>` : c ? `<small>${esc(title(c))}</small>` : ""}</span><b class="num ${a >= 0 ? "green" : "red"}">${a >= 0 ? "+" : "−"}${fmtE(Math.abs(a))}</b></${c ? "button" : "div"}>`; };
   return dhead("Mon argent") + `<div class="wrap">
     <div class="box" style="text-align:center"><p class="eyebrow">Trésorerie</p><b class="num" style="font-size:30px" id="cash2">${fmtE(liveCash())}</b><div class="sub" style="margin:4px 0 0">+${fmtE(netRate())} de loyers par jour${s?.loan_rate > 0 ? ` · ${fmtE(s.loan_rate)} / jour remboursent vos crédits` : ""}</div>
       <div style="margin-top:10px"><button class="btn sm gold" data-push="shop">+ Ajouter de l'argent</button></div></div>

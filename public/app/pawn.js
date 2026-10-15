@@ -230,9 +230,9 @@ function dieSVG(top = 5, left = 1, right = 3, size = 40) {
 const dieHTML = n => `<div class="die n${n}">${[1, 2, 3, 4, 5, 6].map(f => `<i class="f${f}">${"<b></b>".repeat(f)}</i>`).join("")}</div>`;
 async function animDice(n) {
   const D = $("#dice3d"); D.hidden = false;
-  D.innerHTML = `<div class="dice rolling">${dieHTML(n)}</div><b class="dnum">${n}</b>`; await sleep(700);
-  D.querySelector(".dice").classList.remove("rolling"); await sleep(450);   // le dé se pose sur la bonne face
-  D.classList.add("shown"); await sleep(1000);                              // puis le chiffre s'affiche en grand, le temps de le lire
+  D.innerHTML = `<div class="dice rolling">${dieHTML(n)}</div>`; await sleep(800);
+  D.innerHTML = `<div class="dland">${dieSVG(n, ...DSIDE[n], 150)}</div>`; D.classList.add("shown");   // le dé se pose, le résultat sur le dessus…
+  await sleep(1300);                                                                 // …et reste posé le temps de lire le résultat
   D.classList.remove("shown");
   D.hidden = true;
 }
