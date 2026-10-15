@@ -58,9 +58,10 @@ function mineOf(g) { return (ST.mine.get(g)?.length || 0) + (ST.mineParts.get(g)
 
 // ---- panneau du bas ------------------------------------------------------------
 function setMovebar(html, kind) {
-  const m = $("#movebar"); panelKind = html ? kind || "" : "";
+  const m = $("#movebar"), wasLand = panelKind === "land"; panelKind = html ? kind || "" : "";
   m.className = panelKind ? "k-" + panelKind : "";
-  if (!html) { m.hidden = true; m.innerHTML = ""; if (landView) { landView = false; sel = null; paintAll(); if (typeof stripKind !== "undefined" && stripKind && stripKind !== "mine") $("#strip").hidden = false; } } else { m.hidden = false; m.innerHTML = html; }
+  if (!html && wasLand && !landView && !moving && pawnPos() != null && map) map.easeTo({ center: centerOf(pawnPos()), offset: [0, 0], duration: 500 });   // case fermée : on revient sur la montgolfière
+  if (!html) { m.hidden = true; m.innerHTML = ""; if (landView) { landView = false; sel = null; paintAll(); if (typeof stripKind !== "undefined" && false) $("#strip").hidden = false; } } else { m.hidden = false; m.innerHTML = html; }
   $("#dicebar").classList.toggle("off", moving);
   document.body.classList.toggle("landopen", panelKind === "land");
   if (panelKind === "land") $("#pawnoff").hidden = true;
@@ -119,8 +120,11 @@ async function travel(r) {   // le pion marche jusqu'à la case, puis la case s'
   lastLanding = r.landing; landCredit = null; justBought = null; showLand(r.landing);
   // la case reste visible au-dessus du panneau (téléphone) ou à gauche (ordinateur)
   const mb = $("#movebar"), mobile = innerWidth < 900;
+  // la montgolfière reste visible : au-dessus de la case (téléphone) ou à gauche (ordinateur)
+  const cv = map.getCanvas().getBoundingClientRect(), pt = mb.getBoundingClientRect().top;
+  const yWant = Math.max(cv.top + 40, (cv.top + pt) / 2);
   map.easeTo({ center: centerOf(r.landing.card), zoom: Math.min(15.8, Math.max(map.getZoom(), 15.2)), duration: 600,
-    offset: mobile ? [0, -Math.round((mb.offsetHeight || 300) / 2) + 20] : [-Math.round((mb.offsetWidth || 380) / 2), 0] });
+    offset: mobile ? [0, Math.round(yWant - (cv.top + cv.height / 2))] : [-Math.round((mb.offsetWidth || 380) / 2), 0] });
   refreshHold().then(refreshMap).then(() => { paintAll(); renderWallet(); if (panelKind === "land") showLand(); }).catch(() => { });
 }
 
@@ -249,7 +253,13 @@ function showLand(L, gv) {
     const listed = ST.sale.has(g);
     btns = `${free > 0 ? `<div class="farbuy">🎲 Pour l'acheter à la banque, tombez dessus avec le dé.${listed ? "" : " Ou trouvez-le dans un booster."}</div>` : ""}<button class="btn block ${listed ? "buy" : "light"}" data-lopen="${g}"><span>${listed ? "En vente au Marché · voir l'offre" : "Voir la fiche de l'immeuble"}</span></button>`;
   }
-  if (jb) btns = `<button class="btn block buy" data-mvclose><span>Continuer</span><small>+${fmtE(Math.round(c.rent * (landCreditNow ? .3 : 1)))} / jour de loyer en plus</small></button>${free > 0 && !justBought.whole ? `<button class="btn block light more" data-lbuy="${g}">Acheter ${isP ? "une autre part" : "un autre " + word(1)} ici · ${fmtE(landCreditNow ? Math.ceil(c.v * CREDIT_DOWN) : c.v)}</button>` : ""}`;
+  if (jb) {   // juste acheté : s'il reste des logements libres, on peut continuer à acheter ici sans quitter la case
+    const gain = `+${fmtE(Math.round(c.rent * (landCreditNow ? .3 : 1)))} / jour de loyer en plus`;
+    if (free > 0 && !justBought.whole && btns.includes("data-lbuy")) {
+      lines.unshift(`<span class="ln good">${gain}</span>`);
+      btns = btns.replace(/Acheter (1 |une |un )/, (m, w) => `Acheter ${w === "1 " ? "1 autre " : w === "une " ? "une autre " : "un autre "}`) + `<button class="btn block light" data-mvclose>Continuer</button>`;
+    } else btns = `<button class="btn block buy" data-mvclose><span>Continuer</span><small>${gain}</small></button>`;
+  }
   setMovebar(`<div class="land${lines.length ? " hasln" : ""}"><div class="grab"></div><div class="lc" data-lopen="${g}">${cardHTML(c)}</div>
     <div class="lr"><b class="lh ${cls}">${head}</b>${lines.length ? `<div class="lns">${lines.join("")}</div>` : ""}${occ}<div class="lb">${btns}</div></div>
     <button class="x" data-mvclose aria-label="Fermer">×</button></div>`, "land");

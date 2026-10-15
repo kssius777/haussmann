@@ -130,7 +130,7 @@ function buildMap(base) {
     map.on("click", "mfill", e => { const f = e.features[0]; if (f) onBuildingTap(f.id); });
     map.on("click", e => { if (e.defaultPrevented) return;
       // un toucher sur la carte ferme la case ouverte (comme la croix)
-      if (panelKind === "land" && !moving) { justBought = null; if (landView) { landView = false; sel = null; paintAll(); if (stripKind && stripKind !== "mine") $("#strip").hidden = false; } setMovebar(""); closeSearch(); return; }
+      if (panelKind === "land" && !moving) { justBought = null; if (landView) { landView = false; sel = null; paintAll(); if (false) $("#strip").hidden = false; } setMovebar(""); closeSearch(); return; }
       if (!map.queryRenderedFeatures(e.point).some(f => /^(bd|rf)\d|^mfill$/.test(f.layer.id))) hidePreview(); closeSearch(); });
     IDX.arr.forEach((a, i) => {
       const el = document.createElement("button"); el.className = "amark"; el.innerHTML = `<b>${ord(a.n)}</b><span id="am${i}"></span>`;
@@ -251,7 +251,7 @@ async function previewBuilding(g) {
   await ensureCards([g]); if (!card(g)) return; closeSearch(); hideHint();
   if (g === landPos()) { landView = false; showLand(); } else showLand(null, g);
 }
-function hidePreview() { if (!moving && (panelKind !== "land" || landView)) { if (landView) { landView = false; sel = null; paintAll(); if (stripKind && stripKind !== "mine") $("#strip").hidden = false; } setMovebar(""); } const pv = $("#preview"); if (pv && !pv.hidden) { pv.hidden = true; sel = null; paintAll(); if (stripKind && stripKind !== "mine") $("#strip").hidden = false; } }
+function hidePreview() { if (!moving && (panelKind !== "land" || landView)) { if (landView) { landView = false; sel = null; paintAll(); if (false) $("#strip").hidden = false; } setMovebar(""); } const pv = $("#preview"); if (pv && !pv.hidden) { pv.hidden = true; sel = null; paintAll(); if (false) $("#strip").hidden = false; } }
 function closeSearch() { $("#search").hidden = true; }
 
 function initMapUI() {
@@ -308,10 +308,10 @@ function showStrip(kind) {
   const items = kind === "mine" ? holdings().sort((a, b) => b.c.v * unitsOf(b) - a.c.v * unitsOf(a)).map(h => ({ g: h.g, c: h.c, item: { t: "own", ks: h.ks, n: h.n } }))
     : [...ST.sale].map(g => ({ g, c: card(g) })).filter(x => x.c);
   if (!items.length) { stripKind = ""; el.hidden = true; return toast(kind === "mine" ? "Vous n'avez encore aucun bien : lancez le dé ou ouvrez un booster !" : "Rien à vendre en ce moment."); }
-  el.hidden = kind === "mine"; setStripPins(items); document.body.classList.add("mymode"); map.setPaintProperty("arrfill", "fill-opacity", 0);
+  el.hidden = true; setStripPins(items);   // pas de rangée de cartes : seulement les points sur la carte (demande du propriétaire) document.body.classList.add("mymode"); map.setPaintProperty("arrfill", "fill-opacity", 0);
   // on cadre la carte sur ces biens (sans trop dézoomer)
   { const pts = items.map(x => centerOf(x.g)), lo = pts.map(p => p[0]), la = pts.map(p => p[1]);
-    map.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], { padding: { top: 90, bottom: kind === "mine" ? 150 : 260, left: 40, right: 40 }, maxZoom: 15.5, duration: 900 }); }
+    map.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], { padding: { top: 90, bottom: 150, left: 40, right: 40 }, maxZoom: 15.5, duration: 900 }); }
   el.innerHTML = `<div class="sh"><b>${kind === "mine" ? `Mes biens · ${items.length}` : `À vendre · ${items.length}`}</b><span>Touchez une carte pour y aller</span><button class="x" data-sclose aria-label="Fermer">×</button></div>
     <div class="sr">${items.slice(0, 60).map(x => `<button data-sg="${x.g}">${cardHTML(x.c, { w: "96px", item: x.item })}<small>${ord(x.c.arr)} arr.</small></button>`).join("")}</div>`;
 }
