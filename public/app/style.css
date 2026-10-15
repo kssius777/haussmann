@@ -1519,3 +1519,13 @@ body.picksel .dicebar{display:none!important}
   body.landopen #movebar.k-land{bottom:calc(env(safe-area-inset-bottom,0px) + 8px);max-height:calc(100dvh - var(--bar-h) - 64px)}
   body.landopen .land .lc{--cw:clamp(118px,calc((100dvh - var(--bar-h) - 250px) / 1.45),min(62vw,240px))}
 }
+/* téléphone : case ouverte = la page descend jusqu'en bas (plus de bande grise), la case prend toute la hauteur */
+@media (max-width:699px){
+  body.landopen:not(:has(#p-detail:not([hidden]))) #pages,body.picking:not(:has(#p-detail:not([hidden]))) #pages{bottom:0}
+  body.picking:not(:has(#p-detail:not([hidden]))) #tabs{transform:translateY(110%)}
+  body.landopen #movebar.k-land{top:calc(var(--bar-h) + 40px);bottom:calc(env(safe-area-inset-bottom,0px) + 10px);max-height:none;display:flex;flex-direction:column;padding:12px 14px 14px;overflow:auto}
+  body.landopen #movebar.k-land .land{flex:1;display:flex;flex-direction:column;align-items:stretch;gap:10px}
+  body.landopen .land .lc{--cw:clamp(130px,calc((100dvh - var(--bar-h) - 245px) / 1.45),min(74vw,290px));width:var(--cw);align-self:center}
+  body.landopen .land .lr{margin-top:auto;display:grid;gap:10px}
+}
+.dpin i:empty::after{content:"";width:12px;height:12px;border-radius:50%;background:#fff}

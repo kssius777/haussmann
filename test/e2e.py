@@ -63,8 +63,7 @@ async def main():
         if await E("!!document.querySelector('.dpin')"):
             await pg.wait_for_timeout(900); await pg.screenshot(path=T + "05c2_choose.png")
             check("après le dé : 2 à 4 destinations à choisir", await E("document.querySelectorAll('.dpin').length>=1 && ST.state.profile.pend.length>=1"), await E("[...document.querySelectorAll('.dpin')].map(x=>x.innerText).join(' | ')"))
-            await pg.click(".dpin >> nth=0"); await W("!document.querySelector('#destcard').hidden"); await pg.wait_for_timeout(500); await pg.screenshot(path=T + "05c3_selected.png")
-            await pg.click("[data-dcgo]")
+            await pg.click(".dpin >> nth=0")
         await pg.wait_for_timeout(1700); await pg.screenshot(path=T + "05d_walking.png")
         await W("document.querySelector('#movebar .land')", 30000); await pg.wait_for_timeout(900); await pg.screenshot(path=T + "05e_landed.png")
         check("dé lancé : le pion marche et s'arrête sur un immeuble", await E("ST.state.profile.rolls===9 && ST.state.profile.land===ST.state.profile.pos && ST.state.profile.pos!==300658"), await E("document.querySelector('#movebar').innerText.replace(/\\n/g,' · ').slice(0,160)"))
@@ -125,7 +124,7 @@ async def main():
         rv = str(uuid.uuid4()); db.sql("insert into auth.users(id) values (%s)", rv); db.rpc(rv, "join_game", p_pseudo="Rival", p_party="rempart")
         db.rpc(rv, "open_booster", p_kind="welcome"); h = db.rpc(rv, "my_holdings")["lots"][0]
         db.rpc(rv, "list_item", p_card=h[0], p_k=h[1], p_n=1, p_price=400000)
-        await pg.click("[data-back]"); await pg.click("#tabs [data-tab=market]"); await W("document.querySelector('[data-buy]')")
+        await pg.click("[data-back]"); await E("setMovebar(''); 1"); await pg.click("#tabs [data-tab=market]"); await W("document.querySelector('[data-buy]')")
         await pg.wait_for_timeout(300); await pg.screenshot(path=T + "10_market.png")
         await pg.click("[data-buy]"); await W(f"(ST.mine.get({h[0]})||[]).includes({h[1]})"); check("achat sur le marché à un autre joueur", True)
         await pg.click("#tabs [data-tab=paris]"); await W("document.querySelector('#p-paris .party-cta')")

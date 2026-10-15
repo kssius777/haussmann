@@ -128,13 +128,13 @@ async function travel(r) {   // le pion marche jusqu'à la case, puis la case s'
 let destMarks = [], destOpts = [], destSel = null;
 function clearDest() { destMarks.forEach(m => m.remove()); destMarks = []; destOpts = []; destSel = null; $("#pick")?.remove(); const d = $("#destcard"); if (d) { d.hidden = true; d.innerHTML = ""; } document.body.classList.remove("picking", "picksel"); }
 function destInfo(o) {   // [classe, icône, mot court sous le point, phrase complète]
-  if (o.chance) return ["chance", "🍀", "Chance", "Carte Chance : une surprise, bonne ou mauvaise."];
+  if (o.chance) return ["chance", "?", "Chance", "Carte Chance : une surprise, bonne ou mauvaise."];
   if (o.mine > 0) return ["mine", "★", "Chez vous", "Chez vous : vous touchez une journée de loyer en bonus."];
   const who = o.owners?.length ? o.owners.slice(0, 2).join(", ") + (o.owners.length > 2 ? "…" : "") : "";
-  if (who) return ["theirs", "€", "Chez " + o.owners[0], `Chez ${who} : vous lui payez une journée de loyer.` + (o.free > 0 ? ` ${o.free} ${card(o.card) ? lotWord(card(o.card), o.free) : "logement"} à acheter.` : "")];
+  if (who) return ["theirs", "", "Chez " + o.owners[0], `Chez ${who} : vous lui payez une journée de loyer.` + (o.free > 0 ? ` ${o.free} ${card(o.card) ? lotWord(card(o.card), o.free) : "logement"} à acheter.` : "")];
   const c = card(o.card), w = n => c ? lotWord(c, n) : n > 1 ? "logements" : "logement";
-  if (o.free > 0) return ["free", "+", "Libre", `${o.free} ${w(o.free)} ${o.free > 1 ? "libres" : "libre"} : vous pourrez acheter.`];
-  return ["theirs", "€", "Occupé", "Tout est déjà pris : loyer à payer."];
+  if (o.free > 0) return ["free", "", "Libre", `${o.free} ${w(o.free)} ${o.free > 1 ? "libres" : "libre"} : vous pourrez acheter.`];
+  return ["theirs", "", "Occupé", "Tout est déjà pris : loyer à payer."];
 }
 function declutterDest() { }
 async function showDest(die, opts) {
@@ -145,11 +145,11 @@ async function showDest(die, opts) {
     const [k, ic, short] = destInfo(o), ll = centerOf(o.card); pts.push(ll);
     const el = document.createElement("div"); el.className = "destm";   // maplibre place l'élément avec transform : l'animation est sur le bouton intérieur
     el.innerHTML = `<button class="dpin d-${k}" style="animation-delay:${i * 70}ms" aria-label="${esc(short)}"><i>${ic}</i><span>${esc(short)}</span></button>`;
-    el.addEventListener("click", ev => { ev.stopPropagation(); selectDest(i); });
+    el.addEventListener("click", ev => { ev.stopPropagation(); goTo(o.card); });   // toucher un point = la montgolfière y va ; on achète une fois arrivé
     destMarks.push(new maplibregl.Marker({ element: el, anchor: "bottom" }).setLngLat(ll).addTo(map));
   });
   const p = document.createElement("div"); p.id = "pick";
-  p.innerHTML = `<span class="pd">${dieSVG(die, DSIDE[die][0], DSIDE[die][1], 26)}</span><span><b>${die}</b> · Touchez un point pour choisir où aller</span>`;
+  p.innerHTML = `<span class="pd">${dieSVG(die, DSIDE[die][0], DSIDE[die][1], 26)}</span><span>Vous avez fait <b>${die}</b> · Touchez où aller</span>`;
   $("#p-map").appendChild(p); document.body.classList.add("picking");
   if (pawnPos() != null) pts.push(centerOf(pawnPos()));
   const lo = pts.map(x => x[0]), la = pts.map(x => x[1]), mobile = innerWidth < 900;
