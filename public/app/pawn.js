@@ -125,41 +125,46 @@ async function travel(r) {   // le pion marche jusqu'à la case, puis la case s'
 }
 
 // ---- après le dé : choisir sa destination parmi 2 à 4 immeubles ---------------------------
-let destMarks = [];
-function declutterDest() {   // deux étiquettes qui se chevauchent : on décale la seconde vers le bas
-  if (!destMarks.length) return; destMarks.forEach(m => m.setOffset([0, 0]));
-  const bx = destMarks.map(m => { const p = map.project(m.getLngLat()), e = m.getElement(); return { m, x: p.x, y: p.y, w: e.offsetWidth || 170, h: e.offsetHeight || 50, dy: 0 }; }).sort((a, b) => a.y - b.y);
-  for (let i = 1; i < bx.length; i++) for (let j = 0; j < i; j++) { const a = bx[j], b = bx[i];
-    if (Math.abs(a.x - b.x) < (a.w + b.w) / 2 + 4 && Math.abs((a.y + a.dy) - (b.y + b.dy)) < a.h + 4) b.dy = a.y + a.dy + a.h + 4 - b.y; }
-  bx.forEach(b => b.dy && b.m.setOffset([0, b.dy]));
+let destMarks = [], destOpts = [], destSel = null;
+function clearDest() { destMarks.forEach(m => m.remove()); destMarks = []; destOpts = []; destSel = null; $("#pick")?.remove(); const d = $("#destcard"); if (d) { d.hidden = true; d.innerHTML = ""; } document.body.classList.remove("picking", "picksel"); }
+function destInfo(o) {   // [classe, icône, mot court sous le point, phrase complète]
+  if (o.chance) return ["chance", "🍀", "Chance", "Carte Chance : une surprise, bonne ou mauvaise."];
+  if (o.mine > 0) return ["mine", "★", "Chez vous", "Chez vous : vous touchez une journée de loyer en bonus."];
+  const who = o.owners?.length ? o.owners.slice(0, 2).join(", ") + (o.owners.length > 2 ? "…" : "") : "";
+  if (who) return ["theirs", "€", "Chez " + o.owners[0], `Chez ${who} : vous lui payez une journée de loyer.` + (o.free > 0 ? ` ${o.free} ${card(o.card) ? lotWord(card(o.card), o.free) : "logement"} à acheter.` : "")];
+  const c = card(o.card), w = n => c ? lotWord(c, n) : n > 1 ? "logements" : "logement";
+  if (o.free > 0) return ["free", "+", "Libre", `${o.free} ${w(o.free)} ${o.free > 1 ? "libres" : "libre"} : vous pourrez acheter.`];
+  return ["theirs", "€", "Occupé", "Tout est déjà pris : loyer à payer."];
 }
-function clearDest() { destMarks.forEach(m => m.remove()); destMarks = []; $("#pick")?.remove(); document.body.classList.remove("picking"); }
-function destInfo(o) {
-  if (o.chance) return ["chance", "🍀", "Carte Chance"];
-  if (o.mine > 0) return ["mine", "★", "Chez vous · bonus"];
-  if (o.owners?.length) return ["theirs", "€", "Chez " + o.owners.slice(0, 2).join(", ") + (o.owners.length > 2 ? "…" : "") + " · loyer"];
-  if (o.free > 0) return ["free", "+", o.free > 1 ? `${o.free} logements libres` : "1 logement libre"];
-  return ["theirs", "€", "Loyer à payer"];
-}
+function declutterDest() { }
 async function showDest(die, opts) {
-  clearDest();
+  clearDest(); destOpts = opts;
   await ensureCards(opts.map(o => o.card).concat(pawnPos() != null ? [pawnPos()] : []));
   const pts = [];
-  opts.forEach(o => {
-    const c = card(o.card), [k, ic, txt] = destInfo(o), ll = centerOf(o.card); pts.push(ll);
+  opts.forEach((o, i) => {
+    const [k, ic, short] = destInfo(o), ll = centerOf(o.card); pts.push(ll);
     const el = document.createElement("div"); el.className = "destm";   // maplibre place l'élément avec transform : l'animation est sur le bouton intérieur
-    el.innerHTML = `<button class="dest d-${k}" aria-label="${esc("Aller à " + (c ? title(c) : "cet immeuble"))}"><i>${ic}</i><span><b>${esc(c ? (c.adr || title(c)) : "Immeuble")}</b><em>${esc(txt)}</em></span></button>`;
-    el.addEventListener("click", ev => { ev.stopPropagation(); goTo(o.card); });
+    el.innerHTML = `<button class="dpin d-${k}" style="animation-delay:${i * 70}ms" aria-label="${esc(short)}"><i>${ic}</i><span>${esc(short)}</span></button>`;
+    el.addEventListener("click", ev => { ev.stopPropagation(); selectDest(i); });
     destMarks.push(new maplibregl.Marker({ element: el, anchor: "bottom" }).setLngLat(ll).addTo(map));
   });
   const p = document.createElement("div"); p.id = "pick";
-  p.innerHTML = `<span class="pd">${dieSVG(die, DSIDE[die][0], DSIDE[die][1], 34)}</span><span><b>Vous avez fait ${die}</b><br>Touchez l'immeuble où aller</span>`;
+  p.innerHTML = `<span class="pd">${dieSVG(die, DSIDE[die][0], DSIDE[die][1], 26)}</span><span><b>${die}</b> · Touchez un point pour choisir où aller</span>`;
   $("#p-map").appendChild(p); document.body.classList.add("picking");
   if (pawnPos() != null) pts.push(centerOf(pawnPos()));
   const lo = pts.map(x => x[0]), la = pts.map(x => x[1]), mobile = innerWidth < 900;
-  map.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], { padding: { top: mobile ? 200 : 160, bottom: mobile ? 200 : 150, left: mobile ? 95 : 160, right: mobile ? 95 : 160 }, maxZoom: 16, pitch: 45, duration: 700 });
-  map.once("moveend", declutterDest);
+  map.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], { padding: { top: mobile ? 130 : 130, bottom: mobile ? 230 : 160, left: mobile ? 50 : 140, right: mobile ? 50 : 140 }, maxZoom: 16.2, pitch: 40, duration: 700 });
   if (typeof tutTick === "function") tutTick();
+}
+function selectDest(i) {
+  const o = destOpts[i]; if (!o) return; destSel = i;
+  destMarks.forEach((m, j) => m.getElement().querySelector(".dpin").classList.toggle("on", j === i));
+  const c = card(o.card), [k, ic, , txt] = destInfo(o), d = $("#destcard");
+  d.innerHTML = `<div class="dc-h"><i class="d-${k}">${ic}</i><div><b>${esc(c ? (c.adr || title(c)) : "Immeuble")}</b><span>${esc(txt)}</span></div><button class="x" data-dcx aria-label="Choisir un autre">×</button></div>
+    <button class="btn block dc-go" data-dcgo>Y aller</button>`;
+  d.hidden = false; document.body.classList.add("picksel");
+  d.onclick = e => { if (e.target.closest("[data-dcgo]")) goTo(o.card); else if (e.target.closest("[data-dcx]")) { d.hidden = true; destSel = null; document.body.classList.remove("picksel"); destMarks.forEach(m => m.getElement().querySelector(".dpin").classList.remove("on")); } };
+  map.easeTo({ center: centerOf(o.card), duration: 400, offset: [0, innerWidth < 900 ? -60 : 0] });
 }
 async function resumeDest() {   // un dé lancé mais pas encore joué (page rechargée) : on repropose les destinations
   if (!ST.state?.profile?.pend?.length || moving || destMarks.length) return;
@@ -210,7 +215,7 @@ function showLand(L, gv) {
   if (L?.toll > 0) lines.push(`<span class="ln bad">Vous payez son loyer · <b>−${fmtE(L.toll)}</b></span>`);
   if (L?.bonus > 0) lines.push(`<span class="ln good">Bonus chez vous · <b>+${fmtE(L.bonus)}</b></span>`);
   if (L?.chance) { const ch = L.chance; const [nm] = CHANCE[ch.k] || ["Chance"]; lines.push(`<span class="ln ${BAD.has(ch.k) ? "bad" : "good"}"><small>Case Chance${BAD.has(ch.k) ? " · pas de chance" : ""}</small>🃏 <b>${esc(nm)}</b> : ${esc(chanceText(ch))}</span>`); }
-  const occ = occHTML(c, mine, others, free);
+  const occ = mine || others ? occHTML(c, mine, others, free) : "";   // immeuble entièrement libre : le plan n'apprend rien
   let btns = "";
   if (free > 0) {
     const unit = isP ? "1 part" : tot > 1 ? `1 ${word(1)}` : c.lk === "l" ? "le logement" : "le local", allFree = !isP && free === tot && tot > 1, total = c.v * tot;
