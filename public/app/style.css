@@ -1567,3 +1567,12 @@ body.picksel .dicebar{display:none!important}
   body.landopen .land .lc{--cw:clamp(120px,calc((100dvh - var(--bar-h) - 300px) / 1.45),min(70vw,280px))}
   body.landopen #movebar.k-land:has(.farbuy) .land .lc{--cw:clamp(110px,calc((100dvh - var(--bar-h) - 350px) / 1.45),min(64vw,260px))}
 }
+/* lien cadeau sur la page d'accueil */
+.giftb{display:grid;gap:3px;margin:0 0 16px;padding:12px 14px;border-radius:14px;background:linear-gradient(135deg,#2563EB,#7C3AED);color:#fff;font-size:14px;line-height:1.35;box-shadow:0 10px 30px rgba(37,99,235,.35)}
+.giftb b{font-size:15px}
+.giftb span{opacity:.9;font-size:13px}
+.giftb.gone{background:#1F2430;box-shadow:none}
+/* admin */
+.adminbox{border:1.5px dashed #94A3B8;background:#FAFBFC;margin-top:14px}
+.agl{display:flex;gap:6px;margin-top:10px;align-items:center}
+.agl .inp{flex:1;min-width:0;height:36px;font-size:12.5px}

@@ -19,6 +19,7 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
    python3 test/test_rules.py    # règles du jeu (42 tests)
    python3 test/test_pawn.py     # pion et dé
    python3 test/test_credit.py   # crédit immobilier
+   python3 test/test_admin.py    # admin et liens cadeaux
    python3 test/e2e.py           # parcours complet dans un vrai navigateur, captures dans test/shots/
    ```
    Ne pousser que si tout est vert.
@@ -48,6 +49,7 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
   rembourse le crédit automatiquement (impossible d'être en défaut) ; capacité d'emprunt = 5 M€ + 20 jours de loyers − crédits en cours ;
   remboursement anticipé (`repay`) ; un bien à crédit ne peut être ni vendu ni hypothéqué. Patrimoine et classement retirent crédits et hypothèques.
 - **Salaire** : +20 000 € à chaque lancer de dé. Le pion démarre au 18 rue de la Bûcherie (400761), face à Notre-Dame, rive gauche.
+- **Admin et liens cadeaux** (migration_admin.sql) : table `admins` (on s'y ajoute à la main dans le SQL Editor), `is_admin()`. L'admin crée un lien `/?gift=CODE` depuis la fiche d'un immeuble (« Admin · offrir cette carte », n logements) ou depuis Profil → « Liens cadeaux » (boosters) ; le premier joueur connecté qui ouvre le lien gagne (`claim_gift`, verrou sur la ligne), les suivants voient « Trop tard ». La page d'accueil montre le cadeau avant l'inscription (`gift_info`, localStorage `hm_gift`).
 - Historique de l'argent : table `ledger` + `_log()` appelé à chaque mouvement ; page « Mon argent » (clic sur la trésorerie), RPC `my_ledger()`.
 - Sons (`sfx()` dans core.js, sans fichier audio) : coupés par défaut, activables dans le profil (localStorage `hm_sound`).
 - Achat à la banque : le crédit est proposé en premier (c'est ce que tout le monde choisit) ; « payer comptant » en lien dessous.

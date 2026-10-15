@@ -18,13 +18,20 @@ async function landingHTML() {
     ["Devenez maire", "Le plus gros propriétaire d'un arrondissement en prend la mairie et touche 8 % des loyers du quartier."]
   ];
   const gOk = await googleReady();
+  // arrivé par un lien cadeau : on montre ce qui l'attend
+  let giftB = "";
+  try { const code = localStorage.getItem("hm_gift"); if (code) { const gi = await rpc("gift_info", { p_code: code });
+    if (gi) { if (gi.card) await ensureCards([gi.card]); const gc = gi.card ? card(gi.card) : null;
+      const what = [gc ? `${gi.n > 1 ? gi.n + " " + lotWord(gc, gi.n) : (gc.lk === "p" ? "une " : "un ") + lotWord(gc, 1)} au ${title(gc)}` : "", gi.boosters ? `${gi.boosters} booster${gi.boosters > 1 ? "s" : ""}` : ""].filter(Boolean).join(" + ");
+      giftB = gi.claimed ? `<div class="giftb gone">🎁 Trop tard : ce cadeau a déjà été récupéré${gi.winner ? " par " + esc(gi.winner) : ""}. Mais tout Paris reste à prendre !</div>`
+        : `<div class="giftb">🎁 <b>Un cadeau vous attend : ${esc(what)}.</b><span>Premier arrivé, premier servi : créez votre compte pour le récupérer.</span></div>`; } } } catch (e) { }
   const cta = gOk ? `<div class="lcta"><button class="btn block gbtn" data-l="google">${G_ICON}Commencer avec Google</button><button class="btn block ghostw" data-l="email">Créer un compte avec un e-mail</button></div>`
     : `<div class="lcta"><button class="btn block goldb" data-l="guest">Jouer tout de suite</button><button class="btn block ghostw" data-l="email">Créer un compte avec un e-mail</button></div>`;
   return `<div class="landing v2">
     <div class="lhero2"><div class="glow"></div>
       <header class="lhead"><span class="plaque-mini">HAUSSMANN</span><button class="btn sm ghostw" data-l="signin">Se connecter</button></header>
       <div class="ltop"><section class="lhero">
-        <p class="eyebrow">Jeu gratuit · ordinateur et mobile</p>
+        ${giftB}<p class="eyebrow">Jeu gratuit · ordinateur et mobile</p>
         <h1>Tout Paris<br>est à prendre.</h1>
         <p class="lead"><b>77 835 cartes à collectionner</b> : tous les vrais immeubles de Paris. Achetez-les et touchez leurs loyers, même quand vous ne jouez pas.</p>
         ${cta}

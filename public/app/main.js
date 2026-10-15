@@ -3,6 +3,22 @@
 //  Démarrage
 // =====================================================================
 let started = false;
+// lien cadeau : https://…/?gift=CODE — on le garde jusqu'à ce que le joueur soit connecté
+try { const gq = new URLSearchParams(location.search).get("gift"); if (gq) { localStorage.setItem("hm_gift", gq); const u = new URL(location.href); u.searchParams.delete("gift"); history.replaceState(null, "", u); } } catch (e) { }
+async function claimGift() {
+  let code = null; try { code = localStorage.getItem("hm_gift"); localStorage.removeItem("hm_gift"); } catch (e) { }
+  if (!code) return;
+  try {
+    const r = await rpc("claim_gift", { p_code: code }); setState(r.state);
+    await Promise.all([refreshHold(), refreshMap()]).catch(() => { }); renderWallet(); paintAll?.(); renderDice?.();
+    if (r.card) await ensureCards([r.card]);
+    const c = r.card ? card(r.card) : null;
+    const parts = [r.got && c ? `${r.got > 1 ? r.got + " " + lotWord(c, r.got) : (c.lk === "p" ? "1 part" : "1 " + lotWord(c, 1))} au ${title(c)}` : "", r.boosters ? `${r.boosters} booster${r.boosters > 1 ? "s" : ""}` : ""].filter(Boolean);
+    toast(`🎁 Cadeau récupéré : ${parts.join(" + ")} !`, "good");
+    if (window.confetti) confetti("#2563EB", 60);
+    if (c) setTimeout(() => { flyTo(r.card); previewBuilding(r.card); }, 600);
+  } catch (e) { toast("🎁 " + e.message, "bad"); }
+}
 async function boot() {
   try {
     initBackend();
@@ -25,6 +41,8 @@ async function startGame(first) {
   try { buildMap(BASE); } catch (e) { console.error(e); $("#map").innerHTML = `<div class="empty" style="margin:120px 16px 0">La carte 3D ne peut pas s'afficher sur cet appareil. Le reste du jeu fonctionne.</div>`; }
   $("#loading")?.remove();
   go("map"); renderWallet(); initPawnUI(); renderDice();
+  rpc("is_admin").then(v => { ST.admin = v === true; }).catch(() => { });
+  setTimeout(claimGift, 1500);
   try { if (first) { if (localStorage.getItem("hm_tut") == null) localStorage.setItem("hm_tut", "1"); } else if (localStorage.getItem("hm_tut") == null) localStorage.setItem("hm_tut", "99"); } catch (e) { }
   setInterval(tutTick, 700);
   setInterval(() => {

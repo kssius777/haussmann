@@ -34,7 +34,7 @@ function back() {
 async function renderDetail(anim) {
   const top = stack[stack.length - 1]; if (!top) return; const el = $("#p-detail");
   el.hidden = false; if (anim) { el.classList.remove("enter"); void el.offsetWidth; el.classList.add("enter"); el.scrollTop = 0; }
-  const K = { b: buildingPage, arr: arrPage, shop: shopPage, money: moneyPage, profile: profilePage, results: resultsPage, party: partyPage }[top.kind];
+  const K = { b: buildingPage, arr: arrPage, shop: shopPage, money: moneyPage, profile: profilePage, results: resultsPage, party: partyPage, gifts: giftsPage }[top.kind];
   if (!K) return;
   const html = await K(top.arg);
   if (stack[stack.length - 1] !== top) return;
@@ -349,8 +349,49 @@ async function buildingPage(g) {
       ${occHTML(c, isP ? myN : myKs.length, isP ? Math.max(0, sold - myN) : Math.max(0, owners.size - myKs.length), free)}
       <div class="actbar2 lbx" id="actbar"><div class="lb">${buyActions(c, g, owners, free, isP)}</div></div>
       ${mine}${offersHTML}${plan}${about}
+      ${ST.admin ? adminGiftBox(c, g, free) : ""}
     </div>
   </div>`;
+}
+// ---------------- ADMIN : liens cadeaux (le premier qui ouvre le lien gagne) ----------------
+let adminN = 1, adminLink = null;
+const giftURL = code => `${location.origin}/?gift=${code}`;
+function giftLinkHTML(url) {
+  return `<div class="agl"><input class="inp" readonly value="${esc(url)}" aria-label="Lien cadeau"><button class="btn sm" data-act="acopy" data-k="${esc(url)}">Copier</button>${navigator.share ? `<button class="btn sm light" data-act="ashare" data-k="${esc(url)}">Partager</button>` : ""}</div>`;
+}
+function adminGiftBox(c, g, free) {
+  const n = Math.max(1, Math.min(adminN, Math.max(1, free)));
+  return `<div class="box adminbox"><b>🛠 Admin · offrir cette carte</b>
+    <p class="sub" style="margin:2px 0 10px">Crée un lien à partager (X, Instagram…) : le premier joueur qui l'ouvre reçoit ${c.lk === "p" ? "les parts" : "les logements"}.</p>
+    ${free > 0 ? `<div class="ostep"><span>Combien ?</span><div class="stepper"><button data-act="an" data-k="-1" ${n <= 1 ? "disabled" : ""}>−</button><b class="num">${n}</b><button data-act="an" data-k="1" ${n >= free ? "disabled" : ""}>+</button></div><small>sur ${free} libre${free > 1 ? "s" : ""}</small></div>
+      <button class="btn block" data-act="agift" data-k="${n}" style="margin-top:10px">🎁 Créer le lien cadeau</button>` : `<p class="sub">Plus rien de libre dans cet immeuble.</p>`}
+    ${adminLink && adminLink.g === g ? giftLinkHTML(adminLink.url) : ""}</div>`;
+}
+async function giftsPage() {
+  let L = []; try { L = await rpc("admin_gifts"); } catch (e) { return dhead("Liens cadeaux") + `<div class="wrap"><p class="sub">${esc(e.message)}</p></div>`; }
+  await ensureCards(L.filter(x => x.card).map(x => x.card));
+  return dhead("Liens cadeaux") + `<div class="wrap">
+    <div class="box adminbox"><b>🎁 Offrir des boosters</b><p class="sub" style="margin:2px 0 10px">Le premier qui ouvre le lien les reçoit.</p>
+      <div class="ochips">${[1, 3, 5].map(n => `<button data-act="agb" data-k="${n}">${n} booster${n > 1 ? "s" : ""}</button>`).join("")}</div>
+      ${adminLink && adminLink.g == null ? giftLinkHTML(adminLink.url) : ""}</div>
+    <p class="sub">Pour offrir une carte : ouvrez la fiche de l'immeuble, en bas « Admin · offrir cette carte ».</p>
+    <div class="rows">${L.map(x => { const c = x.card ? card(x.card) : null;
+      const what = [c ? `${x.n} × ${title(c)}` : "", x.boosters ? `${x.boosters} booster${x.boosters > 1 ? "s" : ""}` : ""].filter(Boolean).join(" + ");
+      return `<div class="lrow" style="grid-template-columns:1fr auto"><div class="t"><b>${esc(what)}</b><span>${x.winner ? `✓ récupéré par ${esc(x.winner)}` : "en attente"} · ${ago(x.created_at)}</span></div>
+        <div class="v">${x.winner ? "" : `<button class="btn sm" data-act="acopy" data-k="${esc(giftURL(x.code))}">Copier</button><button class="btn sm ghost" data-act="acancel" data-k="${esc(x.code)}">Annuler</button>`}</div></div>`; }).join("") || `<div class="empty">Aucun lien pour l'instant.</div>`}</div></div>`;
+}
+async function adminAct(a, btn, g) {   // actions admin, sur la fiche ou la page des cadeaux
+  const k = btn.dataset.k;
+  if (a === "an") { adminN = Math.max(1, adminN + +k); return renderDetail(false); }
+  if (a === "acopy") { try { await navigator.clipboard.writeText(k); toast("Lien copié", "good"); } catch (e) { prompt("Copiez le lien :", k); } return; }
+  if (a === "ashare") { try { await navigator.share({ title: "Un cadeau sur Haussmann", text: "🎁 Le premier qui ouvre ce lien gagne cette carte !", url: k }); } catch (e) { } return; }
+  btn.disabled = true;
+  try {
+    if (a === "agift") { const r = await rpc("admin_gift_create", { p_card: g, p_n: +k, p_boosters: 0 }); adminLink = { g, url: giftURL(r.code) }; }
+    if (a === "agb") { const r = await rpc("admin_gift_create", { p_card: null, p_n: 1, p_boosters: +k }); adminLink = { g: null, url: giftURL(r.code) }; }
+    if (a === "acancel") { await rpc("admin_gift_cancel", { p_code: k }); toast("Lien annulé", "good"); }
+  } catch (e) { toast(e.message, "bad"); }
+  renderDetail(false);
 }
 function farHTML(d, g) { return `<div class="buyfar"><b>🎲 Pour l'acheter à la banque, tombez dessus avec le dé.</b><span class="muted">Ou trouvez-le dans un booster, ou au Marché si un joueur le vend.</span></div>`; }
 function payToggle(price, rent) {
@@ -381,6 +422,7 @@ function buyActions(c, g, owners, free, isP) {
 $("#p-detail").addEventListener("click", async e => {
   const top = stack[stack.length - 1]; if (!top) return;
   const mt = e.target.closest("[data-mapto]"); if (mt) { const g = +mt.dataset.mapto; showOnMap(g); return; }
+  { const ab = e.target.closest("[data-act]"); if (ab && /^a(n|copy|share|gift|gb|cancel)$/.test(ab.dataset.act)) return adminAct(ab.dataset.act, ab, top.kind === "b" ? top.arg : null); }
   if (top.kind === "party" || top.kind === "profile") return partyClick(e);
   if (top.kind === "shop") { const o = e.target.closest("[data-offer]"); if (o) toast("Le paiement arrive bientôt : la boutique sera ouverte au lancement.", ""); return; }
   if (top.kind !== "b") return;
@@ -489,6 +531,7 @@ async function profilePage() {
     ${!pr ? `<div class="box"><b>Vous n'avez pas encore de parti</b><p class="sub" style="margin:4px 0 0">Rejoignez un camp pour toucher +${MEMBER_BONUS} % de loyers dans les arrondissements qu'il tient, et jouer pour l'Hôtel de Ville.</p></div>` : ""}
     ${pr ? `<div class="box" style="border-left:6px solid ${pr.c};display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center">${emblemSVG(p.party, 56)}<div><b style="color:${pr.c};font-size:17px">${esc(pr.n)}</b> <span class="muted">· ${esc(pr.side)}</span><div class="motto">« ${esc(pr.motto)} »</div><p class="sub" style="margin:6px 0 0">Vous protège de : ${esc(shieldText(p.party))}. Dans les arrondissements tenus par ${esc(pr.n)}, vos loyers sont à +${MEMBER_BONUS} %.</p></div></div>` : ""}
     <div style="margin-top:10px"><button class="btn block ${pr ? "light" : ""}" data-push="party" ${pr && wait > 0 ? "disabled" : ""}>${!pr ? "Choisir mon parti" : wait > 0 ? `Changer de parti possible dans ${hm(wait)}` : "Changer de parti"}</button></div>
+    ${ST.admin ? `<h2 class="h2">Admin</h2><button class="btn block" data-push="gifts">🎁 Liens cadeaux (giveaway)</button>` : ""}
     <h2 class="h2">Réglages</h2>
     <button class="btn block light" id="mute">${(() => { try { return localStorage.getItem("hm_sound") === "1" ? "🔊 Sons activés · couper" : "🔇 Sons coupés · activer"; } catch (e) { return "🔇 Sons"; } })()}</button>
     <h2 class="h2">Compte</h2>
