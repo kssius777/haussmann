@@ -59,3 +59,4 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
 - Patrimoine : « Où sont vos biens » (barres par arrondissement, clic = filtre), collection triable et paginée.
 - « Mes biens » sur la carte : carte épurée (classe `mymode`) : seulement les numéros d'arrondissement et les points bleus.
 - Noms des quartiers, canaux et îles sur la carte (`PLACES` dans map.js).
+- Tutoriel en jouant (fin de main.js, `tutTick`, localStorage `hm_tut` : 1 lancer · 2 la case · 3 après l'achat · 4 boosters · 5 mairies · 99 fini) : une bulle noire pointe ce qu'il faut toucher, seulement pour les nouveaux joueurs ; « Passer le tutoriel » à tout moment. e2e.py le passe (hm_tut=99).

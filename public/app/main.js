@@ -25,6 +25,8 @@ async function startGame(first) {
   try { buildMap(BASE); } catch (e) { console.error(e); $("#map").innerHTML = `<div class="empty" style="margin:120px 16px 0">La carte 3D ne peut pas s'afficher sur cet appareil. Le reste du jeu fonctionne.</div>`; }
   $("#loading")?.remove();
   go("map"); renderWallet(); initPawnUI(); renderDice();
+  try { if (first) { if (localStorage.getItem("hm_tut") == null) localStorage.setItem("hm_tut", "1"); } else if (localStorage.getItem("hm_tut") == null) localStorage.setItem("hm_tut", "99"); } catch (e) { }
+  setInterval(tutTick, 700);
   setInterval(() => {
     renderWallet();
     const w = $("#worth"); if (w && cur() === "assets") w.textContent = fmtE(worthNow());
@@ -68,3 +70,48 @@ window.addEventListener("scroll", () => { if (window.scrollX || window.scrollY) 
 // une erreur inattendue s'affiche en petit message au lieu d'un écran blanc (utile pour comprendre un bug sur téléphone)
 window.addEventListener("error", e => { try { toast("Petit bug : " + String(e.message || "").slice(0, 120), "bad"); } catch (_) { } });
 window.addEventListener("unhandledrejection", e => { const m = String(e.reason?.message || e.reason || ""); if (/fetch|abort|network/i.test(m)) return; try { toast("Petit bug : " + m.slice(0, 120), "bad"); } catch (_) { } });
+
+
+// =====================================================================
+//  Tutoriel en jouant : une bulle à la fois, au moment où la règle sert
+//  1 lancer le dé · 2 la case (libre / chez un autre / Chance) · 3 après l'achat · 4 les boosters · 5 les mairies
+// =====================================================================
+let tutShown = "";
+function tutGet() { try { return +(localStorage.getItem("hm_tut") || 99); } catch (e) { return 99; } }
+function tutSet(n) { try { localStorage.setItem("hm_tut", String(n)); } catch (e) { } tutTick(); }
+function tutTick() {
+  const st = tutGet(); let k = "", anchor = null, html = "", ok = false;
+  const idle = cur() === "map" && $("#reveal").hidden && $("#onb").hidden && !moving;
+  if (st === 1 && idle && !panelKind) { k = "1"; anchor = "#b-roll"; html = "<b>Lancez le dé 🎲</b>Votre montgolfière va se poser sur un immeuble de Paris. Astuce : touchez d'abord un point bleu pour choisir la direction."; }
+  else if (st === 1 && panelKind === "land" && !landView) tutSet(2);
+  else if (st === 2 && panelKind === "land" && !landView && !moving) {
+    if (justBought) return tutSet(3);
+    const g = landPos(), L = lastLanding && lastLanding.card === g ? lastLanding : null, fr = g != null ? freeOf(g) : 0;
+    k = "2" + (L?.toll > 0 ? "t" : L?.chance ? "c" : fr > 0 ? "f" : "x"); anchor = "#movebar .lb"; ok = true;
+    html = L?.toll > 0 ? "<b>Chez un autre joueur</b>Quand vous tombez sur son immeuble, vous lui payez une journée de loyer. À vous d'acheter les immeubles où les autres passent !"
+      : L?.chance ? "<b>Case Chance 🃏</b>Environ une case sur huit : une surprise, bonne ou mauvaise. Ici, l'immeuble reste à acheter s'il est libre."
+      : fr > 0 ? "<b>Il est libre : achetez-le !</b>À crédit, vous ne payez que 10 % maintenant : la banque prête le reste, remboursé tout seul par le loyer."
+      : "<b>Tout est déjà pris ici</b>Relancez le dé pour trouver un immeuble libre.";
+  }
+  else if (st === 2 && !panelKind && idle) tutSet(4);
+  else if (st === 2.5) { if (justBought && panelKind === "land") return tutSet(3); if (!panelKind && idle) return tutSet(4); }
+  else if (st === 3 && panelKind === "land") { k = "3"; anchor = ".money"; ok = true; html = "<b>Bravo, c'est votre premier bien !</b>Il vous rapporte des loyers en continu, même quand vous n'êtes pas connecté. Touchez votre argent, ici, pour voir tout l'historique."; }
+  else if (st === 3 && !panelKind && idle) tutSet(4);
+  else if (st === 4 && idle && !panelKind) { k = "4"; anchor = "#b-pack"; html = "<b>Ouvrez vos boosters</b>Chacun contient 4 vrais biens de Paris et 1 carte Chance. Vous en avez à ouvrir !"; }
+  else if (st === 4 && (cur() === "booster" || !$("#reveal").hidden)) tutSet(5);
+  else if (st === 5 && idle && !panelKind) { k = "5"; anchor = null; ok = true; html = "<b>Dernière chose : devenez maire 👑</b>Le plus gros propriétaire d'un arrondissement en devient le maire et touche 8 % des loyers du quartier. Bonne conquête de Paris !"; }
+  // affichage de la bulle
+  let el = $("#coach");
+  if (!k) { if (el) el.remove(); tutShown = ""; return; }
+  if (!el) { el = document.createElement("div"); el.id = "coach"; document.body.appendChild(el);
+    el.addEventListener("click", e => { if (e.target.closest("[data-tok]")) { const s2 = tutGet(); tutSet(s2 === 2 ? 2.5 : s2 === 3 ? 4 : s2 === 5 ? 99 : s2); if (s2 === 2) el.remove(); } if (e.target.closest("[data-tskip]")) tutSet(99); }); }
+  if (tutShown !== k) { tutShown = k; el.innerHTML = `<div class="ct">${html}</div><div class="cb">${ok ? `<button class="btn sm" data-tok>${st === 5 ? "C'est parti" : "OK"}</button>` : ""}<button class="lnk" data-tskip>Passer le tutoriel</button></div><i class="arr"></i>`; }
+  // position : au-dessus ou en dessous de l'élément visé
+  const a = anchor && document.querySelector(anchor), W = innerWidth, H = innerHeight, bw = Math.min(320, W - 24);
+  el.style.width = bw + "px";
+  if (!a) { el.style.left = (W - bw) / 2 + "px"; el.style.top = Math.round(H * .3) + "px"; el.className = "noarr"; return; }
+  const r = a.getBoundingClientRect(), below = r.top < H / 2, cx = r.left + r.width / 2;
+  const left = Math.max(12, Math.min(W - bw - 12, cx - bw / 2)); el.style.left = left + "px";
+  el.className = below ? "below" : "above"; el.style.setProperty("--ax", (cx - left) + "px");
+  if (below) el.style.top = (r.bottom + 12) + "px"; else el.style.top = Math.max(8, r.top - el.offsetHeight - 12) + "px";
+}

@@ -24,7 +24,7 @@ async def main():
         await pg.fill("#em", "alice@test.fr"); await pg.fill("#pw", "secret12"); await pg.click("#authf button")
         await W("document.querySelector('#ps')")
         await pg.fill("#ps", "Alice"); await pg.click("#pf button")
-        await W("document.querySelector('.welcome')"); await pg.wait_for_timeout(400); await pg.screenshot(path=T + "02_welcome.png")
+        await W("document.querySelector('.welcome')"); await E("localStorage.setItem('hm_tut','99'); 1"); await pg.wait_for_timeout(400); await pg.screenshot(path=T + "02_welcome.png")
         check("bienvenue : 1 M€ et 5 boosters expliqués, sans choix de parti", await E("!ST.state.profile.party && document.querySelector('.welcome').innerText.includes('boosters pour démarrer')"))
         await pg.click("[data-w=open]")
         await W("!document.querySelector('#reveal').hidden && document.querySelector('#rpack .sachet.open')", 30000)

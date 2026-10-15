@@ -269,7 +269,7 @@ function initMapUI() {
 }
 
 // petit message d'aide sur la carte, jusqu'au premier achat ou aperçu
-function showHint() { try { if (localStorage.getItem("hm_hint")) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "🎲 Touchez un point bleu pour choisir votre direction, puis lancez le dé : votre montgolfière s'arrête sur un immeuble. S'il est libre, achetez-le !"; $("#p-map").appendChild(h); }
+function showHint() { try { if (localStorage.getItem("hm_hint") || +(localStorage.getItem("hm_tut") || 99) < 99) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "🎲 Touchez un point bleu pour choisir votre direction, puis lancez le dé : votre montgolfière s'arrête sur un immeuble. S'il est libre, achetez-le !"; $("#p-map").appendChild(h); }
 function hideHint() { $("#maphint")?.remove(); try { localStorage.setItem("hm_hint", "1"); } catch (e) { } }
 function celebrate(c) { toast(`Félicitations ! ${title(c)} est à vous. Loyer : +${fmtE(c.rent)}/jour`, "good"); if (window.confetti) confetti("#0EA5A0", 30); }
 
