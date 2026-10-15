@@ -27,6 +27,7 @@ async function startGame(first) {
   go("map"); renderWallet(); initPawnUI(); renderDice();
   try { if (first) { if (localStorage.getItem("hm_tut") == null) localStorage.setItem("hm_tut", "1"); } else if (localStorage.getItem("hm_tut") == null) localStorage.setItem("hm_tut", "99"); } catch (e) { }
   setInterval(tutTick, 700);
+  setInterval(() => { if (cur() === "map" && !aimMarks.length) showAim(); }, 2000);   // les points de direction réapparaissent dès que possible
   setInterval(() => {
     renderWallet();
     const w = $("#worth"); if (w && cur() === "assets") w.textContent = fmtE(worthNow());

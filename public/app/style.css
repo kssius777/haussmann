@@ -1426,3 +1426,24 @@ body.mymode .mmark,body.mymode .plabel,body.mymode .pricetag,body.mymode .amark 
 #coach .arr{position:absolute;left:calc(var(--ax,50%) - 8px);width:16px;height:16px;background:#0B0C10;transform:rotate(45deg)}
 #coach.above .arr{bottom:-7px} #coach.below .arr{top:-7px} #coach.noarr .arr{display:none}
 @keyframes coachIn{from{transform:translateY(8px) scale(.96);opacity:0}}
+/* le dé qui roule : le même dessin que sur le bouton, qui tourne en changeant de face */
+#dice3d .dland.rolling{animation:dieShake .2s linear infinite}
+@keyframes dieShake{0%{transform:rotate(-14deg) translateY(-6px)}50%{transform:rotate(12deg) translateY(4px)}100%{transform:rotate(-14deg) translateY(-6px)}}
+/* le bouton du milieu : un vrai gros dé, avec le nombre de lancers dessous */
+.dmain{width:92px!important;height:92px!important;background:none!important;border:0!important;box-shadow:none!important;border-radius:0!important;animation:none!important;perspective:none}
+.dmain .cube{width:auto!important;height:auto!important}
+.dmain .dsvg{width:92px!important;height:92px!important;margin-top:-10px;filter:drop-shadow(0 8px 10px rgba(15,27,45,.28))!important;transition:transform .15s}
+.dmain:not(:disabled) .dsvg{animation:dieIdle 2.6s ease-in-out infinite}
+@keyframes dieIdle{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-4px) rotate(-4deg)}}
+.dmain:active:not(:disabled) .dsvg{transform:scale(.92)}
+.dmain:disabled .dsvg,.dmain.empty .dsvg{filter:grayscale(1) opacity(.6)!important}
+.dmain small{bottom:-8px!important;background:var(--act)!important;color:#fff!important;border-color:#fff!important;font-size:12px!important;padding:3px 10px!important}
+@media (max-width:699px){.dmain{width:84px!important;height:84px!important}.dmain .dsvg{width:84px!important;height:84px!important}}
+/* la bulle du tutoriel : bleu « action », comme les boutons à toucher */
+#coach,#coach .arr{background:var(--act)}
+#coach .ct{color:rgba(255,255,255,.92)}
+#coach .cb .btn{background:#fff!important;color:var(--act)!important}
+#coach .lnk{color:rgba(255,255,255,.75)}
+#maphint{bottom:calc(var(--tab-h) + env(safe-area-inset-bottom,0px) + 128px)!important}
+@media (min-width:900px){#maphint{bottom:140px!important}}
+.dmain .dsvg{margin-top:-4px}

@@ -227,17 +227,18 @@ const DSIDE = { 1: [2, 3], 2: [1, 3], 3: [1, 2], 4: [1, 5], 5: [1, 3], 6: [2, 4]
 function setDieIcon(n) { const e = $("#dieico"); if (e) e.innerHTML = dieSVG(n, ...DSIDE[n]); }
 function dieSVG(top = 5, left = 1, right = 3, size = 40) {
   const face = (m, fill, n, pip) => `<g transform="matrix(${m})"><rect x=".02" y=".02" width=".96" height=".96" rx=".2" fill="${fill}"/>${PIPXY[n].map(([x, y]) => `<circle cx="${x}" cy="${y}" r=".095" fill="${pip}"/>`).join("")}</g>`;
-  return `<svg class="dsvg" viewBox="0 0 40 40" width="${size}" height="${size}" aria-hidden="true"><ellipse cx="20" cy="31" rx="11" ry="2.4" fill="rgba(0,0,0,.18)"/>
+  return `<svg class="dsvg" viewBox="7 1.5 26 32" width="${size}" height="${size}" aria-hidden="true"><ellipse cx="20" cy="31" rx="10" ry="2" fill="rgba(0,0,0,.16)"/>
     ${face("10.4,6,-10.4,6,20,4", "#FFFFFF", top, "#0B0C10")}${face("10.4,6,0,12,9.6,10", "#E4E9F3", left, "#0B0C10")}${face("10.4,-6,0,12,20,16", "#C9D3E6", right, "#0B0C10")}</svg>`;
 }
 const dieHTML = n => `<div class="die n${n}">${[1, 2, 3, 4, 5, 6].map(f => `<i class="f${f}">${"<b></b>".repeat(f)}</i>`).join("")}</div>`;
-async function animDice(n) {
-  const D = $("#dice3d"); D.hidden = false;
-  D.innerHTML = `<div class="dice rolling">${dieHTML(n)}</div>`; await sleep(800);
-  D.innerHTML = `<div class="dland">${dieSVG(n, ...DSIDE[n], 150)}</div>`; D.classList.add("shown");   // le dé se pose, le résultat sur le dessus…
-  await sleep(1300);                                                                 // …et reste posé le temps de lire le résultat
-  D.classList.remove("shown");
-  D.hidden = true;
+async function animDice(n) {   // le même dé que sur le bouton : il tourne en changeant de face, puis se pose sur le résultat
+  const D = $("#dice3d"); D.hidden = false; D.classList.remove("shown");
+  D.innerHTML = `<div class="dland rolling">${dieSVG(1, 2, 3, 150)}</div>`; const box = D.querySelector(".dland");
+  const t0 = performance.now();
+  while (performance.now() - t0 < 850) { const a = 1 + Math.floor(Math.random() * 6); box.innerHTML = dieSVG(a, ...DSIDE[a], 150); await sleep(85); }
+  box.classList.remove("rolling"); box.innerHTML = dieSVG(n, ...DSIDE[n], 150); D.classList.add("shown");
+  await sleep(1300);
+  D.classList.remove("shown"); D.hidden = true;
 }
 
 function initPawnUI() {

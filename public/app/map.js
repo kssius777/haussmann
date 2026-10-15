@@ -104,7 +104,7 @@ function buildMap(base) {
   map = new maplibregl.Map({
     container: "map", attributionControl: false, center: [2.3440, 48.8566], zoom: 14.2, pitch: 55, bearing: 0, maxPitch: 75, minZoom: 10.8,
     maxBounds: [[2.10, 48.74], [2.60, 48.98]], fadeDuration: 0, dragRotate: true, touchPitch: true, pitchWithRotate: true,
-    style: { version: 8,
+    style: { version: 8, glyphs: "/fonts/{fontstack}/{range}.pbf",
       light: { anchor: "viewport", color: "#FFFFFF", intensity: .55, position: [1.15, 210, 40] },
       sky: { "sky-color": "#E9F0F8", "horizon-color": "#FFFFFF", "fog-color": "#EFF0F2", "sky-horizon-blend": .6, "horizon-fog-blend": .7, "fog-ground-blend": .85, "atmosphere-blend": 0 },
       sources: { water: { type: "geojson", data: polysGeo(base.water) }, parks: { type: "geojson", data: polysGeo(base.parks) }, major: { type: "geojson", data: linesGeo(base.major) }, arr: { type: "geojson", data: outline }, mfill: { type: "geojson", data: mfill } },
@@ -141,7 +141,13 @@ function buildMap(base) {
     map.on("zoom", renderMarks); map.on("moveend", renderTags); map.on("rotateend", () => showAim()); map.on("zoomend", () => { if (!aimMarks.length || map.getZoom() < 13.6) showAim(); });
     // la boussole n'apparaît que si la carte a été tournée ; elle remet le nord en haut
     map.on("rotate", () => { const b = map.getBearing(); $("#t-north").hidden = Math.abs(b) < 2; $("#needle").style.transform = `rotate(${-b}deg)`; });
-    ARR.forEach((A, i) => { if (A?.cards) addArrToMap(i); });   // arrondissements chargés avant la carte (ex. celui du pion)
+    ARR.forEach((A, i) => { if (A?.cards) addArrToMap(i); });
+    // noms des rues, comme sur une carte classique (données de la Ville de Paris), quand on zoome
+    fetch("/data/streets.json").then(r => r.json()).then(list => {
+      map.addSource("snames", { type: "geojson", data: { type: "FeatureCollection", features: list.map(([n, c]) => ({ type: "Feature", properties: { n }, geometry: { type: "LineString", coordinates: c } })) } });
+      map.addLayer({ id: "snames", type: "symbol", source: "snames", minzoom: 15.3, layout: { "symbol-placement": "line", "text-field": ["get", "n"], "text-font": ["Noto Sans Medium"], "text-size": ["interpolate", ["linear"], ["zoom"], 15.3, 10.5, 18, 14], "text-max-angle": 30, "symbol-spacing": 320, "text-padding": 4 },
+        paint: { "text-color": "#5B6270", "text-halo-color": "#FFFFFF", "text-halo-width": 1.6 } });
+    }).catch(() => { });   // arrondissements chargés avant la carte (ex. celui du pion)
     updateArrFill(); applyMode(); paintAll(); initPawnLayers();
     loadAllProgressive();
   });
