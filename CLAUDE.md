@@ -27,7 +27,8 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
    (rejouable sans risque), on l'ajoute **à la fin de `supabase/migrations.txt`**, on met à jour `schema.sql`, on teste en local, puis on pousse :
    **Vercel applique tout seul les migrations au déploiement** (`buildCommand` → `scripts/migrate.mjs` → fonction `_run_migration`,
    table `_migrations`). Une migration qui échoue est annulée et bloque le déploiement (le site reste sur l'ancienne version).
-   Le propriétaire n'a plus rien à coller (installé une fois avec `bootstrap_auto_migrations.sql`).
+   Le propriétaire n'a plus rien à coller (installé le 16/10/2026 avec `bootstrap_auto_migrations.sql`, vérifié de bout en bout avec `migration_ping.sql` : `migrations_ok()` répond true).
+   Pour vérifier qu'une migration est passée en prod : appeler une de ses fonctions avec la clé publique (anon) de api.js.
    Le site doit continuer à marcher (message « mise à jour en cours ») tant que la migration n'est pas passée.
 3. **Sécurité** : la clé `service_role` ne doit jamais apparaître dans le code ni dans la conversation
    (elle est seulement dans les variables Vercel). Les fonctions internes `_xxx` sont interdites aux joueurs (revoke).
