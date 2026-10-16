@@ -189,7 +189,8 @@ function renderMarks() {
   IDX.arr.forEach((a, i) => {
     const el = a.marker?.getElement(); if (!el) return; el.style.display = z < 14 && mode === "all" ? "" : "none";
     const m = ST.mayors[i]; el.style.setProperty("--pc", m ? PARTIES[m.party]?.c || "#64748B" : "#94A3B8");
-    const s = document.getElementById("am" + i); if (s) s.innerHTML = m ? `${emblemSVG(m.party, 15)}${esc(m.pseudo)}` : "Siège libre";
+    const s = document.getElementById("am" + i); if (s) s.innerHTML = stripByArr ? (stripByArr[i] ? `${stripByArr[i]} bien${stripByArr[i] > 1 ? "s" : ""}` : "") : m ? `${emblemSVG(m.party, 15)}${esc(m.pseudo)}` : "Siège libre";
+    el.classList.toggle("has", !!(stripByArr && stripByArr[i])); el.classList.toggle("none", !!(stripByArr && !stripByArr[i]));
     const bb = el.querySelector("b"), key = (m?.party || "") + a.n; if (bb && bb.dataset.k !== key) { bb.dataset.k = key; bb.innerHTML = (m && PARTIES[m.party] ? emblemSVG(m.party, 16) : "") + ord(a.n); }
   });
   renderPartyLegend(z);
@@ -300,18 +301,28 @@ function setStripPins(items) {
     el.addEventListener("click", ev => { ev.stopPropagation(); flyTo(x.g); previewBuilding(x.g); });
     stripPins.push(new maplibregl.Marker({ element: el }).setLngLat(centerOf(x.g)).addTo(map)); }
 }
+let stripByArr = null;
+function stripCount(items) {
+  stripByArr = new Array(20).fill(0); items.forEach(x => stripByArr[x.c.arr - 1]++);
+  let el = $("#stripsum"); if (!el) { el = document.createElement("div"); el.id = "stripsum"; $("#p-map").appendChild(el); }
+  const n = stripByArr.filter(Boolean).length, sale = stripKind === "sale";
+  el.innerHTML = `<i class="${sale ? "sale" : ""}"></i><b>${items.length} ${sale ? (items.length > 1 ? "biens à vendre" : "bien à vendre") : (items.length > 1 ? "biens" : "bien")}</b><span>dans ${n} arrondissement${n > 1 ? "s" : ""} · touchez un point</span><button data-sclose aria-label="Fermer">×</button>`;
+  el.hidden = false;
+}
 function showStrip(kind) {
   const el = $("#strip"); if (!el) return;
   $$("#filter button").forEach(x => x.setAttribute("aria-selected", x.dataset.m === (kind === "all" ? "all" : kind)));
-  if (kind === "all" || kind === stripKind) { stripKind = ""; el.hidden = true; el.innerHTML = ""; setStripPins(null); document.body.classList.remove("mymode"); applyMode(); $$("#filter button").forEach(x => x.setAttribute("aria-selected", x.dataset.m === "all")); return; }
+  if (kind === "all" || kind === stripKind) { stripKind = ""; el.hidden = true; el.innerHTML = ""; setStripPins(null); document.body.classList.remove("mymode", "salemode"); stripByArr = null; $("#stripsum") && ($("#stripsum").hidden = true); applyMode(); renderMarks(); $$("#filter button").forEach(x => x.setAttribute("aria-selected", x.dataset.m === "all")); return; }
   stripKind = kind;
   const items = kind === "mine" ? holdings().sort((a, b) => b.c.v * unitsOf(b) - a.c.v * unitsOf(a)).map(h => ({ g: h.g, c: h.c, item: { t: "own", ks: h.ks, n: h.n } }))
     : [...ST.sale].map(g => ({ g, c: card(g) })).filter(x => x.c);
-  if (!items.length) { stripKind = ""; el.hidden = true; return toast(kind === "mine" ? "Vous n'avez encore aucun bien : lancez le dé ou ouvrez un booster !" : "Rien à vendre en ce moment."); }
-  el.hidden = true; setStripPins(items);   // pas de rangée de cartes : seulement les points sur la carte (demande du propriétaire) document.body.classList.add("mymode"); map.setPaintProperty("arrfill", "fill-opacity", 0);
-  // on cadre la carte sur ces biens (sans trop dézoomer)
+  if (!items.length) { stripKind = kind; showStrip("all"); return toast(kind === "mine" ? "Vous n'avez encore aucun bien : lancez le dé ou ouvrez un booster !" : "Rien à vendre en ce moment."); }
+  // pas de rangée de cartes : seulement les points sur la carte (demande du propriétaire)
+  el.hidden = true; setStripPins(items); document.body.classList.add("mymode"); document.body.classList.toggle("salemode", kind === "sale"); map.setPaintProperty("arrfill", "fill-opacity", 0);
+  stripCount(items); renderMarks();
+  // vue d'ensemble de Paris : on reste dézoomé, même s'il n'y a qu'un bien
   { const pts = items.map(x => centerOf(x.g)), lo = pts.map(p => p[0]), la = pts.map(p => p[1]);
-    map.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], { padding: { top: 90, bottom: 150, left: 40, right: 40 }, maxZoom: 15.5, duration: 900 }); }
+    map.fitBounds([[Math.min(...lo, 2.27), Math.min(...la, 48.83)], [Math.max(...lo, 2.41), Math.max(...la, 48.89)]], { padding: { top: 70, bottom: 130, left: 20, right: 20 }, maxZoom: 13, pitch: 0, bearing: 0, duration: 900 }); }
   el.innerHTML = `<div class="sh"><b>${kind === "mine" ? `Mes biens · ${items.length}` : `À vendre · ${items.length}`}</b><span>Touchez une carte pour y aller</span><button class="x" data-sclose aria-label="Fermer">×</button></div>
     <div class="sr">${items.slice(0, 60).map(x => `<button data-sg="${x.g}">${cardHTML(x.c, { w: "96px", item: x.item })}<small>${ord(x.c.arr)} arr.</small></button>`).join("")}</div>`;
 }

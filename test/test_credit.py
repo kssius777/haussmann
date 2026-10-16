@@ -40,4 +40,19 @@ B = uuid.uuid4(); db.sql("insert into auth.users(id) values (%s)", str(B)); db.r
 db.sql("update profiles set cash=2000000, land=%s where id=%s", gb[0], str(B)); db.rpc(B, "buy_building", p_card=gb[0], p_credit=True)
 tl = db.sql("select sum(loan), count(*) from lots where card=%s and owner=%s", gb[0], str(B))[0]
 check("immeuble entier à crédit : crédit réparti sur les logements", abs(tl[0] - (gb[1] - round(gb[1] * .1))) <= 2, tl)
+# acheter au Marché à crédit : apport 10 %, la banque prête le reste
+S = uuid.uuid4(); db.sql("insert into auth.users(id) values (%s)", str(S)); db.rpc(S, "join_game", p_pseudo="Vend" + str(S)[:4], p_party=None)
+gs = db.sql("select id, v from cards where lk='l' and lots between 2 and 6 and id not in (select card from lots) limit 1")[0]
+db.sql("update profiles set cash=10000000, land=%s where id=%s", gs[0], str(S)); db.rpc(S, "bank_buy", p_card=gs[0], p_k=0)
+price = 1500000; db.rpc(S, "list_item", p_card=gs[0], p_k=0, p_n=1, p_price=price)
+lid = db.sql("select id from listings where card=%s", gs[0])[0][0]
+C = uuid.uuid4(); db.sql("insert into auth.users(id) values (%s)", str(C)); db.rpc(C, "join_game", p_pseudo="Ache" + str(C)[:4], p_party=None)
+db.sql("update profiles set cash=200000 where id=%s", str(C))
+check("au Marché, comptant refusé sans assez d'argent", "insuffisante" in (err(lambda: db.rpc(C, "buy_listing", p_id=lid)) or ""))
+db.rpc(C, "buy_listing", p_id=lid, p_credit=True)
+own = db.sql("select owner, loan from lots where card=%s and k=0", gs[0])[0]
+c2 = db.sql("select cash from profiles where id=%s", str(C))[0][0]
+check("au Marché à crédit : le bien change de main avec un crédit de 90 %", str(own[0]) == str(C) and abs(own[1] - (price - round(price * .1))) <= 1, own)
+check("au Marché à crédit : seul l'apport de 10 % est payé", abs(c2 - (200000 - round(price * .1))) <= 2000, c2)
+check("le vendeur est payé (prix − 5 %)", db.sql("select coalesce(sum(amount),0) from pay where owner=%s and why='vente'", str(S))[0][0] >= price * .95 - 1)
 print(f"\n{sum(R)}/{len(R)} OK")

@@ -12,3 +12,4 @@ migration_direction.sql
 migration_choix.sql
 migration_admin.sql
 migration_ping.sql
+migration_marche_credit.sql

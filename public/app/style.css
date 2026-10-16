@@ -1410,7 +1410,7 @@ body.landopen #strip{display:none}
 .plabel.w{background:none!important;box-shadow:none!important;border:0!important;color:#2F6FA8!important;font-style:italic;font-weight:600;text-shadow:0 0 3px #fff,0 0 6px #fff}
 .plabel.q{background:none!important;box-shadow:none!important;border:0!important;color:#555B66!important;text-transform:uppercase;letter-spacing:.18em;font-size:11px;font-weight:700;text-shadow:0 0 3px #fff,0 0 6px #fff}
 /* « Mes biens » : la carte épurée, seulement les numéros d'arrondissement et tes points bleus */
-body.mymode .mmark,body.mymode .plabel,body.mymode .pricetag,body.mymode .amark span{display:none!important}
+body.mymode .mmark,body.mymode .plabel,body.mymode .pricetag{display:none!important}
 /* tutoriel : une bulle qui pointe ce qu'il faut toucher */
 #coach{position:fixed;z-index:95;background:#0B0C10;color:#fff;border-radius:16px;padding:14px 14px 10px;box-shadow:0 18px 50px rgba(0,0,0,.35);animation:coachIn .3s cubic-bezier(.2,1.2,.4,1)}
 #coach .ct{font-size:14px;line-height:1.45;color:rgba(255,255,255,.85)}
@@ -1576,3 +1576,47 @@ body.picksel .dicebar{display:none!important}
 .adminbox{border:1.5px dashed #94A3B8;background:#FAFBFC;margin-top:14px}
 .agl{display:flex;gap:6px;margin-top:10px;align-items:center}
 .agl .inp{flex:1;min-width:0;height:36px;font-size:12.5px}
+/* Mes biens / À vendre : vue d'ensemble épurée, nombre de biens par arrondissement */
+body.mymode .amark b{background:#fff!important;color:#94A3B8;border-color:#E5E7EB;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+body.mymode .amark b svg{display:none}
+body.mymode .amark.has b{background:var(--act)!important;color:#fff;border-color:#fff;box-shadow:0 3px 10px rgba(37,99,235,.35)}
+body.salemode .amark.has b{background:#F59E0B!important;box-shadow:0 3px 10px rgba(245,158,11,.35)}
+body.mymode .amark span{display:none!important}
+body.mymode .amark.has span{display:inline-flex!important;font-size:11px;color:#1F2937}
+body.mymode .amark.none{opacity:.55}
+#stripsum{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(var(--tab-h,0px) + 120px);z-index:20;display:flex;align-items:center;gap:8px;background:#fff;border-radius:999px;padding:7px 8px 7px 14px;box-shadow:0 6px 20px rgba(0,0,0,.15);font-size:13.5px;white-space:nowrap;max-width:calc(100% - 24px)}
+#stripsum[hidden]{display:none}
+#stripsum i{width:10px;height:10px;border-radius:50%;background:var(--act);flex:none}
+#stripsum i.sale{background:#F59E0B}
+#stripsum span{color:#6B7080;overflow:hidden;text-overflow:ellipsis}
+#stripsum button{width:26px;height:26px;border-radius:50%;border:0;background:#EEF0F3;font-size:16px;cursor:pointer;flex:none}
+@media (min-width:900px){#stripsum{bottom:130px}}
+@media (max-width:699px){#stripsum{bottom:calc(var(--tab-h) + env(safe-area-inset-bottom,0px) + 118px);font-size:12.5px}#stripsum span{display:none}}
+.lbuy{display:grid;justify-items:end;gap:2px}
+.lbuy .lnk{font-size:12px;background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;padding:0}
+.lbuy .lnk:disabled{opacity:.4;cursor:default}
+/* Patrimoine : en-tête, endettement compact, arrondissements en tuiles */
+.pathead{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.aspark{width:150px;flex:none;display:grid;gap:0;text-align:right}
+.aspark svg{width:100%;height:46px}
+.aspark small{font-size:11px;color:var(--muted)}
+.debt2{margin:10px 0 0;padding:9px 12px;border-radius:12px;background:#fff;border:1px solid var(--line);display:grid;gap:6px}
+.d2h{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13px;color:#4B5160}
+.d2h b{color:#0B0C10}
+.d2h em{font-style:normal;font-size:11.5px;font-weight:700;padding:1px 7px;border-radius:999px;margin-left:4px}
+.d2h em.ok{background:#DCFCE7;color:#15803D}.d2h em.mid{background:#FEF3C7;color:#B45309}.d2h em.hi{background:#FEE2E2;color:#B91C1C}
+.debt2 .dbar{height:5px}
+.dh2{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:14px 0 6px}
+.dh2 .h3{margin:0}
+.dh2 .muted{font-size:12px}
+.dh2 .lnk{font-size:12.5px;background:none;border:0;color:var(--act);font-weight:700;cursor:pointer}
+.dtiles{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+.dtile{flex:none;scroll-snap-align:start;min-width:112px;display:grid;gap:1px;text-align:left;padding:8px 10px 10px;border-radius:12px;background:#fff;border:1.5px solid var(--line);font:inherit;cursor:pointer;position:relative;overflow:hidden}
+.dtile b{font-size:15px}
+.dtile span{font-size:13.5px;font-weight:800}
+.dtile small{font-size:11px;color:var(--muted);white-space:nowrap}
+.dtile i{position:absolute;left:0;bottom:0;height:4px;background:var(--act);border-radius:0 2px 2px 0}
+.dtile[aria-pressed="true"]{border-color:var(--act);background:#EFF4FF}
+@media (min-width:900px){.dtiles{flex-wrap:wrap;overflow:visible}}
+@media (max-width:699px){.aspark{width:110px}.aspark svg{height:38px}}
+body.mymode #pawnoff{display:none!important}

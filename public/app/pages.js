@@ -100,9 +100,14 @@ async function renderAssets0() {
   const nLots = hs.reduce((a, h) => a + h.ks.length, 0);
   const rank = ST.board ? ST.board.findIndex(x => x.id === ME) + 1 : 0;
   const loans = +s.loans || 0, debt = +s.debt || 0;
+  const debtHTML = (loans || debt) ? (() => { const v = +s.value || 0, ratio = v ? Math.round((loans + debt) / v * 100) : 0, cap = Math.max(0, +s.loan_cap || 0), pct = loans + cap ? Math.round(loans / (loans + cap) * 100) : 0;
+    return `<div class="debt2" title="Vos dettes représentent ${ratio} % de la valeur de vos biens. Les crédits se remboursent tout seuls avec 70 % du loyer des biens achetés à crédit."><div class="d2h"><span>Endettement <b>${ratio} %</b> <em class="${ratio < 50 ? "ok" : ratio < 80 ? "mid" : "hi"}">${ratio < 50 ? "sain" : ratio < 80 ? "élevé" : "très élevé"}</em></span><span>Encore empruntable : <b>${fmtE(cap)}</b></span></div><div class="dbar"><i style="width:${pct}%"></i></div></div>`; })() : "";
+  const distHTML = dist.length ? `<div class="dh2"><h2 class="h3">Où sont vos biens</h2>${assetArr ? `<button class="lnk" data-aa="0">Tous les arrondissements</button>` : `<span class="muted">${dist.length} arr. · touchez pour filtrer</span>`}</div>
+    <div class="dtiles">${dist.map(d => { const m = ST.mayors[d.a - 1]; return `<button class="dtile" data-aa="${d.a}" aria-pressed="${assetArr === d.a}"><b>${ord(d.a)}${m?.mayor === ME ? " 👑" : ""}</b><span class="num">${fmtE(d.v)}</span><small>${d.n} bien${d.n > 1 ? "s" : ""} · +${fmtE(d.rent)}/j</small><i style="width:${Math.max(4, d.v / vmax * 100)}%"></i></button>`; }).join("")}</div>` : "";
   $("#p-assets").innerHTML = `<div class="wrap">
-    <p class="eyebrow">Patrimoine net</p><h1 class="h1 num big" id="worth">${fmtE(worthNow())}</h1>
-    <p class="sub" style="margin:0 0 4px">Trésorerie + valeur de vos biens − ce que vous devez à la banque</p>
+    <div class="pathead"><div><p class="eyebrow">Patrimoine net</p><h1 class="h1 num big" id="worth">${fmtE(worthNow())}</h1>
+      <p class="sub" style="margin:0">Trésorerie + biens − dettes</p></div>
+      ${hv.length > 1 ? `<div class="aspark">${sparkSVG(hv)}<small>sur ${hv.length} jours</small></div>` : ""}</div>
     ${rank ? `<button class="rankpill" data-push="results">🏆 Classement : vous êtes <b>${rank === 1 ? "1er" : rank + "e"}</b> sur ${ST.board.length} joueur${ST.board.length > 1 ? "s" : ""}</button>` : ""}
     <div class="kpis k4">
       <div class="kpi"><span>Trésorerie</span><b class="num" id="cash2">${fmtE(liveCash())}</b><small class="muted">disponible</small></div>
@@ -110,6 +115,8 @@ async function renderAssets0() {
       <div class="kpi"><span>Valeur des biens</span><b class="num">${fmtE(+s.value || 0)}</b><small class="muted">${nLots} logement${nLots > 1 ? "s" : ""}</small></div>
       <div class="kpi ${loans || debt ? "warn" : ""}"><span>Dettes</span><b class="num">${fmtE(loans + debt)}</b><small class="muted">${loans ? `${s.credits || 0} crédit${(s.credits || 0) > 1 ? "s" : ""} en cours` : "aucun crédit"}${debt ? ` · hypothèques ${fmtE(debt)}` : ""}</small></div>
     </div>
+    ${debtHTML}
+    ${distHTML}
     <h2 class="h2">Ma collection <span class="muted" style="font:700 14px var(--f)">${hs.length} carte${hs.length > 1 ? "s" : ""}</span></h2>
     <div class="chips"><button class="chip plain" data-af="all" aria-pressed="${assetF === "all"}">Tout</button>
       ${ORDER.split("").reverse().map(r => counts[r] ? `<button class="chip" data-af="${r}" aria-pressed="${assetF === r}">${rarSq(r)}${counts[r]}</button>` : "").join("")}
@@ -121,13 +128,6 @@ async function renderAssets0() {
     ${!hs.length ? `<div class="empty">Vous n'avez encore aucun bien.<br><br><button class="btn" data-go="booster">Ouvrir un booster</button></div>`
       : !list.length ? `<div class="empty">Rien dans cette catégorie.</div>`
       : `<div class="grid-cards">${list.slice(0, assetN).map(cardBtn).join("")}</div>${list.length > assetN ? `<button class="btn light gmore" data-gmore>Afficher plus (${list.length - assetN})</button>` : ""}`}
-    ${loans || debt ? (() => { const val = +s.value || 0, ratio = val ? Math.round((loans + debt) / val * 100) : 0, cap = Math.max(0, +s.loan_cap || 0), used = loans, pct = used + cap ? Math.round(used / (used + cap) * 100) : 0;
-      return `<div class="debt"><div class="dh"><b>Taux d'endettement : ${ratio} %</b><span>${ratio < 50 ? "sain" : ratio < 80 ? "élevé" : "très élevé"}</span></div>
-        <p>Vos dettes représentent ${ratio} % de la valeur de vos biens. Les crédits se remboursent tout seuls avec 70 % du loyer des biens achetés à crédit.</p>
-        <div class="dbar"><i style="width:${pct}%"></i></div>
-        <div class="dl"><span>Déjà emprunté : <b>${fmtE(used)}</b></span><span>Vous pouvez encore emprunter : <b>${fmtE(cap)}</b></span></div></div>`; })() : ""}
-    ${dist.length ? `<h2 class="h2">Où sont vos biens</h2><div class="dist">${(distAll ? dist : dist.slice(0, 5)).map(distRow).join("")}${dist.length > 5 ? `<button class="dmore" data-dall>${distAll ? "Réduire" : `Voir les ${dist.length} arrondissements`}</button>` : ""}</div>` : ""}
-    ${hv.length > 1 ? `<div class="box" style="padding:10px 12px 4px;margin:18px 0 6px">${sparkSVG(hv)}<div class="sub" style="margin:2px 0 6px;font-size:12px">Évolution sur ${hv.length} jours</div></div>` : ""}
   </div>`;
   function cardBtn(h) { return `<button data-push="b" data-arg="${h.g}" class="cw">${cardHTML(h.c, { w: "100%", item: { t: "own", ks: h.ks, n: h.n } })}${onLoan(h) ? `<span class="tagc loan">🏦 crédit</span>` : mortd(h) ? `<span class="tagc mort">🔒 hypothéqué</span>` : ""}</button>`; }
   if (!ST.board) rpc("leaderboard").then(b => { ST.board = b; if (cur() === "assets") renderAssets(); }).catch(() => { });
@@ -140,6 +140,11 @@ $("#p-assets").addEventListener("click", e => {
 });
 $("#p-assets").addEventListener("change", e => { if (e.target.id === "asort") { assetSort = e.target.value; renderAssets(); } });
 
+// acheter une annonce : à crédit (apport 10 %) ou comptant ; attr = attributs du bouton selon la page
+function listingBuy(l, attr) {
+  const cash = liveCash(), cap = ST.state?.loan_cap ?? 1e12, down = Math.ceil(l.price * .1), crOK = cash >= down && l.price - down <= cap;
+  return `<span class="lbuy"><button class="btn sm blue2" ${attr(l.id, 1)} ${crOK ? "" : "disabled"} title="La banque prête 90 %, remboursé tout seul par le loyer">À crédit · ${fmtE(down)}</button><button class="lnk" ${attr(l.id, 0)} ${cash < l.price ? "disabled" : ""}>ou comptant ${fmtE(l.price)}</button></span>`;
+}
 // ---------------- MARCHÉ ----------------
 let marketTab = "all", sellAll = false;
 function sellList() {   // mes biens qu'on peut mettre en vente : un toucher ouvre la fiche, formulaire de vente déjà ouvert
@@ -159,7 +164,7 @@ async function renderMarket() {
     return `<div class="lrow"><button class="th" data-push="b" data-arg="${l.card}" aria-label="Voir la fiche">${photo(c)}</button>
       <div class="t"><b>${esc(title(c))}</b><span>${l.k != null ? lotName(c, l.k) : l.n + " part" + (l.n > 1 ? "s" : "")} · ${ord(c.arr)} arr. · ${own ? "votre annonce" : "par " + esc(l.pseudo)}</span>
       <span><span class="pill" style="height:20px;font-size:11px;${d <= 0 ? "background:#DCFCE7;color:#15803D" : d > .25 ? "background:#FEE2E2;color:#B91C1C" : ""}">${d <= 0 ? "Bonne affaire" : "+" + Math.round(d * 100) + " % vs estimation"}</span></span></div>
-      <div class="v"><b class="num">${fmtE(l.price)}</b>${own ? `<button class="btn sm ghost" data-unlist="${l.id}">Retirer</button>` : `<button class="btn sm green" data-buy="${l.id}" ${liveCash() < l.price ? "disabled" : ""}>Acheter</button>`}</div></div>`; }).join("");
+      <div class="v"><b class="num">${fmtE(l.price)}</b>${own ? `<button class="btn sm ghost" data-unlist="${l.id}">Retirer</button>` : listingBuy(l, (id, cr) => `data-buy="${id}" data-cr="${cr}"`)}</div></div>`; }).join("");
   const sales = ST.market.sales.map(s => { const c = card(s.card); return c ? `<button class="lrow" data-push="b" data-arg="${s.card}"><div class="th">${photo(c)}</div><div class="t"><b>${esc(title(c))}</b><span>${s.k != null ? lotName(c, s.k) : s.n + " parts"} · acheté par ${esc(s.buyer || "?")} · ${ago(s.at)}</span></div><div class="v num"><b>${fmtE(s.price)}</b></div></button>` : ""; }).join("");
   el.innerHTML = `<div class="wrap"><h1 class="h1">Marché</h1><p class="sub">Les biens mis en vente par les joueurs. Le vendeur reçoit le prix moins 5 % de commission.</p>
     <div class="seg" role="tablist"><button data-mt="all" aria-selected="${marketTab === "all"}">Annonces · ${others.length}</button><button data-mt="mine" aria-selected="${marketTab === "mine"}">Les miennes · ${mineL.length}</button><button data-mt="sales" aria-selected="${marketTab === "sales"}">Ventes</button></div>
@@ -171,7 +176,7 @@ $("#p-market").addEventListener("click", async e => {
   const t = e.target.closest("[data-mt]"); if (t) { marketTab = t.dataset.mt; return renderMarket(); }
   const sg = e.target.closest("[data-sellg]"); if (sg) { sellNext = +sg.dataset.sellg; sel = null; return push("b", sellNext); }
   if (e.target.closest("[data-sellall]")) { sellAll = true; return renderMarket(); }
-  const b = e.target.closest("[data-buy]"); if (b) { b.disabled = true; await act("buy_listing", { p_id: +b.dataset.buy }, "Achat conclu !"); return renderMarket(); }
+  const b = e.target.closest("[data-buy]"); if (b) { b.disabled = true; const cr = b.dataset.cr === "1"; await act("buy_listing", Object.assign({ p_id: +b.dataset.buy }, cr ? { p_credit: true } : {}), cr ? "Achat conclu à crédit : la banque a prêté 90 %" : "Achat conclu !"); return renderMarket(); }
   const u = e.target.closest("[data-unlist]"); if (u) { u.disabled = true; await act("unlist", { p_id: +u.dataset.unlist }, "Annonce retirée"); return renderMarket(); }
 });
 
@@ -328,7 +333,7 @@ async function buildingPage(g) {
       ${rows ? `<div class="myrows">${rows}</div>` : ""}</div>`;
   }
   const offers = bInfo.listings.filter(l => l.seller !== ME);
-  const offersHTML = offers.length ? `<h2 class="h3">À vendre par des joueurs</h2><div class="rows">${offers.map(l => `<div class="lrow" style="grid-template-columns:1fr auto"><div class="t"><b>${l.k != null ? lotName(c, l.k) + (c.lk === "l" ? " · " + ord(floorOfLot(c, l.k)) + " étage" : "") : l.n + " part" + (l.n > 1 ? "s" : "")}</b><span>vendu par ${esc(l.pseudo)}</span></div><div class="v"><b class="num">${fmtE(l.price)}</b><button class="btn sm green" data-act="buyl" data-id="${l.id}" ${liveCash() < l.price ? "disabled" : ""}>Acheter</button></div></div>`).join("")}</div>` : "";
+  const offersHTML = offers.length ? `<h2 class="h3">À vendre par des joueurs</h2><div class="rows">${offers.map(l => `<div class="lrow" style="grid-template-columns:1fr auto"><div class="t"><b>${l.k != null ? lotName(c, l.k) + (c.lk === "l" ? " · " + ord(floorOfLot(c, l.k)) + " étage" : "") : l.n + " part" + (l.n > 1 ? "s" : "")}</b><span>vendu par ${esc(l.pseudo)}</span></div><div class="v"><b class="num">${fmtE(l.price)}</b>${listingBuy(l, (id, cr) => `data-act="buyl" data-id="${id}" data-k="${cr}"`)}</div></div>`).join("")}</div>` : "";
   let plan = "";
   if (!isP) {
     const groups = new Map(); for (let k = 0; k < c.lots; k++) { const f = floorOfLot(c, k); if (!groups.has(f)) groups.set(f, []); groups.get(f).push(k); }
@@ -409,7 +414,7 @@ function buyActions(c, g, owners, free, isP) {
     if (!o && far) btn = farHTML(far, g);
     else if (!o) { const [cr, tg] = payToggle(c.v, c.rent); btn = tg + `<button class="btn block buy" data-act="bank" data-k="${k}" ${cash < (cr ? Math.ceil(c.v * .1) : c.v) ? "disabled" : ""}><span>Acheter · ${fmtE(cr ? Math.ceil(c.v * .1) : c.v)}</span>${buySub(cr)}</button>`; }
     else if (o.o === ME) btn = `<div class="sub" style="margin:0">Il est à vous.</div>`;
-    else btn = l ? `<button class="btn block green" data-act="buyl" data-id="${l.id}" ${cash < l.price ? "disabled" : ""}>Acheter à ${esc(l.pseudo)} · ${fmtE(l.price)}</button>` : `<div class="sub" style="margin:0">Appartient à ${esc(o.ps)}, pas en vente.</div>`;
+    else btn = l ? `<div class="sub" style="margin:0 0 6px">En vente par ${esc(l.pseudo)} : ${fmtE(l.price)}</div>${listingBuy(l, (id, cr) => `data-act="buyl" data-id="${id}" data-k="${cr}"`)}` : `<div class="sub" style="margin:0">Appartient à ${esc(o.ps)}, pas en vente.</div>`;
     return head + btn + `<button class="btn sm ghost" data-act="unpick">Annuler</button>`;
   }
   if (free <= 0) return `<div class="what"><span>Tout est pris. Surveillez le Marché : les propriétaires peuvent mettre leurs biens en vente.</span></div>`;
@@ -461,7 +466,7 @@ $("#p-detail").addEventListener("click", async e => {
   if (a === "repay") await act("repay", { p_card: g }, "Crédit remboursé : tout le loyer est à vous !");
   if (a === "list") { const p = +$("#price").value; await act("list_item", { p_card: g, p_k: k, p_n: 1, p_price: p }, "Annonce publiée au Marché"); saleMode = false; }
   if (a === "unlist") await act("unlist", { p_id: id }, "Annonce retirée");
-  if (a === "buyl") await act("buy_listing", { p_id: id }, "Achat conclu !");
+  if (a === "buyl") await act("buy_listing", Object.assign({ p_id: id }, k === 1 ? { p_credit: true } : {}), k === 1 ? "Achat conclu à crédit : la banque a prêté 90 %" : "Achat conclu !");
   if (a === "mort") await act("mortgage", { p_card: g, p_k: k }, "Hypothèque accordée : +" + fmtE(Math.round(c.v / 2)));
   if (a === "lift") await act("lift", { p_card: g, p_k: k }, "Hypothèque remboursée");
   renderDetail(false);

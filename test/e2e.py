@@ -75,7 +75,7 @@ async def main():
         await pg.click("#movebar [data-mvclose]"); await W("document.querySelector('#movebar').hidden")
         await E("localStorage.setItem('hm_hist', JSON.stringify({'2026-01-01':900000,'2026-01-02':1100000})); 1")   # 2 jours d'historique : la courbe s'affiche
         await pg.click("#tabs [data-tab=assets]"); await W("document.querySelector('#p-assets .kpi')")
-        check("patrimoine : courbe d'évolution affichée", await E("!!document.querySelector('#p-assets .box svg')"))
+        check("patrimoine : courbe d'évolution affichée", await E("!!document.querySelector('#p-assets .aspark svg')"))
         await pg.wait_for_timeout(500); await pg.screenshot(path=T + "07_assets.png")
         await E("document.querySelector('#p-assets').scrollTop=700"); await pg.wait_for_timeout(300); await pg.screenshot(path=T + "07b_assets.png")
         check("patrimoine : collection affichée", await E("document.querySelectorAll('#p-assets .grid-cards .hc').length") > 3)
@@ -126,7 +126,7 @@ async def main():
         db.rpc(rv, "list_item", p_card=h[0], p_k=h[1], p_n=1, p_price=400000)
         await pg.click("[data-back]"); await E("setMovebar(''); 1"); await pg.click("#tabs [data-tab=market]"); await W("document.querySelector('[data-buy]')")
         await pg.wait_for_timeout(300); await pg.screenshot(path=T + "10_market.png")
-        await pg.click("[data-buy]"); await W(f"(ST.mine.get({h[0]})||[]).includes({h[1]})"); check("achat sur le marché à un autre joueur", True)
+        await pg.click("[data-buy]:not([disabled])"); await W(f"(ST.mine.get({h[0]})||[]).includes({h[1]})"); check("achat sur le marché à un autre joueur", True)
         await pg.click("#tabs [data-tab=paris]"); await W("document.querySelector('#p-paris .party-cta')")
         await pg.click(".party-cta"); await W("document.querySelector('.spectrum')"); await pg.click(".sp-node[data-party=rempart]"); await pg.wait_for_timeout(200); await pg.screenshot(path=T + "11b_party.png")
         await pg.click(".sp-node[data-party=milieu]"); await pg.click("#party-save"); await W("ST.state.profile.party==='milieu'"); check("choix du parti plus tard, depuis Paris", True)
