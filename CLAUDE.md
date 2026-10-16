@@ -23,9 +23,11 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
    python3 test/e2e.py           # parcours complet dans un vrai navigateur, captures dans test/shots/
    ```
    Ne pousser que si tout est vert.
-2. **Base de données en production** : on ne la modifie jamais directement. On écrit un fichier
-   `supabase/migration_xxx.sql` (rejouable sans risque), on met à jour `schema.sql`, on teste en local,
-   puis le propriétaire colle le fichier dans Supabase → SQL Editor → Run.
+2. **Base de données en production** : on ne la modifie jamais à la main. On écrit un fichier `supabase/migration_xxx.sql`
+   (rejouable sans risque), on l'ajoute **à la fin de `supabase/migrations.txt`**, on met à jour `schema.sql`, on teste en local, puis on pousse :
+   **Vercel applique tout seul les migrations au déploiement** (`buildCommand` → `scripts/migrate.mjs` → fonction `_run_migration`,
+   table `_migrations`). Une migration qui échoue est annulée et bloque le déploiement (le site reste sur l'ancienne version).
+   Le propriétaire n'a plus rien à coller (installé une fois avec `bootstrap_auto_migrations.sql`).
    Le site doit continuer à marcher (message « mise à jour en cours ») tant que la migration n'est pas passée.
 3. **Sécurité** : la clé `service_role` ne doit jamais apparaître dans le code ni dans la conversation
    (elle est seulement dans les variables Vercel). Les fonctions internes `_xxx` sont interdites aux joueurs (revoke).
