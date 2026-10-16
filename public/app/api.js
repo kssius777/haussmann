@@ -27,9 +27,12 @@ async function currentUser() {
   if (LOCAL_MODE) { ME = localStorage.getItem("hm_uid"); return ME; }
   const { data } = await SB.auth.getSession(); ME = data.session?.user?.id || null; return ME;
 }
+// retour après Google ou après le lien de confirmation par e-mail : on garde le lien cadeau dans l'adresse
+// (si la personne finit l'inscription dans un autre navigateur, le cadeau la suit quand même)
+function backURL() { let g = null; try { g = localStorage.getItem("hm_gift"); } catch (e) { } return location.origin + (g ? "/?gift=" + encodeURIComponent(g) : ""); }
 async function signUp(email, password) {
   if (LOCAL_MODE) return localSignIn(email);
-  const { data, error } = await SB.auth.signUp({ email, password, options: { emailRedirectTo: location.origin } });
+  const { data, error } = await SB.auth.signUp({ email, password, options: { emailRedirectTo: backURL() } });
   if (error) throw new Error(frErr(error.message));
   ME = data.session?.user?.id || null;
   return { needsConfirm: !data.session };
@@ -42,7 +45,7 @@ async function signIn(email, password) {
 }
 async function signInGoogle() {
   if (LOCAL_MODE) return localSignIn("google@test");
-  const { error } = await SB.auth.signInWithOAuth({ provider: "google", options: { redirectTo: location.origin } });
+  const { error } = await SB.auth.signInWithOAuth({ provider: "google", options: { redirectTo: backURL() } });
   if (error) throw new Error(frErr(error.message));
 }
 // La connexion Google est-elle activée dans Supabase ? (sinon on propose de jouer sans compte)
