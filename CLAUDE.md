@@ -32,6 +32,15 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
    Ne jamais afficher l'e-mail personnel du propriétaire aux joueurs.
 4. En cas de doute sur une décision de jeu (règles, économie, textes), demander au propriétaire avant de coder.
 
+## Avant la mise en production (à ne pas oublier)
+- **Nouveau nom de domaine** (ex. proprio.paris) : dans Supabase → Authentication → URL Configuration, mettre le **Site URL** sur le nouveau domaine
+  et ajouter `https://NOUVEAU-DOMAINE/**` dans **Redirect URLs** (les `/**` sont indispensables : les liens cadeaux reviennent avec `?gift=…`
+  après Google ou l'e-mail de confirmation). Garder `https://haussmann-beige.vercel.app/**` tant que l'ancien lien circule.
+  Fait pour haussmann-beige.vercel.app le 16/10/2026.
+- Google Cloud (connexion Google) : ajouter le nouveau domaine dans les origines autorisées.
+- Supabase Pro (pas de mise en pause, sauvegardes) et Vercel Pro dès qu'on encaisse de l'argent.
+- Mentions légales au nom de la SASU, conditions et confidentialité relues ; e-mail de contact sur le domaine.
+
 ## Règles du jeu actuelles (résumé)
 - 1 M€ et 5 boosters à l'inscription ; 1 booster gratuit par jour, boosters payants dont le prix double dans la journée.
 - Loyers versés en continu ; trésorerie jamais négative ; hypothèque 50 % de la valeur.
