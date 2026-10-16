@@ -110,7 +110,7 @@ function tutTick() {
     k = "2" + (L?.toll > 0 ? "t" : L?.chance ? "c" : fr > 0 ? "f" : "x"); anchor = "#movebar .lb"; ok = true;
     html = L?.toll > 0 ? "<b>Chez un autre joueur</b>Quand vous tombez sur son immeuble, vous lui payez une journée de loyer. À vous d'acheter les immeubles où les autres passent !"
       : L?.chance ? "<b>Case Chance 🃏</b>Environ une case sur huit : une surprise, bonne ou mauvaise. Ici, l'immeuble reste à acheter s'il est libre."
-      : fr > 0 ? "<b>Il est libre : achetez-le !</b>À crédit, vous ne payez que 10 % maintenant : la banque prête le reste, remboursé tout seul par le loyer."
+      : fr > 0 ? "<b>Il est libre : achetez-le !</b>À crédit, vous ne payez qu'une petite partie maintenant : la banque prête le reste, remboursé tout seul par le loyer."
       : "<b>Tout est déjà pris ici</b>Relancez le dé pour trouver un immeuble libre.";
   }
   else if (st === 2 && !panelKind && idle) tutSet(4);

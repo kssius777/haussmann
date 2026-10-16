@@ -14,3 +14,4 @@ migration_admin.sql
 migration_ping.sql
 migration_marche_credit.sql
 migration_offres.sql
+migration_partis.sql

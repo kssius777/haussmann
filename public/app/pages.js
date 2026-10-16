@@ -142,7 +142,7 @@ $("#p-assets").addEventListener("change", e => { if (e.target.id === "asort") { 
 
 // acheter une annonce : à crédit (apport 10 %) ou comptant ; attr = attributs du bouton selon la page
 function listingBuy(l, attr) {
-  const cash = liveCash(), cap = ST.state?.loan_cap ?? 1e12, down = Math.ceil(l.price * .1), crOK = cash >= down && l.price - down <= cap;
+  const cash = liveCash(), cap = ST.state?.loan_cap ?? 1e12, down = Math.ceil(l.price * downRate()), crOK = cash >= down && l.price - down <= cap;
   return `<span class="lbuy"><button class="btn sm blue2" ${attr(l.id, 1)} ${crOK ? "" : "disabled"} title="La banque prête 90 %, remboursé tout seul par le loyer">À crédit · ${fmtE(down)}</button><button class="lnk" ${attr(l.id, 0)} ${cash < l.price ? "disabled" : ""}>ou comptant ${fmtE(l.price)}</button></span>`;
 }
 // ---------------- OFFRES DE RACHAT ----------------
@@ -459,7 +459,7 @@ async function adminAct(a, btn, g) {   // actions admin, sur la fiche ou la page
 }
 function farHTML(d, g) { return `<div class="buyfar"><b>🎲 Pour l'acheter à la banque, tombez dessus avec le dé.</b><span class="muted">Ou trouvez-le dans un booster, ou au Marché si un joueur le vend.</span></div>`; }
 function payToggle(price, rent) {
-  const cap = ST.state?.loan_cap ?? 1e12, cash = liveCash(), down = Math.ceil(price * .1), can = price - down <= cap && cash >= down;
+  const cap = ST.state?.loan_cap ?? 1e12, cash = liveCash(), down = Math.ceil(price * downRate()), can = price - down <= cap && cash >= down;
   const cr = can && (bCredit === null ? true : bCredit);
   return [cr, `<div class="pay" role="tablist"><button data-act="paymode" data-k="1" aria-selected="${cr}" ${can ? "" : "disabled"}><b>À crédit</b><small>${fmtE(down)} · <em>+${fmtE(Math.round(rent * .3))}/j</em></small></button><button data-act="paymode" data-k="0" aria-selected="${!cr}"><b>Comptant</b><small>${fmtE(price)} · <em>+${fmtE(rent)}/j</em></small></button></div>`];
 }
@@ -471,7 +471,7 @@ function buyActions(c, g, owners, free, isP) {
     const head = `<div class="what"><b>${lotName(c, k)}${c.lk === "l" ? " · " + ord(floorOfLot(c, k)) + " étage" : ""}</b><span class="num">${o ? (o.o === ME ? "À vous" : "À " + esc(o.ps)) : "Libre"}</span></div>`;
     let btn;
     if (!o && far) btn = farHTML(far, g);
-    else if (!o) { const [cr, tg] = payToggle(c.v, c.rent); btn = tg + `<button class="btn block buy" data-act="bank" data-k="${k}" ${cash < (cr ? Math.ceil(c.v * .1) : c.v) ? "disabled" : ""}><span>Acheter · ${fmtE(cr ? Math.ceil(c.v * .1) : c.v)}</span>${buySub(cr)}</button>`; }
+    else if (!o) { const [cr, tg] = payToggle(c.v, c.rent); btn = tg + `<button class="btn block buy" data-act="bank" data-k="${k}" ${cash < (cr ? Math.ceil(c.v * downRate()) : c.v) ? "disabled" : ""}><span>Acheter · ${fmtE(cr ? Math.ceil(c.v * downRate()) : c.v)}</span>${buySub(cr)}</button>`; }
     else if (o.o === ME) btn = `<div class="sub" style="margin:0">Il est à vous.</div>`;
     else btn = l ? `<div class="sub" style="margin:0 0 6px">En vente par ${esc(l.pseudo)} : ${fmtE(l.price)}</div>${listingBuy(l, (id, cr) => `data-act="buyl" data-id="${id}" data-k="${cr}"`)}` : `<div class="sub" style="margin:0">Appartient à ${esc(o.ps)}, pas en vente.</div>${offerForm(c, k, o)}`;
     return head + btn + `<button class="btn sm ghost" data-act="unpick">Annuler</button>`;
@@ -480,18 +480,18 @@ function buyActions(c, g, owners, free, isP) {
   const offerLink = canOffer ? `<button class="btn block light" data-act="ofpick">🤝 Faire une offre à un propriétaire</button>` : "";
   if (free <= 0) return `<div class="what"><span>Tout est pris. ${canOffer ? "Proposez à un propriétaire de lui racheter son logement :" : "Surveillez le Marché : les propriétaires peuvent mettre leurs biens en vente."}</span></div>${offerLink}`;
   if (far) return farHTML(far, g);
-  const total = c.v * c.lots, allFree = !isP && owners.size === 0 && c.lots > 1, [cr, tg] = payToggle(c.v, c.rent), need = p => cr ? Math.ceil(p * .1) : p;
+  const total = c.v * c.lots, allFree = !isP && owners.size === 0 && c.lots > 1, [cr, tg] = payToggle(c.v, c.rent), need = p => cr ? Math.ceil(p * downRate()) : p;
   return tg + `<button class="btn block buy" data-act="bank" ${cash < need(c.v) ? "disabled" : ""}><span>${isP ? "Acheter 1 part" : `Acheter 1 ${c.lk === "l" ? "logement" : "local"}`} · ${fmtE(need(c.v))}</span>${buySub(cr)}</button>
     ${allFree && cash >= need(total) && (!cr || total - need(total) <= (ST.state?.loan_cap ?? 1e12)) ? `<button class="btn block light" data-act="bbuild">Tout l'immeuble · ${fmtE(need(total))} <small class="muted">(+60 % de loyer)</small></button>` : ""}
     ${!cr && cash < c.v ? `<small class="muted">Il vous manque ${fmtE(c.v - cash)}.</small>` : ""}${offerLink}`;
 }
 function offerForm(c, k, o) {
-  const min = Math.ceil(c.v * .8), price = ofPrice || Math.round(c.v * 1.1 / 1000) * 1000, hold = ofCredit ? Math.ceil(price * .1) : price;
+  const min = Math.ceil(c.v * .8), price = ofPrice || Math.round(c.v * 1.1 / 1000) * 1000, hold = ofCredit ? Math.ceil(price * downRate()) : price;
   const presets = [[Math.round(c.v / 1000) * 1000, "Sa valeur"], [Math.round(c.v * 1.1 / 1000) * 1000, "+10 %"], [Math.round(c.v * 1.25 / 1000) * 1000, "+25 %"]];
   return `<div class="ofr"><b>🤝 Proposer à ${esc(o.ps)} de lui racheter</b>
     <div class="oprice"><input class="inp num" id="ofp" type="number" inputmode="numeric" min="${min}" step="1000" value="${price}" aria-label="Votre offre"><span>€</span></div>
     <div class="ochips">${presets.map(([v, l]) => `<button data-act="ofpreset" data-k="${v}" aria-pressed="${v === price}">${l}<small>${fmtE(v)}</small></button>`).join("")}</div>
-    <div class="pay"><button data-act="ofmode" data-k="1" aria-selected="${ofCredit}"><b>À crédit</b><small>apport 10 %</small></button><button data-act="ofmode" data-k="0" aria-selected="${!ofCredit}"><b>Comptant</b><small>tout de suite</small></button></div>
+    <div class="pay"><button data-act="ofmode" data-k="1" aria-selected="${ofCredit}"><b>À crédit</b><small>apport ${Math.round(downRate() * 100)} %</small></button><button data-act="ofmode" data-k="0" aria-selected="${!ofCredit}"><b>Comptant</b><small>tout de suite</small></button></div>
     <p class="onote">Au moins ${fmtE(min)} (80 % de sa valeur). <b id="ofhold">${fmtE(hold)}</b> sont mis de côté pendant 24 h au plus, et rendus si ${esc(o.ps)} refuse. Il peut aussi vous faire une contre-proposition.</p>
     <button class="btn block buy" data-act="offer" data-k="${k}"><span>Envoyer l'offre</span></button></div>`;
 }
@@ -612,7 +612,7 @@ async function profilePage() {
     </div>
     <h2 class="h2">Mon parti</h2>
     ${!pr ? `<div class="box"><b>Vous n'avez pas encore de parti</b><p class="sub" style="margin:4px 0 0">Rejoignez un camp pour toucher +${MEMBER_BONUS} % de loyers dans les arrondissements qu'il tient, et jouer pour l'Hôtel de Ville.</p></div>` : ""}
-    ${pr ? `<div class="box" style="border-left:6px solid ${pr.c};display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center">${emblemSVG(p.party, 56)}<div><b style="color:${pr.c};font-size:17px">${esc(pr.n)}</b> <span class="muted">· ${esc(pr.side)}</span><div class="motto">« ${esc(pr.motto)} »</div><p class="sub" style="margin:6px 0 0">Vous protège de : ${esc(shieldText(p.party))}. Dans les arrondissements tenus par ${esc(pr.n)}, vos loyers sont à +${MEMBER_BONUS} %.</p></div></div>` : ""}
+    ${pr ? `<div class="box" style="border-left:6px solid ${pr.c};display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center">${emblemSVG(p.party, 56)}<div><b style="color:${pr.c};font-size:17px">${esc(pr.n)}</b> <span class="muted">· ${esc(pr.side)}</span><div class="motto">« ${esc(pr.motto)} »</div><div class="sub" style="margin:4px 0 0;font-size:13px"><b>Pouvoir :</b> ${esc(pr.power)}</div><p class="sub" style="margin:6px 0 0">Vous protège de : ${esc(shieldText(p.party))}. Dans les arrondissements tenus par ${esc(pr.n)}, vos loyers sont à +${MEMBER_BONUS} %.</p></div></div>` : ""}
     <div style="margin-top:10px"><button class="btn block ${pr ? "light" : ""}" data-push="party" ${pr && wait > 0 ? "disabled" : ""}>${!pr ? "Choisir mon parti" : wait > 0 ? `Changer de parti possible dans ${hm(wait)}` : "Changer de parti"}</button></div>
     ${ST.admin ? `<h2 class="h2">Admin</h2><button class="btn block" data-push="gifts">🎁 Liens cadeaux (giveaway)</button>` : ""}
     <h2 class="h2">Réglages</h2>
@@ -640,7 +640,8 @@ function partyDetailHTML(k) {
   return `<div class="pdet" style="--pc:${p.c}">
     <div class="pdet-h">${emblemSVG(k, 72)}<div><span class="ps">${esc(p.side)}</span><b>${esc(p.n)}</b><em class="motto">« ${esc(p.motto)} »</em></div></div>
     <p>${esc(p.pitch)}</p>
-    <ul><li><b>Protège ses membres</b> contre : ${esc(shieldText(k))}.</li><li><b>Dans ses arrondissements</b>, ses membres touchent +${MEMBER_BONUS} % de loyers.</li><li><b>Mêmes règles pour tous</b> : seuls l'esprit et la protection changent d'un parti à l'autre.</li></ul>
+    <div class="ppower"><span>Pouvoir du parti</span><b>${esc(p.power)}</b><p>${esc(p.powerTxt)}</p></div>
+    <ul><li><b>Protège ses membres</b> contre : ${esc(shieldText(k))}.</li><li><b>Dans ses arrondissements</b>, ses membres touchent +${MEMBER_BONUS} % de loyers.</li></ul>
     <button class="btn block" id="party-save" style="background:${p.c}" ${cur === k ? "disabled" : ""}>${cur === k ? "C'est déjà votre parti" : `Rejoindre ${esc(p.n)}`}</button>
     <p class="sub" style="margin:8px 0 0;font-size:12.5px;text-align:center">${cur ? "Vous pourrez changer de nouveau dans 48 h." : "Vous pourrez en changer plus tard (une fois toutes les 48 h)."}</p></div>`;
 }
@@ -655,7 +656,7 @@ function afterDetail(top) { }
 // offre de rachat : l'argent mis de côté suit le prix tapé
 $("#p-detail").addEventListener("input", e => {
   if (e.target.id !== "ofp") return; const p = +e.target.value || 0; ofPrice = p;
-  const h = $("#ofhold"); if (h) h.textContent = fmtE(ofCredit ? Math.ceil(p * .1) : p);
+  const h = $("#ofhold"); if (h) h.textContent = fmtE(ofCredit ? Math.ceil(p * downRate()) : p);
   $$(".ofr .ochips button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.k === p));
 });
 // prix de vente : « vous recevrez » suit ce qu'on tape

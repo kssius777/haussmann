@@ -45,7 +45,7 @@ async function landingHTML() {
       <div class="lstats2"><div><b>77 835</b><span>cartes à collectionner</span></div><div><b>24 h/24</b><span>vos loyers tombent tout seuls</span></div><div><b>22</b><span>monuments en 3D</span></div><div><b>20</b><span>mairies à conquérir</span></div></div>
       <p class="sub">Un appartement du 7<sup>e</sup> vaut plus cher qu'un du 19<sup>e</sup>, comme dans la réalité : les valeurs viennent des ventes immobilières publiées par l'État.</p></section>
     <section class="lsec"><p class="eyebrow">Cinq partis, une seule mairie</p><h2>Choisissez votre camp.</h2>
-      <div class="lparties">${PARTY_ORDER.map(k => `<div>${emblemSVG(k, 46)}<b style="color:${PARTIES[k].c}">${esc(PARTIES[k].n)}</b><span>${esc(PARTIES[k].side)}</span></div>`).join("")}</div></section>
+      <div class="lparties">${PARTY_ORDER.map(k => `<div>${emblemSVG(k, 46)}<b style="color:${PARTIES[k].c}">${esc(PARTIES[k].n)}</b><span>${esc(PARTIES[k].power)}</span></div>`).join("")}</div></section>
     <section class="lfinal"><h2>Votre premier immeuble vous attend.</h2>${cta}</section>
     <footer class="lfoot"><p>Haussmann est un jeu : posséder une carte ne donne aucun droit sur le bien réel. L'argent du jeu est virtuel. <a href="/terms" target="_blank">Conditions</a> · <a href="/privacy" target="_blank">Confidentialité</a></p></footer>
   </div>`;

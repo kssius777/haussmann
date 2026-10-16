@@ -21,6 +21,7 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
    python3 test/test_credit.py   # crédit immobilier
    python3 test/test_admin.py    # admin et liens cadeaux
    python3 test/test_offers.py   # offres de rachat entre joueurs
+   python3 test/test_partis.py   # pouvoirs des partis
    python3 test/e2e.py           # parcours complet dans un vrai navigateur, captures dans test/shots/
    ```
    Ne pousser que si tout est vert.
@@ -49,6 +50,7 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
 - 1 M€ et 5 boosters à l'inscription ; 1 booster gratuit par jour, boosters payants dont le prix double dans la journée.
 - Loyers versés en continu ; trésorerie jamais négative ; hypothèque 50 % de la valeur.
 - Maire d'un arrondissement = plus gros propriétaire, touche 8 % des loyers des autres. 5 partis, +10 % de loyers là où son parti tient la mairie.
+- **Pouvoirs des partis** (migration_partis.sql, choix du propriétaire) : Poing Levé −50 % de loyer quand il tombe chez un autre ; Gauche Unie salaire doublé (40 000 €/lancer) ; Juste Milieu 0 % de commission quand il vend ; Droite Libre apport 5 % et capacité d'emprunt ×1,5 (`_down_rate`, `_loan_cap`) ; Rempart National +50 % de loyer encaissé quand on tombe chez lui. Poing chez Rempart = ×0,75. Texte dans `PARTIES[k].power/powerTxt` (core.js), `downRate()` côté site. Chaque parti garde aussi sa protection contre 2-3 cartes Chance.
 - **Pion façon Monopoly** : un dé de 1 à 6, le pion marche tout seul (4 immeubles voisins par point) et s'arrête sur un immeuble.
   Libre → on peut l'acheter à la banque (c'est le seul endroit où l'on achète à la banque). À un autre joueur → on lui paie
   une journée de ses loyers ici (max 20 % de sa trésorerie). À soi → une journée de loyer en bonus. 1 case sur 8 environ : carte Chance.

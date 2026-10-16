@@ -229,14 +229,14 @@ function showLand(L, gv) {
   else { head = "Tout est déjà pris"; cls = ""; }
   // ce qui s'est passé à l'arrivée (on n'affiche que ce qui compte : loyer payé, bonus, Chance)
   const lines = [];
-  if (L?.toll > 0) lines.push(`<span class="ln bad">Vous payez son loyer · <b>−${fmtE(L.toll)}</b></span>`);
+  if (L?.toll > 0) lines.push(`<span class="ln bad">Vous payez son loyer · <b>−${fmtE(L.toll)}</b>${L.perk === "poing" ? " <small>(−50 % grâce au Poing Levé)</small>" : L.perk === "rempart" ? " <small>(+50 % : propriétaire Rempart National)</small>" : ""}</span>`);
   if (L?.bonus > 0) lines.push(`<span class="ln good">Bonus chez vous · <b>+${fmtE(L.bonus)}</b></span>`);
   if (L?.chance) { const ch = L.chance; const [nm] = CHANCE[ch.k] || ["Chance"]; lines.push(`<span class="ln ${BAD.has(ch.k) ? "bad" : "good"}"><small>Case Chance${BAD.has(ch.k) ? " · pas de chance" : ""}</small>🃏 <b>${esc(nm)}</b> : ${esc(chanceText(ch))}</span>`); }
   const occ = mine || others ? occHTML(c, mine, others, free) : "";   // immeuble entièrement libre : le plan n'apprend rien
   let btns = "";
   if (free > 0) {
     const unit = isP ? "1 part" : tot > 1 ? `1 ${word(1)}` : c.lk === "l" ? "le logement" : "le local", allFree = !isP && free === tot && tot > 1, total = c.v * tot;
-    const cap = ST.state?.loan_cap ?? 1e12, down = p => Math.ceil(p * CREDIT_DOWN);
+    const cap = ST.state?.loan_cap ?? 1e12, down = p => Math.ceil(p * downRate());
     const cashOK = cash >= c.v, creditOK = cash >= down(c.v) && c.v - down(c.v) <= cap;
     const cr = creditOK && (landCredit === null ? true : landCredit) || (!cashOK && creditOK);
     if (!cashOK && !creditOK) {

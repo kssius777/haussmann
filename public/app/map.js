@@ -180,7 +180,7 @@ function renderPartyLegend(z) {
   el.hidden = !show; if (!show) return;
   const n = {}; ST.mayors.forEach(m => m && PARTIES[m.party] && (n[m.party] = (n[m.party] || 0) + 1));
   const free = 20 - Object.values(n).reduce((a, b) => a + b, 0);
-  const html = PARTY_ORDER.filter(k => n[k]).sort((a, b) => n[b] - n[a]).map(k => `<span style="--pc:${PARTIES[k].c}">${emblemSVG(k, 16)}<b>${esc(PARTIES[k].n)}</b><em>${n[k]}</em></span>`).join("")
+  const html = PARTY_ORDER.filter(k => n[k]).sort((a, b) => n[b] - n[a]).map(k => `<span style="--pc:${PARTIES[k].c}" title="${esc(PARTIES[k].power)}">${emblemSVG(k, 16)}<b>${esc(PARTIES[k].n)}</b><em>${n[k]}</em></span>`).join("")
     + (free > 0 ? `<span class="free"><i></i><b>Sans maire</b><em>${free}</em></span>` : "");
   if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = `<p>Qui gouverne Paris</p><div>${html}</div>`; }
 }
