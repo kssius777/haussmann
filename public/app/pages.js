@@ -145,6 +145,62 @@ function listingBuy(l, attr) {
   const cash = liveCash(), cap = ST.state?.loan_cap ?? 1e12, down = Math.ceil(l.price * .1), crOK = cash >= down && l.price - down <= cap;
   return `<span class="lbuy"><button class="btn sm blue2" ${attr(l.id, 1)} ${crOK ? "" : "disabled"} title="La banque prête 90 %, remboursé tout seul par le loyer">À crédit · ${fmtE(down)}</button><button class="lnk" ${attr(l.id, 0)} ${cash < l.price ? "disabled" : ""}>ou comptant ${fmtE(l.price)}</button></span>`;
 }
+// ---------------- OFFRES DE RACHAT ----------------
+let ofCounter = null;
+function setOffers(r) { if (!r) return; if (r.state) setState(r.state); ST.offers = { received: r.received || [], sent: r.sent || [] }; paintOfferBadge(); }
+const offersBadge = () => !ST.offers ? 0 : ST.offers.received.filter(o => o.status === "open").length + ST.offers.sent.filter(o => o.status === "countered").length;
+function paintOfferBadge() {
+  const t = $('#tabs [data-tab="market"]'); if (!t) return; let b = t.querySelector(".tbadge"); const n = offersBadge();
+  if (!n) { b?.remove(); return; } if (!b) { b = document.createElement("i"); b.className = "tbadge"; t.appendChild(b); } b.textContent = n;
+}
+let ofSeen = null;
+async function refreshOffers() {
+  try { const r = await rpc("my_offers"); const before = ofSeen; setOffers(r); const ids = new Set(ST.offers.received.filter(o => o.status === "open").map(o => o.id).concat(ST.offers.sent.filter(o => o.status === "countered").map(o => -o.id)));
+    if (before) { const nw = [...ids].filter(x => !before.has(x)); if (nw.length) toast(`🤝 ${nw.length > 1 ? nw.length + " nouvelles réponses ou offres" : "Nouvelle offre ou contre-proposition"} : voir le Marché → Offres`, "good"); }
+    ofSeen = ids; } catch (e) { }
+}
+function lotLabel(c, k) { return `${lotName(c, k)}${c.lk === "l" ? " · " + ord(floorOfLot(c, k)) + " étage" : ""}`; }
+const OST = { open: "en attente", countered: "contre-proposition", accepted: "✓ vendu", refused: "refusée", expired: "expirée", cancelled: "annulée" };
+async function offersHTML() {
+  try { setOffers(await rpc("my_offers")); } catch (e) { return `<div class="empty">Les offres arrivent bientôt (mise à jour en cours).</div>`; }
+  const all = ST.offers.received.concat(ST.offers.sent); await ensureCards(all.map(o => o.card));
+  const left = o => { const s = (new Date(o.expires_at) - Date.now()) / 1000; return s > 0 ? `encore ${hm(s)}` : ""; };
+  const row = (o, mine) => { const c = card(o.card); if (!c) return "";
+    let act = "";
+    if (mine && o.status === "open") act = ofCounter === o.id
+      ? `<div class="ofc"><input class="inp num" id="ofcp" type="number" inputmode="numeric" step="1000" value="${Math.round(o.price * 1.15 / 1000) * 1000}"><button class="btn sm" data-of="counter" data-id="${o.id}">Envoyer</button><button class="btn sm ghost" data-of="nocounter">×</button></div>`
+      : `<button class="btn sm green" data-of="accept" data-id="${o.id}">Accepter</button><button class="btn sm light" data-of="countero" data-id="${o.id}">Contre-proposer</button><button class="btn sm ghost" data-of="refuse" data-id="${o.id}">Refuser</button>`;
+    if (!mine && o.status === "countered") act = `<button class="btn sm green" data-of="yes" data-id="${o.id}">Accepter ${fmtE(o.counter)}</button><button class="btn sm ghost" data-of="no" data-id="${o.id}">Refuser</button>`;
+    if (!mine && o.status === "open") act = `<button class="btn sm ghost" data-of="cancel" data-id="${o.id}">Annuler</button>`;
+    const live = o.status === "open" || o.status === "countered";
+    return `<div class="orow${live ? " live" : ""}"><button class="th" data-push="b" data-arg="${o.card}">${photo(c)}</button>
+      <div class="t"><b>${esc(title(c))}</b><span>${esc(lotLabel(c, o.k))} · ${mine ? "offre de " : "à "}${esc(o.other)}</span>
+        <span class="num"><b>${fmtE(o.price)}</b>${o.counter ? ` → contre-proposition <b>${fmtE(o.counter)}</b>` : ""} · ${o.credit ? "à crédit" : "comptant"} · <em class="st-${o.status}">${OST[o.status] || o.status}</em>${live ? " · " + left(o) : ""}</span></div>
+      ${act ? `<div class="oacts2">${act}</div>` : ""}</div>`; };
+  const R = ST.offers.received, S = ST.offers.sent;
+  return `<p class="sub" style="margin:4px 0 10px">Proposez à un joueur de lui racheter son logement depuis la fiche de l'immeuble (« Faire une offre »). Il a 24 h pour accepter, refuser ou faire une contre-proposition.</p>
+    <h2 class="h3">Reçues</h2>${R.length ? `<div class="rows">${R.map(o => row(o, true)).join("")}</div>` : `<div class="empty">Aucune offre reçue.</div>`}
+    <h2 class="h3">Envoyées</h2>${S.length ? `<div class="rows">${S.map(o => row(o, false)).join("")}</div>` : `<div class="empty">Aucune offre envoyée.</div>`}`;
+}
+async function offerAct(b) {
+  const a = b.dataset.of, id = +b.dataset.id;
+  if (a === "countero") { ofCounter = id; return renderMarket(); }
+  if (a === "nocounter") { ofCounter = null; return renderMarket(); }
+  b.disabled = true;
+  try {
+    let r;
+    if (a === "accept") r = await rpc("respond_offer", { p_id: id, p_action: "accept" });
+    if (a === "refuse") r = await rpc("respond_offer", { p_id: id, p_action: "refuse" });
+    if (a === "counter") { r = await rpc("respond_offer", { p_id: id, p_action: "counter", p_price: +($("#ofcp")?.value || 0) }); ofCounter = null; }
+    if (a === "yes") r = await rpc("answer_counter", { p_id: id, p_accept: true });
+    if (a === "no") r = await rpc("answer_counter", { p_id: id, p_accept: false });
+    if (a === "cancel") r = await rpc("cancel_offer", { p_id: id });
+    setOffers(r);
+    if (r?.error) toast(r.error, "bad"); else toast({ accept: "Vendu ! L'argent arrive dans votre trésorerie", refuse: "Offre refusée", counter: "Contre-proposition envoyée", yes: "Acheté ! Le logement est à vous", no: "Contre-proposition refusée", cancel: "Offre annulée : l'argent vous est rendu" }[a], "good");
+    await Promise.all([refreshState(), refreshHold(), refreshMap()]).catch(() => { }); renderWallet(); paintAll?.();
+  } catch (e) { toast(e.message, "bad"); }
+  renderMarket();
+}
 // ---------------- MARCHÉ ----------------
 let marketTab = "all", sellAll = false;
 function sellList() {   // mes biens qu'on peut mettre en vente : un toucher ouvre la fiche, formulaire de vente déjà ouvert
@@ -167,13 +223,15 @@ async function renderMarket() {
       <div class="v"><b class="num">${fmtE(l.price)}</b>${own ? `<button class="btn sm ghost" data-unlist="${l.id}">Retirer</button>` : listingBuy(l, (id, cr) => `data-buy="${id}" data-cr="${cr}"`)}</div></div>`; }).join("");
   const sales = ST.market.sales.map(s => { const c = card(s.card); return c ? `<button class="lrow" data-push="b" data-arg="${s.card}"><div class="th">${photo(c)}</div><div class="t"><b>${esc(title(c))}</b><span>${s.k != null ? lotName(c, s.k) : s.n + " parts"} · acheté par ${esc(s.buyer || "?")} · ${ago(s.at)}</span></div><div class="v num"><b>${fmtE(s.price)}</b></div></button>` : ""; }).join("");
   el.innerHTML = `<div class="wrap"><h1 class="h1">Marché</h1><p class="sub">Les biens mis en vente par les joueurs. Le vendeur reçoit le prix moins 5 % de commission.</p>
-    <div class="seg" role="tablist"><button data-mt="all" aria-selected="${marketTab === "all"}">Annonces · ${others.length}</button><button data-mt="mine" aria-selected="${marketTab === "mine"}">Les miennes · ${mineL.length}</button><button data-mt="sales" aria-selected="${marketTab === "sales"}">Ventes</button></div>
+    <div class="seg" role="tablist"><button data-mt="all" aria-selected="${marketTab === "all"}">Annonces${others.length ? " · " + others.length : ""}</button><button data-mt="mine" aria-selected="${marketTab === "mine"}">Vendre${mineL.length ? " · " + mineL.length : ""}</button><button data-mt="offers" aria-selected="${marketTab === "offers"}">Offres${offersBadge() ? ` <i class="obadge">${offersBadge()}</i>` : ""}</button><button data-mt="sales" aria-selected="${marketTab === "sales"}">Ventes</button></div>
     ${marketTab === "all" ? (others.length ? `<div class="rows">${rows(others, false)}</div>` : `<div class="empty"><b>Aucune annonce pour l'instant.</b><br><span class="muted">Les joueurs peuvent vendre leurs biens ici, 5 % de commission. Soyez le premier !</span><br><br><button class="btn sm light" data-mt="mine">Vendre un de mes biens</button></div>${sales ? `<h2 class="h3">Dernières ventes</h2><div class="rows">${sales}</div>` : ""}`) : ""}
     ${marketTab === "mine" ? (mineL.length ? `<div class="rows">${rows(mineL, true)}</div>` : "") + sellList() : ""}
+    ${marketTab === "offers" ? await offersHTML() : ""}
     ${marketTab === "sales" ? (sales ? `<div class="rows">${sales}</div>` : `<div class="empty">Pas encore de vente entre joueurs.</div>`) : ""}</div>`;
 }
 $("#p-market").addEventListener("click", async e => {
   const t = e.target.closest("[data-mt]"); if (t) { marketTab = t.dataset.mt; return renderMarket(); }
+  const of = e.target.closest("[data-of]"); if (of) return offerAct(of);
   const sg = e.target.closest("[data-sellg]"); if (sg) { sellNext = +sg.dataset.sellg; sel = null; return push("b", sellNext); }
   if (e.target.closest("[data-sellall]")) { sellAll = true; return renderMarket(); }
   const b = e.target.closest("[data-buy]"); if (b) { b.disabled = true; const cr = b.dataset.cr === "1"; await act("buy_listing", Object.assign({ p_id: +b.dataset.buy }, cr ? { p_credit: true } : {}), cr ? "Achat conclu à crédit : la banque a prêté 90 %" : "Achat conclu !"); return renderMarket(); }
@@ -268,13 +326,14 @@ async function resultsPage() {
 }
 
 // ---------------- FICHE IMMEUBLE ----------------
-let sellNext = null;
+let sellNext = null, offerNext = null, ofPrice = 0, ofCredit = true;
 let selLot = null, saleMode = false, bInfo = null, bCredit = null, ownSheet = null, ownN = 1, ownPrice = 0;
 async function buildingPage(g) {
   await ensureCards([g]); const c = card(g); if (!c) return dhead("Immeuble") + `<div class="wrap"><p class="sub">Introuvable.</p></div>`;
-  if (sel !== g) { sel = g; selLot = null; saleMode = false; bCredit = null; ownSheet = sellNext === g ? "sale" : null; ownN = 1; ownPrice = 0; } sellNext = null;
+  if (sel !== g) { sel = g; selLot = null; saleMode = false; bCredit = null; ownSheet = sellNext === g ? "sale" : null; ownN = 1; ownPrice = 0; ofPrice = 0; ofCredit = true; } sellNext = null;
   try { bInfo = await rpc("building", { p_card: g }); } catch (e) { bInfo = { lots: [], parts: [], listings: [], sales: [] }; }
   const owners = new Map(bInfo.lots.map(([k, o, ps, m]) => [k, { o, ps, m }]));
+  if (offerNext === g) { offerNext = null; const lk = new Set(bInfo.listings.map(x => x.k)); const t = [...owners.entries()].find(([k, o]) => o.o !== ME && !o.m && !lk.has(k)); if (t) selLot = t[0]; }
   const isP = c.lk === "p"; const myKs = ST.mine.get(g) || []; const myN = ST.mineParts.get(g) || 0;
   const sold = bInfo.parts.reduce((a, x) => a + x[2], 0);
   const free = isP ? c.lots - sold : c.lots - owners.size;
@@ -414,15 +473,27 @@ function buyActions(c, g, owners, free, isP) {
     if (!o && far) btn = farHTML(far, g);
     else if (!o) { const [cr, tg] = payToggle(c.v, c.rent); btn = tg + `<button class="btn block buy" data-act="bank" data-k="${k}" ${cash < (cr ? Math.ceil(c.v * .1) : c.v) ? "disabled" : ""}><span>Acheter · ${fmtE(cr ? Math.ceil(c.v * .1) : c.v)}</span>${buySub(cr)}</button>`; }
     else if (o.o === ME) btn = `<div class="sub" style="margin:0">Il est à vous.</div>`;
-    else btn = l ? `<div class="sub" style="margin:0 0 6px">En vente par ${esc(l.pseudo)} : ${fmtE(l.price)}</div>${listingBuy(l, (id, cr) => `data-act="buyl" data-id="${id}" data-k="${cr}"`)}` : `<div class="sub" style="margin:0">Appartient à ${esc(o.ps)}, pas en vente.</div>`;
+    else btn = l ? `<div class="sub" style="margin:0 0 6px">En vente par ${esc(l.pseudo)} : ${fmtE(l.price)}</div>${listingBuy(l, (id, cr) => `data-act="buyl" data-id="${id}" data-k="${cr}"`)}` : `<div class="sub" style="margin:0">Appartient à ${esc(o.ps)}, pas en vente.</div>${offerForm(c, k, o)}`;
     return head + btn + `<button class="btn sm ghost" data-act="unpick">Annuler</button>`;
   }
-  if (free <= 0) return `<div class="what"><span>Tout est pris. Surveillez le Marché : les propriétaires peuvent mettre leurs biens en vente.</span></div>`;
+  const canOffer = !isP && [...owners.values()].some(o => o.o !== ME);
+  const offerLink = canOffer ? `<button class="btn block light" data-act="ofpick">🤝 Faire une offre à un propriétaire</button>` : "";
+  if (free <= 0) return `<div class="what"><span>Tout est pris. ${canOffer ? "Proposez à un propriétaire de lui racheter son logement :" : "Surveillez le Marché : les propriétaires peuvent mettre leurs biens en vente."}</span></div>${offerLink}`;
   if (far) return farHTML(far, g);
   const total = c.v * c.lots, allFree = !isP && owners.size === 0 && c.lots > 1, [cr, tg] = payToggle(c.v, c.rent), need = p => cr ? Math.ceil(p * .1) : p;
   return tg + `<button class="btn block buy" data-act="bank" ${cash < need(c.v) ? "disabled" : ""}><span>${isP ? "Acheter 1 part" : `Acheter 1 ${c.lk === "l" ? "logement" : "local"}`} · ${fmtE(need(c.v))}</span>${buySub(cr)}</button>
     ${allFree && cash >= need(total) && (!cr || total - need(total) <= (ST.state?.loan_cap ?? 1e12)) ? `<button class="btn block light" data-act="bbuild">Tout l'immeuble · ${fmtE(need(total))} <small class="muted">(+60 % de loyer)</small></button>` : ""}
-    ${!cr && cash < c.v ? `<small class="muted">Il vous manque ${fmtE(c.v - cash)}.</small>` : ""}`;
+    ${!cr && cash < c.v ? `<small class="muted">Il vous manque ${fmtE(c.v - cash)}.</small>` : ""}${offerLink}`;
+}
+function offerForm(c, k, o) {
+  const min = Math.ceil(c.v * .8), price = ofPrice || Math.round(c.v * 1.1 / 1000) * 1000, hold = ofCredit ? Math.ceil(price * .1) : price;
+  const presets = [[Math.round(c.v / 1000) * 1000, "Sa valeur"], [Math.round(c.v * 1.1 / 1000) * 1000, "+10 %"], [Math.round(c.v * 1.25 / 1000) * 1000, "+25 %"]];
+  return `<div class="ofr"><b>🤝 Proposer à ${esc(o.ps)} de lui racheter</b>
+    <div class="oprice"><input class="inp num" id="ofp" type="number" inputmode="numeric" min="${min}" step="1000" value="${price}" aria-label="Votre offre"><span>€</span></div>
+    <div class="ochips">${presets.map(([v, l]) => `<button data-act="ofpreset" data-k="${v}" aria-pressed="${v === price}">${l}<small>${fmtE(v)}</small></button>`).join("")}</div>
+    <div class="pay"><button data-act="ofmode" data-k="1" aria-selected="${ofCredit}"><b>À crédit</b><small>apport 10 %</small></button><button data-act="ofmode" data-k="0" aria-selected="${!ofCredit}"><b>Comptant</b><small>tout de suite</small></button></div>
+    <p class="onote">Au moins ${fmtE(min)} (80 % de sa valeur). <b id="ofhold">${fmtE(hold)}</b> sont mis de côté pendant 24 h au plus, et rendus si ${esc(o.ps)} refuse. Il peut aussi vous faire une contre-proposition.</p>
+    <button class="btn block buy" data-act="offer" data-k="${k}"><span>Envoyer l'offre</span></button></div>`;
 }
 $("#p-detail").addEventListener("click", async e => {
   const top = stack[stack.length - 1]; if (!top) return;
@@ -458,6 +529,13 @@ $("#p-detail").addEventListener("click", async e => {
   if (a === "cancelsale") { saleMode = false; return renderDetail(false); }
   if (a === "unpick") { selLot = null; return renderDetail(false); }
   if (a === "paymode") { bCredit = k === 1; return renderDetail(false); }
+  if (a === "ofpick") { const lk = new Set(bInfo.listings.map(x => x.k)); const t = bInfo.lots.find(([kk, o, ps, m]) => o !== ME && !m && !lk.has(kk)); if (!t) return toast("Aucun logement à racheter ici pour l'instant", "bad"); selLot = t[0]; renderDetail(false); return setTimeout(() => $(".ofr")?.scrollIntoView({ behavior: "smooth", block: "center" }), 60); }
+  if (a === "ofpreset") { ofPrice = k; return renderDetail(false); }
+  if (a === "ofmode") { ofPrice = +($("#ofp")?.value || 0) || ofPrice; ofCredit = k === 1; return renderDetail(false); }
+  if (a === "offer") { const p = +($("#ofp")?.value || 0); btn.disabled = true;
+    try { const r = await rpc("make_offer", Object.assign({ p_card: g, p_k: k, p_price: p }, ofCredit ? { p_credit: true } : {})); setOffers(r); toast("Offre envoyée ! Réponse sous 24 h au plus", "good"); selLot = null; ofPrice = 0; renderWallet(); }
+    catch (er) { toast(er.message, "bad"); }
+    return renderDetail(false); }
   btn.disabled = true;
   const before = (ST.mine.get(g) || []).length + (ST.mineParts.get(g) || 0);
   const credit = btn.closest("#actbar")?.querySelector('.pay [aria-selected="true"]')?.dataset.k === "1";
@@ -497,7 +575,7 @@ document.addEventListener("click", e => { const b = e.target.closest("[data-arrm
 
 // ---------------- BOUTIQUE, PROFIL ----------------
 // ---------------- MON ARGENT : historique ----------------
-const LK = { rent: ["🏠", "Loyers"], rent_away: ["🌙", "Loyers pendant votre absence"], tax: ["🏛️", "Taxe des maires"], tax_in: ["👑", "Taxe de maire reçue"], salary: ["💼", "Salaire du tour"], toll_paid: ["💸", "Loyer de passage payé"], toll_in: ["💰", "Loyer de passage reçu"], buy: ["🔑", "Achat"], sale: ["🤝", "Vente"], chance: ["🃏", "Carte Chance"], booster: ["📦", "Booster"], rolls: ["🎲", "Lancers"], mortgage: ["🏦", "Hypothèque"], lift: ["🏦", "Hypothèque remboursée"], repay: ["🏦", "Crédit remboursé"], bonus: ["🏠", "Bonus"], credit: ["🏦", "Remboursement des crédits"] };
+const LK = { offer: ["🤝", "Offre de rachat"], rent: ["🏠", "Loyers"], rent_away: ["🌙", "Loyers pendant votre absence"], tax: ["🏛️", "Taxe des maires"], tax_in: ["👑", "Taxe de maire reçue"], salary: ["💼", "Salaire du tour"], toll_paid: ["💸", "Loyer de passage payé"], toll_in: ["💰", "Loyer de passage reçu"], buy: ["🔑", "Achat"], sale: ["🤝", "Vente"], chance: ["🃏", "Carte Chance"], booster: ["📦", "Booster"], rolls: ["🎲", "Lancers"], mortgage: ["🏦", "Hypothèque"], lift: ["🏦", "Hypothèque remboursée"], repay: ["🏦", "Crédit remboursé"], bonus: ["🏠", "Bonus"], credit: ["🏦", "Remboursement des crédits"] };
 async function moneyPage() {
   let rows = []; try { rows = await rpc("my_ledger"); } catch (e) { }
   await ensureCards(rows.filter(r => r.card != null).map(r => r.card));
@@ -539,6 +617,7 @@ async function profilePage() {
     ${ST.admin ? `<h2 class="h2">Admin</h2><button class="btn block" data-push="gifts">🎁 Liens cadeaux (giveaway)</button>` : ""}
     <h2 class="h2">Réglages</h2>
     <button class="btn block light" id="mute">${(() => { try { return localStorage.getItem("hm_sound") === "1" ? "🔊 Sons activés · couper" : "🔇 Sons coupés · activer"; } catch (e) { return "🔇 Sons"; } })()}</button>
+    <button class="btn block light" id="nooffers" style="margin-top:8px">${p.no_offers ? "🚫 Offres de rachat refusées · les accepter" : "🤝 J'accepte de recevoir des offres de rachat · désactiver"}</button>
     <h2 class="h2">Compte</h2>
     <button class="btn block ghost" id="logout">Se déconnecter</button>
     <p class="sub" style="margin-top:16px;text-align:center"><a href="/terms" target="_blank">Conditions d'utilisation</a> · <a href="/privacy" target="_blank">Confidentialité</a></p>
@@ -569,9 +648,16 @@ async function partyClick(e) {
   const pc = e.target.closest("[data-party]"); if (pc) { pickParty = pc.dataset.party; $$("#p-detail [data-party]").forEach(b => b.setAttribute("aria-pressed", b === pc)); $("#pdetail").innerHTML = partyDetailHTML(pickParty); return; }
   if (e.target.closest("#party-save")) { if (await act("set_party", { p_party: pickParty }, `Bienvenue chez ${PARTIES[pickParty].n} !`)) { renderWallet(); back(); } return; }
   if (e.target.closest("#logout")) return signOut();
+  if (e.target.closest("#nooffers")) { await act("set_no_offers", { p_on: !ST.state.profile.no_offers }, ST.state.profile.no_offers ? "Vous recevez à nouveau les offres" : "Vous ne recevrez plus d'offres"); return renderDetail(false); }
   if (e.target.closest("#mute")) { try { localStorage.setItem("hm_sound", localStorage.getItem("hm_sound") === "1" ? "0" : "1"); } catch (x) { } return renderDetail(false); }
 }
 function afterDetail(top) { }
+// offre de rachat : l'argent mis de côté suit le prix tapé
+$("#p-detail").addEventListener("input", e => {
+  if (e.target.id !== "ofp") return; const p = +e.target.value || 0; ofPrice = p;
+  const h = $("#ofhold"); if (h) h.textContent = fmtE(ofCredit ? Math.ceil(p * .1) : p);
+  $$(".ofr .ochips button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.k === p));
+});
 // prix de vente : « vous recevrez » suit ce qu'on tape
 $("#p-detail").addEventListener("input", e => {
   if (e.target.id !== "price" || !$("#osget")) return;

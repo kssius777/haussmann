@@ -253,6 +253,8 @@ function showLand(L, gv) {
     const listed = ST.sale.has(g);
     btns = `${free > 0 ? `<div class="farbuy">🎲 Pour l'acheter à la banque, tombez dessus avec le dé.${listed ? "" : " Ou trouvez-le dans un booster."}</div>` : ""}<button class="btn block ${listed ? "buy" : "light"}" data-lopen="${g}"><span>${listed ? "En vente au Marché · voir l'offre" : "Voir la fiche de l'immeuble"}</span></button>`;
   }
+  // racheter à un autre joueur : faire une offre (pas pendant l'écran « Acheté ! »)
+  if (!jb && others > 0 && !isP && !ST.sale.has(g)) btns += `<button class="btn block light" data-lofr="${g}">🤝 Proposer de racheter ${owners.length === 1 ? "au propriétaire" : "à un propriétaire"}</button>`;
   if (jb) {   // juste acheté : s'il reste des logements libres, on peut continuer à acheter ici sans quitter la case
     const gain = `+${fmtE(Math.round(c.rent * (landCreditNow ? .3 : 1)))} / jour de loyer en plus`;
     if (free > 0 && !justBought.whole && btns.includes("data-lbuy")) {
@@ -343,6 +345,7 @@ function initPawnUI() {
       if (await act(whole ? "buy_building" : "bank_buy", Object.assign(whole ? { p_card: g } : { p_card: g, p_k: null }, credit ? { p_credit: true } : {}), null)) { justBought = { g, whole }; sfx("buy"); if (window.confetti) confetti("#2563EB", 30); }
       return showLand();
     }
+    const lf = e.target.closest("[data-lofr]"); if (lf) { offerNext = +lf.dataset.lofr; sel = null; return push("b", offerNext); }
     const lo = e.target.closest("[data-lopen]"); if (lo) return push("b", +lo.dataset.lopen);
   });
   setInterval(() => { if (cur() === "map") renderDice(); }, 15000);

@@ -20,6 +20,7 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
    python3 test/test_pawn.py     # pion et dé
    python3 test/test_credit.py   # crédit immobilier
    python3 test/test_admin.py    # admin et liens cadeaux
+   python3 test/test_offers.py   # offres de rachat entre joueurs
    python3 test/e2e.py           # parcours complet dans un vrai navigateur, captures dans test/shots/
    ```
    Ne pousser que si tout est vert.
@@ -63,6 +64,7 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
 - **Salaire** : +20 000 € à chaque lancer de dé. Le pion démarre au 18 rue de la Bûcherie (400761), face à Notre-Dame, rive gauche.
 - **Admin et liens cadeaux** (migration_admin.sql) : table `admins` (on s'y ajoute à la main dans le SQL Editor), `is_admin()`. L'admin crée un lien `/?gift=CODE` depuis la fiche d'un immeuble (« Admin · offrir cette carte », n logements) ou depuis Profil → « Liens cadeaux » (boosters) ; le premier joueur connecté qui ouvre le lien gagne (`claim_gift`, verrou sur la ligne), les suivants voient « Trop tard ». La page d'accueil montre le cadeau avant l'inscription (`gift_info`, localStorage `hm_gift`).
 - **Marché à crédit** (migration_marche_credit.sql) : `buy_listing(p_id, p_credit)` ; à crédit = apport 10 %, la banque prête le reste (même capacité d'emprunt, remboursé par 70 % du loyer), le vendeur touche le prix − 5 %. Boutons « À crédit · apport » + « ou comptant » (`listingBuy` dans pages.js).
+- **Offres de rachat** (migration_offres.sql) : sur la fiche d'un immeuble, « Proposer de racheter » un logement d'un autre joueur (`make_offer`) ; prix ≥ 80 % de la valeur ; argent bloqué (tout, ou l'apport de 10 % à crédit) ; 24 h pour répondre ; le vendeur accepte / refuse / fait UNE contre-proposition (`respond_offer`), l'acheteur y répond (`answer_counter`) ; 3 offres en cours max ; après un refus, 24 h avant de réoffrir ; option « ne pas recevoir d'offres » dans le profil (`no_offers`). Marché → onglet « Offres » (reçues / envoyées), pastille rose sur l'onglet Marché, vérification toutes les 60 s (`refreshOffers`). Choix du propriétaire (80 %, 24 h, une contre-proposition).
 - Historique de l'argent : table `ledger` + `_log()` appelé à chaque mouvement ; page « Mon argent » (clic sur la trésorerie), RPC `my_ledger()`.
 - Sons (`sfx()` dans core.js, sans fichier audio) : coupés par défaut, activables dans le profil (localStorage `hm_sound`).
 - Achat à la banque : le crédit est proposé en premier (c'est ce que tout le monde choisit) ; « payer comptant » en lien dessous.
@@ -79,7 +81,7 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
 - Page d'accueil « vitrine » noire (landing.js, `.landing.v2`), sans le bloc d'explication Google.
 - Après un achat, s'il reste des logements libres, la case garde le bouton « Acheter 1 autre … » (Continuer devient secondaire). Fermer la case recentre la carte sur la montgolfière.
 - Patrimoine (de haut en bas) : patrimoine net + petite courbe à droite, classement, 4 chiffres, endettement sur une ligne (`.debt2`), « Où sont vos biens » en tuiles par arrondissement (clic = filtre, `.dtile`), puis la collection.
-- Fiche d'un bien possédé : « Vendre… » / « Hypothéquer… » ouvrent un formulaire en deux temps (`ownSheet` dans pages.js : nombre de logements, prix avec repères valeur / +10 % / +25 %, ce qu'on recevra ; hypothèque : argent reçu vs loyer perdu, puis Confirmer). Seuls les logements en vente ou hypothéqués ont une ligne. Marché → « Les miennes » liste les biens vendables (`sellList`), un toucher ouvre la fiche avec le formulaire de vente.
+- Fiche d'un bien possédé : « Vendre… » / « Hypothéquer… » ouvrent un formulaire en deux temps (`ownSheet` dans pages.js : nombre de logements, prix avec repères valeur / +10 % / +25 %, ce qu'on recevra ; hypothèque : argent reçu vs loyer perdu, puis Confirmer). Seuls les logements en vente ou hypothéqués ont une ligne. Marché → « Vendre » liste les biens vendables (`sellList`), un toucher ouvre la fiche avec le formulaire de vente.
 - « Mes biens » sur la carte : carte épurée (classe `mymode`) : seulement les numéros d'arrondissement et les points bleus.
 - Noms des quartiers, canaux et îles sur la carte (`PLACES` dans map.js).
 - Tutoriel en jouant (fin de main.js, `tutTick`, localStorage `hm_tut` : 1 lancer · 2 la case · 3 après l'achat · 4 boosters · 5 mairies · 99 fini) : une bulle noire pointe ce qu'il faut toucher, seulement pour les nouveaux joueurs ; « Passer le tutoriel » à tout moment. e2e.py le passe (hm_tut=99).
