@@ -1402,3 +1402,7 @@ language sql stable security definer set search_path = public as $$ select coale
 revoke all on function _run_migration(text, text), _applied_migrations() from public, anon, authenticated;
 grant execute on function _run_migration(text, text), _applied_migrations() to service_role;
 notify pgrst, 'reload schema';
+
+-- Vérifie que les migrations automatiques marchent (sans effet sur le jeu)
+create or replace function migrations_ok() returns boolean language sql stable as $$ select true $$;
+grant execute on function migrations_ok() to anon, authenticated;
