@@ -22,7 +22,7 @@ async function claimGift() {
 async function boot() {
   try {
     initBackend();
-    const [idx, base] = await Promise.all([getJSON(DATA + "index.json"), getJSON(DATA + "base.json")]);
+    const [idx, base] = await Promise.all([getJSON(DATA + "index.json?v=" + DATA_V), getJSON(DATA + "base.json")]);
     IDX = idx; FIELDS = idx.fields; ARR = new Array(20).fill(null); BASE = base; (idx.hide || []).forEach(g => hideSet.add(g));
     getJSON(DATA + "mons.json").then(m => MONS = m).catch(() => { });
     initMapUI();

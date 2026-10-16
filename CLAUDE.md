@@ -65,6 +65,7 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
 - Historique de l'argent : table `ledger` + `_log()` appelé à chaque mouvement ; page « Mon argent » (clic sur la trésorerie), RPC `my_ledger()`.
 - Sons (`sfx()` dans core.js, sans fichier audio) : coupés par défaut, activables dans le profil (localStorage `hm_sound`).
 - Achat à la banque : le crédit est proposé en premier (c'est ce que tout le monde choisit) ; « payer comptant » en lien dessous.
+- Photos des cartes : planches `public/data/atlas/aN.jpg` (5 × 8 photos 400 × 300), champs `ph` = [planche, case] et `cr` = « Photo Auteur · Licence ». 2 596 bonnes photos (16/10/2026 : +1 340 photos libres de Wikimedia Commons trouvées via Wikidata, image P18 des lieux dont le point tombe dans l'emprise de l'immeuble ; script `scripts/add_photos.py`, rejouable). Les photos Panoramax sont ignorées à l'affichage. Quand on change `public/data`, changer `DATA_V` dans core.js.
 - Cartes : image = maquette 3D de la vraie forme de l'immeuble (`maquetteSVG` dans cards.js), couleurs selon l'époque.
 - Le joueur est une montgolfière 3D (`models.js`, `pawn3d`) aux couleurs de son parti, qui survole les toits sur le trajet du dé. Barre du bas : Téléport (avec confirmation) · Lancer · Boosters (mini paquet, badge) — il n'y a plus d'onglet Boosters.
 - Sur téléphone : pas de bandeau des maires sur la carte (il est dans l'onglet Paris) ; quand on tombe sur une case, la carte s'affiche en grand.

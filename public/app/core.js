@@ -98,6 +98,7 @@ function toast(msg, kind) {
 // ---------------- données statiques ----------------
 let IDX = null, FIELDS = [], ARR = [], BASE = null, MONS = null;
 const DATA = "/data/";
+const DATA_V = "20261016";   // à changer quand les fichiers de public/data changent (sinon le navigateur garde l'ancienne version un jour)
 async function getJSON(u) { const r = await fetch(u); if (!r.ok) throw new Error(u + " : HTTP " + r.status); return r.json(); }
 const atlasURL = a => `${DATA}atlas/a${a}.jpg`;
 function decodeRing(f) { let x = f[0] + 235000, y = f[1] + 4886000; const o = [[x / 1e5, y / 1e5]]; for (let k = 2; k < f.length; k += 2) { x += f[k]; y += f[k + 1]; o.push([x / 1e5, y / 1e5]); } return o; }
@@ -113,7 +114,7 @@ function card(g) {
 async function loadArr(i) {
   if (ARR[i]?.cards) return ARR[i];
   if (ARR[i]?.p) return ARR[i].p;
-  const p = (async () => { const d = await getJSON(`${DATA}a/${IDX.arr[i].c}.json`); ARR[i] = { cards: d.cards, geo: d.geo, roads: d.roads, obj: [] }; window.onArrLoaded?.(i); return ARR[i]; })();
+  const p = (async () => { const d = await getJSON(`${DATA}a/${IDX.arr[i].c}.json?v=${DATA_V}`); ARR[i] = { cards: d.cards, geo: d.geo, roads: d.roads, obj: [] }; window.onArrLoaded?.(i); return ARR[i]; })();
   ARR[i] = { p }; return p;
 }
 async function ensureCards(gs) { await Promise.all([...new Set(gs.map(ai))].map(loadArr)); }
