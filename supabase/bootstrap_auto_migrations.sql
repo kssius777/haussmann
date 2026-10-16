@@ -9,7 +9,7 @@ alter table _migrations enable row level security;
 insert into _migrations(name) values
   ('migration_pion.sql'), ('migration_pion2.sql'), ('migration_pion3.sql'), ('migration_pion4.sql'),
   ('migration_eco.sql'), ('migration_credit.sql'), ('migration_ledger.sql'),
-  ('migration_absence.sql'), ('migration_direction.sql'), ('migration_choix.sql')
+  ('migration_absence.sql'), ('migration_direction.sql'), ('migration_choix.sql'), ('migration_admin.sql')
 on conflict do nothing;
 
 -- appliquer une migration (seulement avec la clé service_role, qui n'existe que dans Vercel)
