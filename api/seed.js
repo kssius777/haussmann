@@ -1,7 +1,7 @@
 // Charge les données de Paris dans la base (à relancer jusqu'au message « prêt ») :
 // 1. les 77 835 immeubles ; 2. leurs coordonnées ; 3. le plan des rues pour le pion (immeubles voisins).
 // Ouvrir : https://<votre-site>/api/seed
-const SUPABASE_URL = "https://fmqixxakhphkijtsyeqd.supabase.co";
+const SUPABASE_URL = (process.env.SUPABASE_URL || "https://fmqixxakhphkijtsyeqd.supabase.co").trim().replace(/\/$/, "");   // base de test si SUPABASE_URL est définie
 export const config = { maxDuration: 60 };
 
 export default async function handler(req, res) {

@@ -56,6 +56,10 @@ function renderWallet() {
   const s = ST.state; if (!s?.profile) return;
   $("#cash").textContent = fmtE(liveCash());
   $("#rate").textContent = netRate() ? `+${fmtE(netRate())}/j` : "";
+  const pl = $("#plaque"); if (pl) {   // la plaque du logo indique l'arrondissement où se trouve la montgolfière
+    const a = s.profile.pos != null && typeof IDX !== "undefined" ? IDX?.arr?.[ai(s.profile.pos)]?.n : null;
+    pl.dataset.sub = a ? (a === 1 ? "1ᵉʳ Arrᵗ" : a + "ᵉ Arrᵗ") : "Paris";
+  }
   const cb = $("#credbar"); if (cb && s.loan_cap != null) {   // crédit encore disponible, sous la barre du haut
     const cap = Math.max(0, +s.loan_cap || 0), loans = +s.loans || 0, pct = loans + cap ? Math.round(loans / (loans + cap) * 100) : 0;
     cb.innerHTML = `<span>🏦 Crédit dispo <b>${fmtE(cap)}</b></span><i class="trk"><i style="width:${pct}%" class="${pct < 60 ? "" : pct < 90 ? "mid" : "hi"}"></i></i><span class="pc">${pct} % du plafond</span>`;
@@ -498,7 +502,7 @@ async function adminAct(a, btn, g) {   // actions admin, sur la fiche ou la page
   const k = btn.dataset.k;
   if (a === "an") { adminN = Math.max(1, adminN + +k); return renderDetail(false); }
   if (a === "acopy") { try { await navigator.clipboard.writeText(k); toast("Lien copié", "good"); } catch (e) { prompt("Copiez le lien :", k); } return; }
-  if (a === "ashare") { try { await navigator.share({ title: "Un cadeau sur Haussmann", text: "🎁 Le premier qui ouvre ce lien gagne cette carte !", url: k }); } catch (e) { } return; }
+  if (a === "ashare") { try { await navigator.share({ title: "Un cadeau sur Proprio", text: "🎁 Le premier qui ouvre ce lien gagne cette carte !", url: k }); } catch (e) { } return; }
   btn.disabled = true;
   try {
     if (a === "agift") { const r = await rpc("admin_gift_create", { p_card: g, p_n: +k, p_boosters: 0 }); adminLink = { g, url: giftURL(r.code) }; }
@@ -647,7 +651,7 @@ async function shopPage() {
     <div class="box" style="text-align:center"><p class="eyebrow">Trésorerie</p><b class="num" style="font-size:28px">${fmtE(liveCash())}</b><div class="sub" style="margin:4px 0 0">+${fmtE(ST.state?.rate || 0)} de loyers par jour</div></div>
     <h2 class="h2">Ajouter de l'argent</h2>
     <div class="shop">${offers.map(([p, a, tag]) => `<button class="offer" data-offer="${p}"><span class="num">${fmtE(a)}${tag ? `<span class="best">${tag}</span>` : ""}</span><span class="p num">${String(p).replace(".", ",")} €</span></button>`).join("")}</div>
-    <p class="sub" style="margin-top:12px">L'argent du jeu sert uniquement dans Haussmann et ne peut jamais être reconverti en euros.</p></div>`;
+    <p class="sub" style="margin-top:12px">L'argent du jeu sert uniquement dans Proprio et ne peut jamais être reconverti en euros.</p></div>`;
 }
 async function profilePage() {
   const p = ST.state.profile; const pr = PARTIES[p.party];

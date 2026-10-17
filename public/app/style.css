@@ -1327,11 +1327,11 @@ body.landopen #strip{display:none}
 .grid-cards .hc .fr,#strip .hc .fr{box-shadow:0 2px 8px rgba(20,40,70,.14)!important}
 .grid-cards>.cw{content-visibility:auto;contain-intrinsic-size:auto 220px}
 #p-assets .page,#p-assets{will-change:auto}
-/* logo : une vraie plaque de rue parisienne (émail bleu, filet blanc, cadre vert), « 8ᵉ Arrᵗ » comme le boulevard Haussmann */
+/* logo Proprio : une vraie plaque de rue parisienne (émail bleu, filet blanc, cadre vert) ; la petite ligne du haut (data-sub) = l'arrondissement où est la montgolfière */
 .plaque-mini{display:inline-grid!important;justify-items:center;gap:1px;background:linear-gradient(180deg,#2547A6,#1B3888)!important;color:#fff!important;
   font:800 13px/1 var(--f)!important;letter-spacing:.06em!important;padding:4px 12px 5px!important;border-radius:6px!important;
   border:1.5px solid #fff!important;outline:2.5px solid #1F6B4A!important;outline-offset:0!important;box-shadow:0 2px 6px rgba(0,0,0,.18)!important;text-transform:uppercase}
-.plaque-mini::before{content:"8ᵉ Arrᵗ";font:600 8px/1 var(--f);letter-spacing:.04em;text-transform:none;opacity:.95}
+.plaque-mini::before{content:attr(data-sub);font:600 8px/1 var(--f);letter-spacing:.04em;text-transform:none;opacity:.95}
 .plaque-mini.big{font-size:26px!important;padding:8px 22px 10px!important;border-width:2.5px!important;outline-width:4px!important;border-radius:10px!important}
 .plaque-mini.big::before{font-size:13px}
 /* de loin : « Vous » posé sur un point, plus d'étiquette qui flotte dans le vide */
@@ -1775,3 +1775,5 @@ body.zfar .amark b svg{width:12px;height:12px}
 .adtab .th{font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .adtab>div>span:not(:first-child){text-align:right}
 .adtab small{display:block;font-size:10.5px;color:var(--muted);font-weight:600}
+/* site de test (base de test) : bandeau bien visible */
+html.dbtest body::after{content:"SITE DE TEST · base de test";position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 2px);transform:translateX(-50%);z-index:999;padding:2px 10px;border-radius:0 0 8px 8px;background:#F59E0B;color:#111;font:800 10.5px/1.4 var(--f);letter-spacing:.06em;pointer-events:none}

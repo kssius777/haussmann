@@ -252,7 +252,7 @@ function packHTML(cls = "", col = "blue") {
     <i class="holo"></i>
     <svg class="frame" viewBox="0 0 100 160" preserveAspectRatio="none" aria-hidden="true"><rect x="4.5" y="13" width="91" height="134" rx="2" class="ln"/><rect x="6.5" y="15" width="87" height="130" rx="1.4" class="ln thin"/><circle cx="50" cy="13" r="1.3" class="dot"/><circle cx="50" cy="147" r="1.3" class="dot"/></svg>
     <svg class="fac" viewBox="0 0 100 160" aria-hidden="true">${FACADE_SVG}</svg>
-    <span class="brand">HAUSSMANN</span>
+    <span class="brand">PROPRIO</span>
     <span class="ed">Édition Paris</span>
     <span class="seal"><b>75</b><small>PARIS</small></span>
     <span class="sub">4 biens · 1 Chance</span>

@@ -29,7 +29,7 @@ async function landingHTML() {
     : `<div class="lcta"><button class="btn block goldb" data-l="guest">Jouer tout de suite</button><button class="btn block ghostw" data-l="email">Créer un compte avec un e-mail</button></div>`;
   return `<div class="landing v2">
     <div class="lhero2"><div class="glow"></div>
-      <header class="lhead"><span class="plaque-mini">HAUSSMANN</span><button class="btn sm ghostw" data-l="signin">Se connecter</button></header>
+      <header class="lhead"><span class="plaque-mini" data-sub="Paris">PROPRIO</span><button class="btn sm ghostw" data-l="signin">Se connecter</button></header>
       <div class="ltop"><section class="lhero">
         ${giftB}<p class="eyebrow">Jeu gratuit · ordinateur et mobile</p>
         <h1>Tout Paris<br>est à prendre.</h1>
@@ -47,7 +47,7 @@ async function landingHTML() {
     <section class="lsec"><p class="eyebrow">Cinq partis, une seule mairie</p><h2>Choisissez votre camp.</h2>
       <div class="lparties">${PARTY_ORDER.map(k => `<div>${emblemSVG(k, 46)}<b style="color:${PARTIES[k].c}">${esc(PARTIES[k].n)}</b><span>${esc(PARTIES[k].power)}</span></div>`).join("")}</div></section>
     <section class="lfinal"><h2>Votre premier immeuble vous attend.</h2>${cta}</section>
-    <footer class="lfoot"><p>Haussmann est un jeu : posséder une carte ne donne aucun droit sur le bien réel. L'argent du jeu est virtuel. <a href="/terms" target="_blank">Conditions</a> · <a href="/privacy" target="_blank">Confidentialité</a></p></footer>
+    <footer class="lfoot"><p>Proprio est un jeu : posséder une carte ne donne aucun droit sur le bien réel. L'argent du jeu est virtuel. <a href="/terms" target="_blank">Conditions</a> · <a href="/privacy" target="_blank">Confidentialité</a></p></footer>
   </div>`;
 }
 async function showLanding() {

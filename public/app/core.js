@@ -1,9 +1,16 @@
 "use strict";
 // =====================================================================
-//  HAUSSMANN — constantes, données statiques, utilitaires
+//  PROPRIO (ex-Haussmann) — constantes, données statiques, utilitaires
 // =====================================================================
-const SUPABASE_URL = "https://fmqixxakhphkijtsyeqd.supabase.co";
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtcWl4eGFraHBoa2lqdHN5ZXFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2MzA1ODAsImV4cCI6MjEwNzIwNjU4MH0.DbX0oidMAdRe_JF2RDx2VwPJ6anAZaHw2nZKpAU42rw";
+// Base de données : la vraie sur le site public (proprio.games, haussmann-beige.vercel.app) ;
+// la base de test sur les sites de test de Vercel (branche « dev ») dès que DB_TEST est rempli.
+const DB_PROD = { url: "https://fmqixxakhphkijtsyeqd.supabase.co", anon: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtcWl4eGFraHBoa2lqdHN5ZXFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2MzA1ODAsImV4cCI6MjEwNzIwNjU4MH0.DbX0oidMAdRe_JF2RDx2VwPJ6anAZaHw2nZKpAU42rw" };
+const DB_TEST = { url: "", anon: "" };   // projet Supabase de test : adresse + clé publique (anon), à remplir
+const IS_PROD_SITE = /(^|\.)proprio\.games$|^haussmann-beige\.vercel\.app$/.test(location.hostname);
+const DB_IS_TEST = !IS_PROD_SITE && !!DB_TEST.url;
+const SUPABASE_URL = (DB_IS_TEST ? DB_TEST : DB_PROD).url;
+const SUPABASE_ANON = (DB_IS_TEST ? DB_TEST : DB_PROD).anon;
+if (DB_IS_TEST) document.documentElement.classList.add("dbtest");   // bandeau « site de test » pour ne pas confondre
 const LOCAL_MODE = new URLSearchParams(location.search).has("local") || location.hostname === "localhost" || location.hostname === "127.0.0.1";
 
 const RAR = {

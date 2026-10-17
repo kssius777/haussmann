@@ -1,7 +1,13 @@
 // Lancé par Vercel à chaque déploiement : applique les migrations SQL pas encore passées.
 // Si une migration échoue, le déploiement est annulé (le site reste sur l'ancienne version).
 import { readFileSync } from "node:fs";
-const URL_ = "https://fmqixxakhphkijtsyeqd.supabase.co";
+// la base visée : SUPABASE_URL si elle est définie dans Vercel (ex. : base de test pour les sites de test), sinon la vraie
+const URL_ = (process.env.SUPABASE_URL || "https://fmqixxakhphkijtsyeqd.supabase.co").trim().replace(/\/$/, "");
+console.log("migrate : base " + URL_ + " (" + (process.env.VERCEL_ENV || "local") + ")");
+// sécurité : un site de test (preview Vercel) ne modifie JAMAIS la vraie base ; il lui faut sa propre SUPABASE_URL
+if (process.env.VERCEL_ENV === "preview" && (!process.env.SUPABASE_URL || URL_.includes("fmqixxakhphkijtsyeqd"))) {
+  console.log("migrate : site de test sans base de test → la vraie base n'est pas touchée, migrations ignorées"); process.exit(0);
+}
 const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
 if (!key) { console.log("migrate : pas de clé SUPABASE_SERVICE_ROLE_KEY au build, migrations ignorées"); process.exit(0); }
 const H = { apikey: key, "Content-Type": "application/json" }; if (key.startsWith("eyJ")) H.Authorization = "Bearer " + key;

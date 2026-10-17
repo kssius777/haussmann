@@ -4,18 +4,38 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#FFFFFF">
-<title>Haussmann</title>
-<meta name="description" content="Collectionnez les vrais immeubles de Paris, touchez leurs loyers, devenez maire de votre arrondissement.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='4' y='14' width='56' height='36' rx='8' fill='%231F3B73' stroke='%232E7B5A' stroke-width='3'/%3E%3Ctext x='32' y='40' font-family='Arial' font-weight='800' font-size='22' fill='white' text-anchor='middle'%3EH%3C/text%3E%3C/svg%3E">
+<title>Proprio · Achète Paris, immeuble par immeuble</title>
+<meta name="description" content="Proprio : collectionnez les 77 835 vrais immeubles de Paris, touchez leurs loyers, devenez maire de votre arrondissement. Jeu gratuit, sur ordinateur et téléphone.">
+<link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/icons/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Proprio">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Proprio">
+<meta property="og:title" content="Proprio · Achète Paris, immeuble par immeuble">
+<meta property="og:description" content="77 835 vrais immeubles de Paris à collectionner. Touche leurs loyers, deviens maire de ton arrondissement.">
+<meta property="og:url" content="https://proprio.games/">
+<meta property="og:image" content="https://proprio.games/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="fr_FR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Proprio · Achète Paris, immeuble par immeuble">
+<meta name="twitter:description" content="77 835 vrais immeubles de Paris à collectionner. Touche leurs loyers, deviens maire de ton arrondissement.">
+<meta name="twitter:image" content="https://proprio.games/og.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.css" rel="stylesheet">
-<link href="/app/style.css?v=20261017f" rel="stylesheet">
+<link href="/app/style.css?v=20261017g" rel="stylesheet">
 </head>
 <body>
 <div id="credbar" hidden data-push="money" role="button" aria-label="Crédit encore disponible"></div>
 <header id="bar">
-  <button class="brand" data-go="map" aria-label="Haussmann, retour à la carte"><span class="plaque-mini">HAUSSMANN</span></button>
+  <button class="brand" data-go="map" aria-label="Proprio, retour à la carte"><span class="plaque-mini" id="plaque" data-sub="Paris">PROPRIO</span></button>
   <div class="wallet">
     <button class="money" data-push="money" aria-label="Mon argent : trésorerie et historique">
       <span class="mv"><span class="num" id="cash">—</span><span class="rate num" id="rate"></span></span><i class="plus">+</i>
@@ -81,22 +101,22 @@
 <div id="reveal" hidden></div>
 <div id="onb" hidden></div>
 <div id="toast" role="status" aria-live="polite"></div>
-<div id="loading"><span class="plaque-mini big">HAUSSMANN</span><p id="loadmsg">Chargement de Paris…</p></div>
+<div id="loading"><span class="plaque-mini big" data-sub="Paris">PROPRIO</span><p id="loadmsg">Chargement de Paris…</p></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/app/models.js?v=20261017f"></script>
-<script src="/app/core.js?v=20261017f"></script>
-<script src="/app/api.js?v=20261017f"></script>
-<script src="/app/cards.js?v=20261017f"></script>
-<script src="/app/map.js?v=20261017f"></script>
-<script src="/app/pawn.js?v=20261017f"></script>
-<script src="/app/life.js?v=20261017f"></script>
-<script src="/app/pages.js?v=20261017f"></script>
-<script src="/app/booster.js?v=20261017f"></script>
-<script src="/app/onboard.js?v=20261017f"></script>
-<script src="/app/landing.js?v=20261017f"></script>
-<script src="/app/main.js?v=20261017f"></script>
+<script src="/app/models.js?v=20261017g"></script>
+<script src="/app/core.js?v=20261017g"></script>
+<script src="/app/api.js?v=20261017g"></script>
+<script src="/app/cards.js?v=20261017g"></script>
+<script src="/app/map.js?v=20261017g"></script>
+<script src="/app/pawn.js?v=20261017g"></script>
+<script src="/app/life.js?v=20261017g"></script>
+<script src="/app/pages.js?v=20261017g"></script>
+<script src="/app/booster.js?v=20261017g"></script>
+<script src="/app/onboard.js?v=20261017g"></script>
+<script src="/app/landing.js?v=20261017g"></script>
+<script src="/app/main.js?v=20261017g"></script>
 </body>
 </html>

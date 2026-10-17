@@ -1,7 +1,10 @@
-# Haussmann — notes pour reprendre le projet
+# Proprio (ex-Haussmann) — notes pour reprendre le projet
 
 Jeu de cartes à collectionner sur les vrais immeubles de Paris, joué sur une carte 3D de Paris.
-Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (branche `main`).
+Nom du jeu : **Proprio** (choisi le 17/10/2026), domaine **proprio.games**. Le dépôt et le projet Vercel gardent le nom « haussmann ».
+Site : https://proprio.games (quand le domaine sera branché) · https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (branche `main`).
+Logo : plaque de rue parisienne « PROPRIO » (`.plaque-mini`, la petite ligne du haut `data-sub` = arrondissement de la montgolfière) + emblème « P-clé » (`public/icons/`, favicon, icônes d'app, `manifest.webmanifest`), image de partage `public/og.png` (1200 × 630). Sources du logo : script dans le scratchpad, à refaire en SVG si besoin.
+« Haussmann » reste utilisé seulement pour le baron (anecdotes, exemple de pseudo) et l'époque « haussmannien ». Les comptes invités gardent leur e-mail technique `@haussmann.app` (ne pas changer : ils ne pourraient plus se reconnecter).
 
 ## Comment c'est construit
 - **Front** : HTML/CSS/JS sans build, dans `public/` (`index.html`, `app/*.js`, `app/style.css`).
@@ -10,6 +13,8 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
 - **Back** : Supabase (Postgres). **Toutes les règles du jeu sont dans des fonctions SQL** de `supabase/schema.sql`
   (le pion et le dé : `supabase/pion.sql`, recopié dans schema.sql). Le site appelle ces fonctions via `rpc()`.
 - **Déploiement** : chaque `git push` sur `main` est mis en ligne automatiquement par Vercel.
+- **Base de test** (core.js) : `DB_PROD` sur proprio.games et haussmann-beige.vercel.app ; ailleurs (sites de test Vercel), `DB_TEST` dès qu'il est rempli (bandeau orange « SITE DE TEST »).
+  `scripts/migrate.mjs` et `api/seed.js` visent `SUPABASE_URL` (variable Vercel) sinon la vraie base ; un build « preview » sans base de test ne touche JAMAIS la vraie base.
 - `api/seed.js` : charge les immeubles et le plan des rues dans Supabase (ouvrir /api/seed jusqu'à « Prêt »).
 
 ## Règles de travail (important)
@@ -38,7 +43,7 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
 4. En cas de doute sur une décision de jeu (règles, économie, textes), demander au propriétaire avant de coder.
 
 ## Avant la mise en production (à ne pas oublier)
-- **Nouveau nom de domaine** (ex. proprio.paris) : dans Supabase → Authentication → URL Configuration, mettre le **Site URL** sur le nouveau domaine
+- **Nouveau nom de domaine proprio.games** : dans Supabase → Authentication → URL Configuration, mettre le **Site URL** sur le nouveau domaine
   et ajouter `https://NOUVEAU-DOMAINE/**` dans **Redirect URLs** (les `/**` sont indispensables : les liens cadeaux reviennent avec `?gift=…`
   après Google ou l'e-mail de confirmation). Garder `https://haussmann-beige.vercel.app/**` tant que l'ancien lien circule.
   Fait pour haussmann-beige.vercel.app le 16/10/2026.
