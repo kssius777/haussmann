@@ -30,4 +30,11 @@ check("l'admin peut annuler un lien pas encore pris", "n'existe pas" in (err(lam
 check("la liste des cadeaux de l'admin indique le gagnant", any(x["code"] == code and x["winner"] for x in db.rpc(ADM, "admin_gifts")))
 full = db.sql("select id, lots from cards where lk='l' and lots between 2 and 4 and id not in (select card from lots) limit 1")[0]
 check("impossible d'offrir plus de logements que de libres", "Pas assez" in (err(lambda: db.rpc(ADM, "admin_gift_create", p_card=full[0], p_n=full[1] + 1, p_boosters=0)) or ""))
+c0.cursor().execute(open("supabase/migration_stats.sql").read()); c0.commit()
+check("tableau de bord : réservé à l'admin", "administrateur" in (err(lambda: db.rpc(A, "admin_stats")) or ""))
+b0 = db.rpc(ADM, "admin_stats")["boosters_today"]
+db.rpc(B, "open_booster", p_kind="welcome")
+st = db.rpc(ADM, "admin_stats")
+check("tableau de bord : joueurs, inscrits du jour, boosters ouverts comptés", st["players"] >= 3 and st["new_today"] >= 3 and st["boosters_today"] == b0 + 1 and len(st["by_day"]) == 14 and len(st["top"]) >= 1, {k: st[k] for k in ("players", "new_today", "boosters_today", "active_today")})
+check("tableau de bord : le joueur qui agit compte comme actif", db.sql("select seen_at is not null from profiles where id=%s", str(B))[0][0])
 print(f"\n{sum(R)}/{len(R)} OK")

@@ -1746,3 +1746,24 @@ body.hascred #bar{height:calc(58px + env(safe-area-inset-top,0px))}
 body.zfar .amark span{display:none}
 body.zfar .amark b{font-size:12px;padding:4px 7px;border-radius:8px;border-width:1.5px}
 body.zfar .amark b svg{width:12px;height:12px}
+/* ordinateur : panneau de la case propre, tout tient sans défiler */
+@media (min-width:900px){
+  #movebar.k-land{top:calc(var(--bar-h) + 12px);bottom:16px;width:360px;padding:18px 18px 16px;overflow:auto;border-radius:22px;box-shadow:0 12px 40px rgba(15,23,42,.18)}
+  #movebar.k-land::before{display:none}
+  #movebar.k-land .land .lc{width:var(--cw,240px);align-self:center;justify-self:center}
+  #movebar.k-land .land .lc .hc{--w:var(--cw,240px)}
+  #movebar.k-land .x[data-mvclose]{position:absolute;top:10px;right:10px;z-index:3;width:34px;height:34px;border-radius:50%;background:#F1F5F9;border:0;font-size:20px;line-height:1}
+}
+/* pas de paiement pour l'instant : pas de « + » d'achat d'argent */
+.money .plus{display:none}
+.money{padding-right:12px}
+/* tableau de bord admin */
+.adbars{display:grid;grid-template-columns:repeat(14,1fr);gap:4px;align-items:end;height:120px;margin-top:10px}
+.adbars>div{position:relative;height:100%;display:flex;align-items:flex-end;justify-content:center;gap:2px}
+.adbars i{display:block;width:40%;min-height:2px;border-radius:3px 3px 0 0}
+.adbars i.a,.adleg i.a{background:var(--act)}.adbars i.s,.adleg i.s{background:#10B981}
+.adbars small{position:absolute;bottom:-16px;font-size:10px;color:var(--muted)}
+.adleg{display:flex;gap:14px;margin-top:22px;font-size:12px;color:var(--muted)}.adleg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.adlist{display:grid;gap:0;padding:4px 14px}
+.adlist>div{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+.adlist>div:last-child{border:0}

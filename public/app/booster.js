@@ -34,6 +34,7 @@ async function openBooster(kind) {
   R.innerHTML = `<div class="bstage"><div class="rays"></div><button class="close" data-rclose aria-label="Fermer">×</button>
     <div class="rv"><div class="slot" id="slot"></div><div id="rpack">${packHTML("shake", PACK_COL[kind] || "blue")}</div></div>
     <p class="bnote" id="rhint">Ouverture…</p></div>`;
+  packColSeed++;   // le prochain sachet aura une autre couleur
   const pack = R.querySelector(".sachet");
   const t0 = performance.now();
   let res;

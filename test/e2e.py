@@ -144,7 +144,7 @@ async def main():
         await W("document.querySelector('#slot .hc')"); await pg.click("#reveal .close"); await W("document.querySelector('.sumgrid')")
         await pg.click("[data-r=map]"); check("booster payant (prix suivant doublé)", await E("ST.state.price===300000"), await E("ST.state.price"))
         await pg.click(".money"); await W("document.querySelector('.ml')"); await pg.screenshot(path=T + "15_money.png"); check("mon argent : historique des mouvements", await E("document.querySelectorAll('.ml').length") >= 3, await E("document.querySelectorAll('.ml').length"))
-        await pg.click("[data-push=shop]"); await W("document.querySelector('.shop')"); await pg.screenshot(path=T + "15_shop.png"); await pg.click("[data-back]"); await pg.click("[data-back]")
+        check("pas de boutique en vrai argent pour l'instant", await E("!document.querySelector('[data-push=shop]')")); await pg.click("[data-back]")
         await pg.click("#avatar"); await W("document.querySelector('#logout')"); await pg.screenshot(path=T + "16_profile.png"); await pg.click("[data-back]")
         p0 = await E("ST.state.profile.pos"); await pg.click("#b-tp"); await W("document.querySelector('[data-tpgo]')"); await pg.click("[data-tpgo]")
         await W(f"ST.state.profile.pos!=={p0} && ST.state.profile.tp===2"); await pg.wait_for_timeout(800); await pg.screenshot(path=T + "16b_teleport.png")

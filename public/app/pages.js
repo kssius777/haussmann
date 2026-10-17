@@ -34,7 +34,7 @@ function back() {
 async function renderDetail(anim) {
   const top = stack[stack.length - 1]; if (!top) return; const el = $("#p-detail");
   el.hidden = false; if (anim) { el.classList.remove("enter"); void el.offsetWidth; el.classList.add("enter"); el.scrollTop = 0; }
-  const K = { b: buildingPage, arr: arrPage, shop: shopPage, money: moneyPage, profile: profilePage, results: resultsPage, party: partyPage, gifts: giftsPage }[top.kind];
+  const K = { b: buildingPage, arr: arrPage, shop: shopPage, money: moneyPage, profile: profilePage, results: resultsPage, party: partyPage, gifts: giftsPage, admin: adminPage }[top.kind];
   if (!K) return;
   const html = await K(top.arg);
   if (stack[stack.length - 1] !== top) return;
@@ -444,6 +444,29 @@ function adminGiftBox(c, g, free) {
       <button class="btn block" data-act="agift" data-k="${n}" style="margin-top:10px">🎁 Créer le lien cadeau</button>` : `<p class="sub">Plus rien de libre dans cet immeuble.</p>`}
     ${adminLink && adminLink.g === g ? giftLinkHTML(adminLink.url) : ""}</div>`;
 }
+// ---- tableau de bord de l'administrateur ----
+async function adminPage() {
+  let d; try { d = await rpc("admin_stats"); } catch (e) { return dhead("Tableau de bord") + `<div class="wrap"><p class="sub">${esc(e.message)}</p></div>`; }
+  const N = n => fmtN(+n || 0), K = (t, v, sub) => `<div class="kpi"><span>${t}</span><b class="num">${v}</b>${sub ? `<small class="muted">${sub}</small>` : ""}</div>`;
+  const days = d.by_day || [], mx = Math.max(1, ...days.map(x => Math.max(x.signups, x.active)));
+  const bars = `<div class="adbars">${days.map(x => `<div title="${x.day} · ${x.signups} inscrits · ${x.active} actifs"><i class="a" style="height:${x.active / mx * 100}%"></i><i class="s" style="height:${x.signups / mx * 100}%"></i><small>${x.day.slice(8, 10)}</small></div>`).join("")}</div>
+    <div class="adleg"><span><i class="a"></i>joueurs actifs</span><span><i class="s"></i>inscrits</span></div>`;
+  const ago2 = t => t ? ago(t) : "—";
+  return dhead("Tableau de bord") + `<div class="wrap">
+    <h2 class="h3">Joueurs</h2>
+    <div class="kpis k4">${K("Inscrits", N(d.players), `+${N(d.new_today)} aujourd'hui`)}${K("Nouveaux 7 j", N(d.new_7d), `${N(d.new_30d)} sur 30 j`)}${K("Actifs aujourd'hui", N(d.active_today))}${K("Actifs 7 j", N(d.active_7d), d.players ? `${Math.round(d.active_7d / d.players * 100)} % des inscrits` : "")}</div>
+    <div class="box" style="margin-top:10px"><b>14 derniers jours</b>${bars}</div>
+    <h2 class="h3">Activité</h2>
+    <div class="kpis k4">${K("Lancers de dé", N(d.rolls_today), `${N(d.rolls_7d)} sur 7 j`)}${K("Boosters ouverts", N(d.boosters_today), `${N(d.boosters_7d)} sur 7 j`)}${K("Achats", N(d.buys_today), `${N(d.buys_7d)} sur 7 j`)}${K("Ventes au Marché", N(d.sales_7d), "sur 7 j")}</div>
+    <h2 class="h3">Économie</h2>
+    <div class="kpis k4">${K("Argent en circulation", fmtE(d.cash_total))}${K("Crédits en cours", fmtE(d.loans_total))}${K("Logements possédés", N(d.lots_owned))}${K("Partis", `<span style="font-size:14px;line-height:1.35;display:block">${Object.entries(d.parties || {}).map(([k, n]) => `${esc(PARTIES[k]?.n || "Sans parti")} ${n}`).join(" · ") || "—"}</span>`)}</div>
+    <h2 class="h3">Classement</h2>
+    <div class="box adlist">${(d.top || []).map((x, i) => `<div><span>${i + 1}. ${esc(x.pseudo)}</span><b class="num">${fmtE(x.worth)}</b></div>`).join("") || "—"}</div>
+    <h2 class="h3">Derniers inscrits</h2>
+    <div class="box adlist">${(d.latest || []).map(x => `<div><span>${esc(x.pseudo)} <small class="muted">${x.lots} logt · vu ${ago2(x.seen_at)}</small></span><small class="muted">inscrit ${ago2(x.created_at)}</small></div>`).join("") || "—"}</div>
+    <p class="sub" style="font-size:12px;margin-top:12px">« Actif » = a lancé le dé, acheté ou ouvert un booster (compté depuis le 17/10/2026 pour les boosters).</p>
+  </div>`;
+}
 async function giftsPage() {
   let L = []; try { L = await rpc("admin_gifts"); } catch (e) { return dhead("Liens cadeaux") + `<div class="wrap"><p class="sub">${esc(e.message)}</p></div>`; }
   await ensureCards(L.filter(x => x.card).map(x => x.card));
@@ -599,7 +622,7 @@ async function moneyPage() {
     return `<${c ? `button data-push="b" data-arg="${r.card}"` : "div"} class="ml"><span class="ic">${ic}</span><span class="t"><b>${esc((r.label || dft).split(" · ")[0])}</b>${(r.label || "").includes(" · ") ? `<small>pendant ${esc(r.label.split(" · ")[1])}</small>` : c ? `<small>${esc(title(c))}</small>` : ""}</span><b class="num ${a >= 0 ? "green" : "red"}">${a >= 0 ? "+" : "−"}${fmtE(Math.abs(a))}</b></${c ? "button" : "div"}>`; };
   return dhead("Mon argent") + `<div class="wrap">
     <div class="box" style="text-align:center"><p class="eyebrow">Trésorerie</p><b class="num" style="font-size:30px" id="cash2">${fmtE(liveCash())}</b><div class="sub" style="margin:4px 0 0">+${fmtE(netRate())} de loyers par jour${s?.loan_rate > 0 ? ` · ${fmtE(s.loan_rate)} / jour remboursent vos crédits` : ""}</div>
-      <div style="margin-top:10px"><button class="btn sm gold" data-push="shop">+ Ajouter de l'argent</button></div></div>
+      </div>
     <h2 class="h2">Historique</h2>
     ${rows.length ? [...days.values()].map(g => `<div class="mday"><div class="mdh"><span>${dayLabel(g.d)}</span><b class="num ${g.tot >= 0 ? "green" : "red"}">${g.tot >= 0 ? "+" : "−"}${fmtE(Math.abs(g.tot))}</b></div>${g.items.map(line).join("")}</div>`).join("") : `<div class="empty">Vos premiers mouvements apparaîtront ici : loyers, achats, salaires…</div>`}
   </div>`;
@@ -627,7 +650,7 @@ async function profilePage() {
     ${!pr ? `<div class="box"><b>Vous n'avez pas encore de parti</b><p class="sub" style="margin:4px 0 0">Rejoignez un camp pour toucher +${MEMBER_BONUS} % de loyers dans les arrondissements qu'il tient, et jouer pour l'Hôtel de Ville.</p></div>` : ""}
     ${pr ? `<div class="box" style="border-left:6px solid ${pr.c};display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center">${emblemSVG(p.party, 56)}<div><b style="color:${pr.c};font-size:17px">${esc(pr.n)}</b> <span class="muted">· ${esc(pr.side)}</span><div class="motto">« ${esc(pr.motto)} »</div><div class="sub" style="margin:4px 0 0;font-size:13px"><b>Pouvoir :</b> ${esc(pr.power)}</div><p class="sub" style="margin:6px 0 0">Vous protège de : ${esc(shieldText(p.party))}. Dans les arrondissements tenus par ${esc(pr.n)}, vos loyers sont à +${MEMBER_BONUS} %.</p></div></div>` : ""}
     <div style="margin-top:10px"><button class="btn block ${pr ? "light" : ""}" data-push="party" ${pr && wait > 0 ? "disabled" : ""}>${!pr ? "Choisir mon parti" : wait > 0 ? `Changer de parti possible dans ${hm(wait)}` : "Changer de parti"}</button></div>
-    ${ST.admin ? `<h2 class="h2">Admin</h2><button class="btn block" data-push="gifts">🎁 Liens cadeaux (giveaway)</button>` : ""}
+    ${ST.admin ? `<h2 class="h2">Admin</h2><button class="btn block" data-push="admin">📊 Tableau de bord</button><button class="btn block light" data-push="gifts" style="margin-top:8px">🎁 Liens cadeaux (giveaway)</button>` : ""}
     <h2 class="h2">Réglages</h2>
     <button class="btn block light" id="lifeb">${(() => { try { return localStorage.getItem("hm_life") === "0" ? "🚶 Passants et voitures masqués · afficher" : "🚶 Passants et voitures · masquer"; } catch (e) { return "🚶 Passants"; } })()}</button>
     <button class="btn block light" id="mute">${(() => { try { return localStorage.getItem("hm_sound") === "1" ? "🔊 Sons activés · couper" : "🔇 Sons coupés · activer"; } catch (e) { return "🔇 Sons"; } })()}</button>

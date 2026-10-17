@@ -69,7 +69,7 @@ function setMovebar(html, kind) {
 // téléphone : la case tient dans l'écran sans faire défiler — on rétrécit la carte jusqu'à ce que tout rentre
 function fitLand() {
   const m = $("#movebar"), lc = m.querySelector(".land .lc");
-  if (!lc || innerWidth >= 700) return;
+  if (!lc) return;
   lc.style.removeProperty("--cw");
   requestAnimationFrame(() => {
     let w = lc.getBoundingClientRect().width, i = 0;

@@ -232,7 +232,9 @@ function itemFace(it, w) {
   return cardHTML(c, { w, item: { t: it.t, ks: it.ks, n: it.n }, tier: it.tier });
 }
 // le booster : un sachet métallisé (bleu, argent, or…), bords sertis, cercles en relief, gros « 75 »
-const PACK_COL = { welcome: "blue", free: "silver", paid: "gold" };
+const PACK_COLS = ["blue", "silver", "gold", "bronze", "black"];
+const PACK_COL = new Proxy({}, { get: () => PACK_COLS[(packColSeed + new Date().getDate()) % PACK_COLS.length] });   // couleur du sachet au hasard (le contenu, lui, est toujours tiré au hasard)
+let packColSeed = Math.floor(Math.random() * 5);
 // façade haussmannienne gravée (dessin du sachet)
 const FACADE_SVG = (() => {
   const L = [], x0 = 20, x1 = 80, cols = 5, cw = (x1 - x0) / cols;
