@@ -1742,3 +1742,7 @@ body.hascred #bar{height:calc(58px + env(safe-area-inset-top,0px))}
 .debt2 .dbar.mid i{background:#F59E0B}.debt2 .dbar.hi i{background:#EF4444}
 .debt2>small{font-size:11.5px;line-height:1.35}
 .kpi[data-af]:hover{border-color:var(--act)}
+/* tout dézoomé : étiquettes d'arrondissement compactes, pas de nom de maire (sinon tout se chevauche) */
+body.zfar .amark span{display:none}
+body.zfar .amark b{font-size:12px;padding:4px 7px;border-radius:8px;border-width:1.5px}
+body.zfar .amark b svg{width:12px;height:12px}

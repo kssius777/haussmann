@@ -103,7 +103,7 @@ function buildMap(base) {
   const ev = ST.state?.event;
   map = new maplibregl.Map({
     container: "map", attributionControl: false, center: [2.3440, 48.8566], zoom: 14.2, pitch: 55, bearing: 0, maxPitch: 75, minZoom: 10.8,
-    maxBounds: [[2.10, 48.74], [2.60, 48.98]], fadeDuration: 0, dragRotate: true, touchPitch: true, pitchWithRotate: true,
+    maxBounds: [[2.16, 48.77], [2.54, 48.95]], fadeDuration: 0, dragRotate: true, touchPitch: true, pitchWithRotate: true,
     style: { version: 8, glyphs: "/fonts/{fontstack}/{range}.pbf",
       light: { anchor: "viewport", color: "#FFFFFF", intensity: .55, position: [1.15, 210, 40] },
       sky: { "sky-color": "#E9F0F8", "horizon-color": "#FFFFFF", "fog-color": "#EFF0F2", "sky-horizon-blend": .6, "horizon-fog-blend": .7, "fog-ground-blend": .85, "atmosphere-blend": 0 },
@@ -124,7 +124,10 @@ function buildMap(base) {
       ] }
   });
   map.touchZoomRotate.enableRotation();
-  map.on("load", () => {
+  // on ne peut pas dézoomer plus loin que « tout Paris remplit l'écran »
+  const fitMin = () => { const c = map.cameraForBounds([[2.235, 48.818], [2.455, 48.900]], { padding: 8 }); if (c?.zoom) map.setMinZoom(Math.max(10.5, Math.min(12.6, c.zoom - .15))); };
+  addEventListener("resize", () => setTimeout(fitMin, 50));
+  map.on("load", () => { fitMin();
     mapReady = true; pumpGeo();
     if (window.THREE && window.addMonuments) addMonuments(map, IDX.models);
     map.on("click", "mfill", e => { const f = e.features[0]; if (f) onBuildingTap(f.id); });
@@ -186,6 +189,7 @@ function renderPartyLegend(z) {
 }
 function renderMarks() {
   if (!mapReady) return; const z = map.getZoom();
+  document.body.classList.toggle("zfar", z < 12.4);   // tout dézoomé : étiquettes réduites, sans le nom des maires
   IDX.arr.forEach((a, i) => {
     const el = a.marker?.getElement(); if (!el) return; el.style.display = z < 14 && mode === "all" ? "" : "none";
     const m = ST.mayors[i]; el.style.setProperty("--pc", m ? PARTIES[m.party]?.c || "#64748B" : "#94A3B8");
