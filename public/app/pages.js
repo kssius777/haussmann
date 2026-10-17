@@ -119,9 +119,9 @@ async function renderAssets0() {
     ${distHTML}
     <h2 class="h2">Ma collection <span class="muted" style="font:700 14px var(--f)">${hs.length} carte${hs.length > 1 ? "s" : ""}</span></h2>
     <div class="chips"><button class="chip plain" data-af="all" aria-pressed="${assetF === "all"}">Tout</button>
-      ${ORDER.split("").reverse().map(r => counts[r] ? `<button class="chip" data-af="${r}" aria-pressed="${assetF === r}">${rarSq(r)}${counts[r]}</button>` : "").join("")}
       ${nLoan ? `<button class="chip plain" data-af="loan" aria-pressed="${assetF === "loan"}">🏦 À crédit · ${nLoan}</button>` : ""}
-      ${nMort ? `<button class="chip plain" data-af="mort" aria-pressed="${assetF === "mort"}">🔒 Hypothéqués · ${nMort}</button>` : ""}</div>
+      ${nMort ? `<button class="chip plain" data-af="mort" aria-pressed="${assetF === "mort"}">🔒 Hypothéqués · ${nMort}</button>` : ""}
+      ${ORDER.split("").reverse().map(r => counts[r] ? `<button class="chip" data-af="${r}" aria-pressed="${assetF === r}">${rarSq(r)}${counts[r]}</button>` : "").join("")}</div>
     <div class="ctools">${assetArr ? `<span class="afilter">${ord(assetArr)} arrondissement<button data-aa="0" aria-label="Retirer le filtre">×</button></span>` : `<span class="muted" style="font-size:13px;font-weight:700">${list.length} affichée${list.length > 1 ? "s" : ""}</span>`}
       <select id="asort" aria-label="Trier">${[["v", "Les plus chères"], ["rent", "Les meilleurs loyers"], ["r", "Les plus rares"], ["arr", "Par arrondissement"]].map(([k, l]) => `<option value="${k}" ${assetSort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
     ${assetF === "loan" ? `<div class="crx" style="margin:0 0 10px">Chaque bien à crédit se rembourse tout seul avec 70 % de son loyer. Vous pouvez aussi le rembourser en avance depuis sa fiche.</div>` : ""}
@@ -285,10 +285,11 @@ async function renderParis() {
     <h1 class="h1">Paris</h1>
     ${!ST.state?.profile?.party ? `<button class="box party-cta" data-push="party"><div class="pc-em">${PARTY_ORDER.map(k => emblemSVG(k, 26)).join("")}</div><b>Choisissez votre camp</b><span>+${MEMBER_BONUS} % de loyers là où votre parti tient la mairie.</span></button>` : ""}
     <div class="box pbox">
-      <div class="pb-h"><p class="eyebrow">Les 20 mairies</p>${w?.party ? `<span class="pill" style="background:${PARTIES[w.party].c};color:#fff">🏛 Hôtel de Ville : ${esc(PARTIES[w.party].n)}</span>` : ""}</div>
-      ${mayorsMapSVG()}
+      <div class="pb-h"><p class="eyebrow">Les 20 mairies</p>${w?.party ? `<button class="pill" data-push="results" style="background:${PARTIES[w.party].c};color:#fff;border:0">🏛 Hôtel de Ville : ${esc(PARTIES[w.party].n)} ›</button>` : ""}</div>
+      <div data-push="results" style="cursor:pointer">${mayorsMapSVG()}</div>
       <div class="pleg">${PARTY_ORDER.map(k => `<span><i style="background:${PARTIES[k].c}"></i>${esc(PARTIES[k].n)} <em>(${esc(PARTIES[k].side.toLowerCase())})</em> <b>${seats[k] || 0}</b></span>`).join("")}</div>
-      <p class="sub" style="margin:8px 0 0;font-size:12.5px">Le maire d'un arrondissement est le joueur qui y possède le plus. Chaque lundi, le parti qui a le plus de maires gagne l'Hôtel de Ville. <button class="lnk" data-push="results">En savoir plus</button></p>
+      <p class="sub" style="margin:8px 0 0;font-size:12.5px">Le maire d'un arrondissement est le joueur qui y possède le plus. Chaque lundi, le parti qui a le plus de maires gagne l'Hôtel de Ville.</p>
+      <button class="hdvbtn" data-push="results"><span>🏛</span><b>La course à l'Hôtel de Ville</b><em>Résultats, prime de la semaine ›</em></button>
     </div>
     ${ev ? (() => { const t = evText(ev); return `<button class="box evbox" data-push="arr" data-arg="${ev.arr - 1}"><span class="ei">${t.ic}</span><span><small>Événement du jour</small><b>${esc(t.t)}</b><span>${t.d}</span></span></button>`; })() : ""}
     <div class="seg" role="tablist"><button data-pt="news" aria-selected="${parisTab === "news"}">Actu</button><button data-pt="rank" aria-selected="${parisTab === "rank"}">Classement</button><button data-pt="arr" aria-selected="${parisTab === "arr"}">Arrondissements</button></div>
@@ -616,6 +617,7 @@ async function profilePage() {
     <div style="margin-top:10px"><button class="btn block ${pr ? "light" : ""}" data-push="party" ${pr && wait > 0 ? "disabled" : ""}>${!pr ? "Choisir mon parti" : wait > 0 ? `Changer de parti possible dans ${hm(wait)}` : "Changer de parti"}</button></div>
     ${ST.admin ? `<h2 class="h2">Admin</h2><button class="btn block" data-push="gifts">🎁 Liens cadeaux (giveaway)</button>` : ""}
     <h2 class="h2">Réglages</h2>
+    <button class="btn block light" id="lifeb">${(() => { try { return localStorage.getItem("hm_life") === "0" ? "🚶 Passants et voitures masqués · afficher" : "🚶 Passants et voitures · masquer"; } catch (e) { return "🚶 Passants"; } })()}</button>
     <button class="btn block light" id="mute">${(() => { try { return localStorage.getItem("hm_sound") === "1" ? "🔊 Sons activés · couper" : "🔇 Sons coupés · activer"; } catch (e) { return "🔇 Sons"; } })()}</button>
     <button class="btn block light" id="nooffers" style="margin-top:8px">${p.no_offers ? "🚫 Offres de rachat refusées · les accepter" : "🤝 J'accepte de recevoir des offres de rachat · désactiver"}</button>
     <h2 class="h2">Compte</h2>
@@ -650,6 +652,7 @@ async function partyClick(e) {
   if (e.target.closest("#party-save")) { if (await act("set_party", { p_party: pickParty }, `Bienvenue chez ${PARTIES[pickParty].n} !`)) { renderWallet(); back(); } return; }
   if (e.target.closest("#logout")) return signOut();
   if (e.target.closest("#nooffers")) { await act("set_no_offers", { p_on: !ST.state.profile.no_offers }, ST.state.profile.no_offers ? "Vous recevez à nouveau les offres" : "Vous ne recevrez plus d'offres"); return renderDetail(false); }
+  if (e.target.closest("#lifeb")) { try { localStorage.setItem("hm_life", localStorage.getItem("hm_life") === "0" ? "1" : "0"); } catch (x) { } return renderDetail(false); }
   if (e.target.closest("#mute")) { try { localStorage.setItem("hm_sound", localStorage.getItem("hm_sound") === "1" ? "0" : "1"); } catch (x) { } return renderDetail(false); }
 }
 function afterDetail(top) { }

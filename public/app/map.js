@@ -175,7 +175,7 @@ function buildMonMarkers() {
 }
 // vue dézoomée : quel parti tient chaque mairie (légende en haut de la carte)
 function renderPartyLegend(z) {
-  let el = $("#partyleg"); if (!el) { el = document.createElement("div"); el.id = "partyleg"; el.onclick = () => go("paris"); $("#p-map").appendChild(el); }
+  let el = $("#partyleg"); if (!el) { el = document.createElement("div"); el.id = "partyleg"; el.onclick = () => { go("paris"); setTimeout(() => push("results"), 30); }; $("#p-map").appendChild(el); }
   const show = z < 13.4 && mode === "all" && !document.body.classList.contains("mymode") && !document.body.classList.contains("picking");
   el.hidden = !show; if (!show) return;
   const n = {}; ST.mayors.forEach(m => m && PARTIES[m.party] && (n[m.party] = (n[m.party] || 0) + 1));

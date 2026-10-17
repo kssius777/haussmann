@@ -233,11 +233,27 @@ function itemFace(it, w) {
 }
 // le booster : un sachet métallisé (bleu, argent, or…), bords sertis, cercles en relief, gros « 75 »
 const PACK_COL = { welcome: "blue", free: "silver", paid: "gold" };
+// façade haussmannienne gravée (dessin du sachet)
+const FACADE_SVG = (() => {
+  const L = [], x0 = 20, x1 = 80, cols = 5, cw = (x1 - x0) / cols;
+  L.push(`<path d="M${x0 - 2} 66 L${x0 + 5} 52 H${x1 - 5} L${x1 + 2} 66 Z" class="roof"/>`);   // toit mansardé
+  for (let c = 0; c < 3; c++) { const x = 32 + c * 14; L.push(`<path d="M${x} 62 V56 Q${x + 3} 52.5 ${x + 6} 56 V62 Z" class="ln"/>`); }   // lucarnes
+  L.push(`<rect x="${x0}" y="66" width="${x1 - x0}" height="70" class="ln"/>`);
+  [[68, 8], [80, 9], [93, 8], [105, 8], [117, 7]].forEach(([y, h]) => { for (let c = 0; c < cols; c++) L.push(`<rect x="${(x0 + c * cw + cw * .28).toFixed(1)}" y="${y}" width="${(cw * .44).toFixed(1)}" height="${h}" class="win"/>`); });
+  for (const y of [77, 102]) { L.push(`<path d="M${x0 - 1.5} ${y} H${x1 + 1.5}" class="bal"/><path d="M${x0 - 1.5} ${y + 2.3} H${x1 + 1.5}" class="ln"/>`); for (let x = x0; x <= x1; x += 1.6) L.push(`<path d="M${x.toFixed(1)} ${y} v2.3" class="tk"/>`); }   // balcons filants
+  L.push(`<path d="M${x0} 126 H${x1}" class="ln"/>`);
+  for (let c = 0; c < cols; c++) { const x = x0 + c * cw + cw * .2, w = cw * .6; L.push(`<path d="M${x.toFixed(1)} 136 V${130} Q${(x + w / 2).toFixed(1)} 126.5 ${(x + w).toFixed(1)} 130 V136" class="ln"/>`); }   // arcades
+  return L.join("");
+})();
 function packHTML(cls = "", col = "blue") {
-  return `<div class="sachet s-${col} ${cls}" role="img" aria-label="Booster Haussmann"><div class="tear"></div>
-    <svg class="rings" viewBox="0 0 100 100" aria-hidden="true">${[46, 38, 30, 22, 14].map((r, i) => `<circle cx="62" cy="44" r="${r}" fill="none" stroke="rgba(255,255,255,${.1 + i * .04})" stroke-width="${i === 2 ? 1.6 : .7}"/>`).join("")}</svg>
+  return `<div class="sachet s-${col} ${cls}" role="img" aria-label="Booster"><div class="tear"></div>
+    <i class="holo"></i>
+    <svg class="frame" viewBox="0 0 100 160" preserveAspectRatio="none" aria-hidden="true"><rect x="4.5" y="13" width="91" height="134" rx="2" class="ln"/><rect x="6.5" y="15" width="87" height="130" rx="1.4" class="ln thin"/><circle cx="50" cy="13" r="1.3" class="dot"/><circle cx="50" cy="147" r="1.3" class="dot"/></svg>
+    <svg class="fac" viewBox="0 0 100 160" aria-hidden="true">${FACADE_SVG}</svg>
     <span class="brand">HAUSSMANN</span>
-    <span class="sub">Booster · Paris<small>4 biens · 1 Chance</small></span><span class="big">75</span>
+    <span class="ed">Édition Paris</span>
+    <span class="seal"><b>75</b><small>PARIS</small></span>
+    <span class="sub">4 biens · 1 Chance</span>
     <i class="sheen"></i><div class="crimp b"></div></div>`;
 }
 

@@ -64,8 +64,19 @@ function setMovebar(html, kind) {
   if (!html) { m.hidden = true; m.innerHTML = ""; if (landView) { landView = false; sel = null; paintAll(); if (typeof stripKind !== "undefined" && false) $("#strip").hidden = false; } } else { m.hidden = false; m.innerHTML = html; }
   $("#dicebar").classList.toggle("off", moving);
   document.body.classList.toggle("landopen", panelKind === "land");
-  if (panelKind === "land") $("#pawnoff").hidden = true;
+  if (panelKind === "land") { $("#pawnoff").hidden = true; fitLand(); }
 }
+// téléphone : la case tient dans l'écran sans faire défiler — on rétrécit la carte jusqu'à ce que tout rentre
+function fitLand() {
+  const m = $("#movebar"), lc = m.querySelector(".land .lc");
+  if (!lc || innerWidth >= 700) return;
+  lc.style.removeProperty("--cw");
+  requestAnimationFrame(() => {
+    let w = lc.getBoundingClientRect().width, i = 0;
+    while (m.scrollHeight > m.clientHeight + 1 && w > 96 && i++ < 40) { w -= 8; lc.style.setProperty("--cw", w + "px"); }
+  });
+}
+addEventListener("resize", () => { if (panelKind === "land") fitLand(); });
 function renderDice() {
   const p = ST.state?.profile; if (!p) return;
   const r = $("#b-roll"), left = p.rolls ?? 0;

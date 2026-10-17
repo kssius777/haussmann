@@ -5,7 +5,7 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
 
 ## Comment c'est construit
 - **Front** : HTML/CSS/JS sans build, dans `public/` (`index.html`, `app/*.js`, `app/style.css`).
-  Ordre des scripts : models, core, api, cards, map, pawn, pages, booster, onboard, landing, main.
+  Ordre des scripts : models, core, api, cards, map, pawn, life, pages, booster, onboard, landing, main.
 - **Données statiques** : `public/data/` (index.json, a/751xx.json par arrondissement, cards.json, edges.json, atlas photos).
 - **Back** : Supabase (Postgres). **Toutes les règles du jeu sont dans des fonctions SQL** de `supabase/schema.sql`
   (le pion et le dé : `supabase/pion.sql`, recopié dans schema.sql). Le site appelle ces fonctions via `rpc()`.
@@ -70,7 +70,7 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
 - Historique de l'argent : table `ledger` + `_log()` appelé à chaque mouvement ; page « Mon argent » (clic sur la trésorerie), RPC `my_ledger()`.
 - Sons (`sfx()` dans core.js, sans fichier audio) : coupés par défaut, activables dans le profil (localStorage `hm_sound`).
 - Achat à la banque : le crédit est proposé en premier (c'est ce que tout le monde choisit) ; « payer comptant » en lien dessous.
-- Photos des cartes : planches `public/data/atlas/aN.jpg` (5 × 8 photos 400 × 300), champs `ph` = [planche, case] et `cr` = « Photo Auteur · Licence ». 2 596 bonnes photos (16/10/2026 : +1 340 photos libres de Wikimedia Commons trouvées via Wikidata, image P18 des lieux dont le point tombe dans l'emprise de l'immeuble ; script `scripts/add_photos.py`, rejouable). Les photos Panoramax sont ignorées à l'affichage. Quand on change `public/data`, changer `DATA_V` dans core.js.
+- Photos des cartes : planches `public/data/atlas/aN.jpg` (5 × 8 photos 400 × 300), champs `ph` = [planche, case] et `cr` = « Photo Auteur · Licence ». 4 797 bonnes photos (17/10/2026 : +2 201 photos de Commons rattachées par l'adresse dans le titre du fichier ou par position, script dans /tmp, planches a78–a133 ; 16/10/2026 : +1 340 photos libres de Wikimedia Commons trouvées via Wikidata, image P18 des lieux dont le point tombe dans l'emprise de l'immeuble ; script `scripts/add_photos.py`, rejouable). Les photos Panoramax sont ignorées à l'affichage. Quand on change `public/data`, changer `DATA_V` dans core.js.
 - Cartes : image = maquette 3D de la vraie forme de l'immeuble (`maquetteSVG` dans cards.js), couleurs selon l'époque.
 - Le joueur est une montgolfière 3D (`models.js`, `pawn3d`) aux couleurs de son parti, qui survole les toits sur le trajet du dé. Barre du bas : Téléport (avec confirmation) · Lancer · Boosters (mini paquet, badge) — il n'y a plus d'onglet Boosters.
 - Sur téléphone : pas de bandeau des maires sur la carte (il est dans l'onglet Paris) ; quand on tombe sur une case, la carte s'affiche en grand.
@@ -89,3 +89,8 @@ Site : https://haussmann-beige.vercel.app · repo GitHub `kssius777/haussmann` (
 - Tutoriel en jouant (fin de main.js, `tutTick`, localStorage `hm_tut` : 1 lancer · 2 la case · 3 après l'achat · 4 boosters · 5 mairies · 99 fini) : une bulle noire pointe ce qu'il faut toucher, seulement pour les nouveaux joueurs ; « Passer le tutoriel » à tout moment. e2e.py le passe (hm_tut=99).
 - Noms des rues sur la carte (à partir du zoom 15,3) : `public/data/streets.json` (données « voie » de la Ville de Paris), polices de carte hébergées dans `public/fonts/` (Noto Sans).
 - Dé : le bouton du milieu est un gros dé dessiné (`dieSVG`), et l'animation de lancer utilise le même dessin.
+- Destinations après le dé (`_options`, migration_options.sql) : immeubles à au moins 0,6 × n pas, directions séparées si cos < 0,3 → 4 choix presque partout (moins au bord de Paris, c'est normal).
+- Paris vivant (`life.js`) : voitures, bus, passants, poussettes, chiens, pigeons sur les vraies rues (une couche de symboles `life` sous les immeubles, ~18 images/s, seulement zoom ≥ 15 et onglet Carte) ; toutes les 40–70 s un passant raconte une anecdote (`ANECDOTES`, bulle `.lbub`, jamais pendant le choix du dé ni case ouverte). Désactivable dans le profil (localStorage `hm_life`), coupé si « réduire les animations ».
+- Case sur téléphone : `fitLand()` (pawn.js) rétrécit la carte jusqu'à ce que tout tienne sans faire défiler. Page booster : tout tient à l'écran.
+- Sachet de booster v3 : façade haussmannienne gravée (`FACADE_SVG`), feuille holographique, sceau « 75 PARIS ». Barre d'onglets : icônes en couleur dans des tuiles (index.html).
+- Hôtel de Ville : accessible en un toucher (bouton « La course à l'Hôtel de Ville », pastille, carte des mairies, légende des partis sur la carte).
