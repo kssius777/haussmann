@@ -1698,3 +1698,42 @@ body.mymode #pawnoff{display:none!important}
 .lbub.out .lb-in{animation:lbOut .25s ease-in both}
 @keyframes lbIn{from{opacity:0;transform:translateY(8px) scale(.85)}}
 @keyframes lbOut{to{opacity:0;transform:translateY(6px) scale(.9)}}
+/* crédit encore disponible : fine ligne sous la barre du haut */
+body.hascred{--bar-h:84px}
+body.hascred #bar{height:calc(58px + env(safe-area-inset-top,0px))}
+#credbar{position:fixed;left:0;right:0;top:calc(58px + env(safe-area-inset-top,0px));height:26px;z-index:29;display:flex;align-items:center;gap:10px;padding:0 14px;background:#F5F8FF;border-bottom:1px solid var(--line);font:600 12.5px var(--f);color:#374151;cursor:pointer;white-space:nowrap}
+#credbar b{color:#1D4ED8;font-weight:800}
+#credbar .trk{flex:1;min-width:40px;height:5px;border-radius:9px;background:#DBE4F7;overflow:hidden;display:block}
+#credbar .trk i{display:block;height:100%;background:#2563EB;border-radius:9px}
+#credbar .trk i.mid{background:#F59E0B}#credbar .trk i.hi{background:#EF4444}
+#credbar .pc{color:#6B7280;font-weight:600}
+@media (min-width:900px){#credbar{justify-content:center}#credbar .trk{flex:0 0 160px}}
+/* séparer nettement les barres de la carte (le jeu se passe au milieu) */
+@media (max-width:899px){
+  #bar{box-shadow:0 2px 10px rgba(15,23,42,.10)}
+  #credbar{box-shadow:0 3px 10px rgba(15,23,42,.08)}
+  #tabs{box-shadow:0 -3px 14px rgba(15,23,42,.10);border-top-color:#E2E8F0}
+}
+/* « Où sont vos biens » : liste classée, lisible */
+.dtiles{display:none}
+.drows{display:grid;gap:2px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:4px}
+.drow{display:grid;grid-template-columns:44px 1fr auto;align-items:center;gap:12px;padding:8px 10px;border-radius:12px;background:transparent;border:0;font:inherit;text-align:left;cursor:pointer;color:var(--ink)}
+.drow:hover{background:#F8FAFC}
+.drow[aria-pressed="true"]{background:#EFF4FF}
+.drow .dn{position:relative;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:#F1F5F9;font:800 17px/1 var(--f);letter-spacing:-.02em}
+.drow .dn sup{font-size:10px;font-weight:700;margin-left:1px;vertical-align:top;position:relative;top:-1px}
+.drow .dn.may{background:#FEF3C7}
+.drow .dn em{position:absolute;top:-8px;right:-7px;font-size:14px;font-style:normal}
+.drow .dmid{display:grid;gap:6px;min-width:0}
+.drow .dtop{display:flex;align-items:baseline;gap:8px}
+.drow .dtop b{font-size:15.5px;font-weight:800}
+.drow .dtop small{font-size:12.5px;color:var(--muted);font-weight:600}
+.drow .dbar{display:block;height:6px;border-radius:9px;background:#EEF2F7;overflow:hidden}
+.drow .dbar i{display:block;height:100%;border-radius:9px;background:linear-gradient(90deg,#60A5FA,var(--act))}
+.drow .dr{font-size:14px;font-weight:800;color:#15803D;text-align:right;white-space:nowrap}
+.drow .dr small{display:block;font-size:11px;font-weight:600;color:var(--muted)}
+.dmore{display:block;width:100%;margin-top:6px;padding:9px;border:0;background:transparent;color:var(--act);font:700 13.5px var(--f);cursor:pointer}
+@media (min-width:900px){.drows{grid-template-columns:1fr 1fr;column-gap:10px}}
+.drows .drow{border:0!important;box-shadow:none!important;min-height:0}
+.drow .dn{display:flex;align-items:baseline;justify-content:center;padding-top:10px;box-sizing:border-box}
+.drow .dn sup{top:-6px}

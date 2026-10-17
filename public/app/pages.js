@@ -56,6 +56,11 @@ function renderWallet() {
   const s = ST.state; if (!s?.profile) return;
   $("#cash").textContent = fmtE(liveCash());
   $("#rate").textContent = netRate() ? `+${fmtE(netRate())}/j` : "";
+  const cb = $("#credbar"); if (cb && s.loan_cap != null) {   // crédit encore disponible, sous la barre du haut
+    const cap = Math.max(0, +s.loan_cap || 0), loans = +s.loans || 0, pct = loans + cap ? Math.round(loans / (loans + cap) * 100) : 0;
+    cb.innerHTML = `<span>🏦 Crédit dispo <b>${fmtE(cap)}</b></span><i class="trk"><i style="width:${pct}%" class="${pct < 50 ? "" : pct < 80 ? "mid" : "hi"}"></i></i><span class="pc">${pct} % utilisé</span>`;
+    cb.hidden = false; document.body.classList.add("hascred");
+  }
   const pr = PARTIES[s.profile.party]; const av = $("#avatar");
   av.textContent = (s.profile.pseudo || "?")[0].toUpperCase(); av.style.background = pr ? pr.c : "#94A3B8";
   const n = packsReady(); const b = $("#packbadge"); b.hidden = !n; b.textContent = n;
@@ -103,7 +108,8 @@ async function renderAssets0() {
   const debtHTML = (loans || debt) ? (() => { const v = +s.value || 0, ratio = v ? Math.round((loans + debt) / v * 100) : 0, cap = Math.max(0, +s.loan_cap || 0), pct = loans + cap ? Math.round(loans / (loans + cap) * 100) : 0;
     return `<div class="debt2" title="Vos dettes représentent ${ratio} % de la valeur de vos biens. Les crédits se remboursent tout seuls avec 70 % du loyer des biens achetés à crédit."><div class="d2h"><span>Endettement <b>${ratio} %</b> <em class="${ratio < 50 ? "ok" : ratio < 80 ? "mid" : "hi"}">${ratio < 50 ? "sain" : ratio < 80 ? "élevé" : "très élevé"}</em></span><span>Encore empruntable : <b>${fmtE(cap)}</b></span></div><div class="dbar"><i style="width:${pct}%"></i></div></div>`; })() : "";
   const distHTML = dist.length ? `<div class="dh2"><h2 class="h3">Où sont vos biens</h2>${assetArr ? `<button class="lnk" data-aa="0">Tous les arrondissements</button>` : `<span class="muted">${dist.length} arr. · touchez pour filtrer</span>`}</div>
-    <div class="dtiles">${dist.map(d => { const m = ST.mayors[d.a - 1]; return `<button class="dtile" data-aa="${d.a}" aria-pressed="${assetArr === d.a}"><b>${ord(d.a)}${m?.mayor === ME ? " 👑" : ""}</b><span class="num">${fmtE(d.v)}</span><small>${d.n} bien${d.n > 1 ? "s" : ""} · +${fmtE(d.rent)}/j</small><i style="width:${Math.max(4, d.v / vmax * 100)}%"></i></button>`; }).join("")}</div>` : "";
+    <div class="drows">${(distAll || assetArr ? dist : dist.slice(0, 5)).map(d => { const m = ST.mayors[d.a - 1], my = m?.mayor === ME; return `<button class="drow" data-aa="${d.a}" aria-pressed="${assetArr === d.a}"><span class="dn${my ? " may" : ""}">${d.a}<sup>${d.a === 1 ? "er" : "e"}</sup>${my ? `<em title="Vous êtes maire">👑</em>` : ""}</span><span class="dmid"><span class="dtop"><b class="num">${fmtE(d.v)}</b><small>${d.n} bien${d.n > 1 ? "s" : ""}</small></span><i class="dbar"><i style="width:${Math.max(3, d.v / vmax * 100)}%"></i></i></span><span class="dr num">+${fmtE(d.rent)}<small>/jour</small></span></button>`; }).join("")}</div>
+    ${!assetArr && dist.length > 5 ? `<button class="dmore" data-dall>${distAll ? "Réduire" : `Voir les ${dist.length} arrondissements`}</button>` : ""}` : "";
   $("#p-assets").innerHTML = `<div class="wrap">
     <div class="pathead"><div><p class="eyebrow">Patrimoine net</p><h1 class="h1 num big" id="worth">${fmtE(worthNow())}</h1>
       <p class="sub" style="margin:0">Trésorerie + biens − dettes</p></div>
@@ -134,6 +140,7 @@ async function renderAssets0() {
 }
 $("#p-assets").addEventListener("click", e => {
   const f = e.target.closest("[data-af]"); if (f) { assetF = f.dataset.af; assetN = 30; return renderAssets(); }
+  if (e.target.closest("[data-dall]")) { distAll = !distAll; return renderAssets(); }
   const a = e.target.closest("[data-aa]"); if (a) { const v = +a.dataset.aa; assetArr = assetArr === v ? 0 : v; assetN = 30; renderAssets(); if (assetArr) setTimeout(() => $("#p-assets .chips")?.scrollIntoView({ behavior: "smooth", block: "start" }), 30); return; }
   if (e.target.closest("[data-dall]")) { distAll = !distAll; return renderAssets(); }
   if (e.target.closest("[data-gmore]")) { assetN += 60; return renderAssets(); }
