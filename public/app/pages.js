@@ -446,7 +446,7 @@ function adminGiftBox(c, g, free) {
 }
 // ---- tableau de bord de l'administrateur ----
 async function adminPage() {
-  let d; try { d = await rpc("admin_stats"); } catch (e) { return dhead("Tableau de bord") + `<div class="wrap"><p class="sub">${esc(e.message)}</p></div>`; }
+  let d, R = null; try { [d, R] = await Promise.all([rpc("admin_stats"), rpc("admin_retention").catch(() => null)]); } catch (e) { return dhead("Tableau de bord") + `<div class="wrap"><p class="sub">${esc(e.message)}</p></div>`; }
   const N = n => fmtN(+n || 0), K = (t, v, sub) => `<div class="kpi"><span>${t}</span><b class="num">${v}</b>${sub ? `<small class="muted">${sub}</small>` : ""}</div>`;
   const days = d.by_day || [], mx = Math.max(1, ...days.map(x => Math.max(x.signups, x.active)));
   const bars = `<div class="adbars">${days.map(x => `<div title="${x.day} · ${x.signups} inscrits · ${x.active} actifs"><i class="a" style="height:${x.active / mx * 100}%"></i><i class="s" style="height:${x.signups / mx * 100}%"></i><small>${x.day.slice(8, 10)}</small></div>`).join("")}</div>
@@ -456,6 +456,7 @@ async function adminPage() {
     <h2 class="h3">Joueurs</h2>
     <div class="kpis k4">${K("Inscrits", N(d.players), `+${N(d.new_today)} aujourd'hui`)}${K("Nouveaux 7 j", N(d.new_7d), `${N(d.new_30d)} sur 30 j`)}${K("Actifs aujourd'hui", N(d.active_today))}${K("Actifs 7 j", N(d.active_7d), d.players ? `${Math.round(d.active_7d / d.players * 100)} % des inscrits` : "")}</div>
     <div class="box" style="margin-top:10px"><b>14 derniers jours</b>${bars}</div>
+    ${R ? retentionHTML(R) : ""}
     <h2 class="h3">Activité</h2>
     <div class="kpis k4">${K("Lancers de dé", N(d.rolls_today), `${N(d.rolls_7d)} sur 7 j`)}${K("Boosters ouverts", N(d.boosters_today), `${N(d.boosters_7d)} sur 7 j`)}${K("Achats", N(d.buys_today), `${N(d.buys_7d)} sur 7 j`)}${K("Ventes au Marché", N(d.sales_7d), "sur 7 j")}</div>
     <h2 class="h3">Économie</h2>
@@ -466,6 +467,19 @@ async function adminPage() {
     <div class="box adlist">${(d.latest || []).map(x => `<div><span>${esc(x.pseudo)} <small class="muted">${x.lots} logt · vu ${ago2(x.seen_at)}</small></span><small class="muted">inscrit ${ago2(x.created_at)}</small></div>`).join("") || "—"}</div>
     <p class="sub" style="font-size:12px;margin-top:12px">« Actif » = a lancé le dé, acheté ou ouvert un booster (compté depuis le 17/10/2026 pour les boosters).</p>
   </div>`;
+}
+// taux de retour : parmi les inscrits d'un jour, combien reviennent le lendemain, 7 jours après, 30 jours après
+function retentionHTML(R) {
+  const pc = (b, n) => n ? Math.round(b / n * 100) : null;
+  const tile = (t, o, goal) => { const p = pc(o.back, o.n), cls = p == null ? "" : goal == null ? "" : p >= goal ? "ok" : p >= goal / 2 ? "mid" : "hi";
+    return `<div class="kpi rt ${cls}"><span>${t}</span><b class="num">${p == null ? "—" : p + " %"}</b><small class="muted">${o.n ? `${o.back} sur ${o.n} joueur${o.n > 1 ? "s" : ""}${goal != null ? ` · objectif ${goal} %` : ""}${o.n < 20 ? " · encore peu de joueurs" : ""}` : "pas encore assez de recul"}</small></div>`; };
+  const cell = (b, n) => b == null ? `<span class="muted">…</span>` : `${pc(b, n)} %<small>${b}/${n}</small>`;
+  const day = s => new Date(s + "T12:00").toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "2-digit" });
+  return `<h2 class="h3">Taux de retour</h2>
+    <div class="kpis k4">${tile("Revenus le lendemain", R.d1, 40)}${tile("Revenus 7 jours après", R.d7, 20)}${tile("Revenus 30 jours après", R.d30, 10)}${tile("Revenus au moins une fois", R.ever, null)}</div>
+    ${R.cohorts?.length ? `<div class="box adtab"><div class="th"><span>Inscrits le</span><span>Inscrits</span><span>Lendemain</span><span>7 j après</span><span>30 j après</span></div>
+      ${R.cohorts.slice(0, 14).map(c => `<div><span>${day(c.day)}</span><span class="num">${c.n}</span><span class="num">${cell(c.d1, c.n)}</span><span class="num">${cell(c.d7, c.n)}</span><span class="num">${cell(c.d30, c.n)}</span></div>`).join("")}</div>` : ""}
+    <p class="sub" style="font-size:12px;margin:8px 0 0">« Revenu le lendemain » = a ouvert le jeu le jour suivant son inscription. Repère pour un bon jeu : 40 % le lendemain, 20 % à 7 jours, 10 % à 30 jours. Les comptes admin ne comptent pas ; avant le 17/10/2026, les visites sont reconstituées à partir des lancers et des achats (un peu sous-estimées).</p>`;
 }
 async function giftsPage() {
   let L = []; try { L = await rpc("admin_gifts"); } catch (e) { return dhead("Liens cadeaux") + `<div class="wrap"><p class="sub">${esc(e.message)}</p></div>`; }

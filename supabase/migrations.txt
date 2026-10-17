@@ -17,3 +17,4 @@ migration_offres.sql
 migration_partis.sql
 migration_options.sql
 migration_stats.sql
+migration_retention.sql

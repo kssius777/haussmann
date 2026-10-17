@@ -37,4 +37,23 @@ db.rpc(B, "open_booster", p_kind="welcome")
 st = db.rpc(ADM, "admin_stats")
 check("tableau de bord : joueurs, inscrits du jour, boosters ouverts comptés", st["players"] >= 3 and st["new_today"] >= 3 and st["boosters_today"] == b0 + 1 and len(st["by_day"]) == 14 and len(st["top"]) >= 1, {k: st[k] for k in ("players", "new_today", "boosters_today", "active_today")})
 check("tableau de bord : le joueur qui agit compte comme actif", db.sql("select seen_at is not null from profiles where id=%s", str(B))[0][0])
+c0.cursor().execute(open("supabase/migration_retention.sql").read()); c0.commit()
+check("taux de retour : réservé à l'admin", "administrateur" in (err(lambda: db.rpc(A, "admin_retention")) or ""))
+check("taux de retour : le jour où le joueur joue est enregistré", db.sql("select count(*) from active_day where u=%s and day=(now() at time zone 'Europe/Paris')::date", str(B))[0][0] == 1)
+d0 = db.sql("select ((now() - interval '20 days') at time zone 'Europe/Paris')::date")[0][0]
+def coh(): return next((x for x in db.rpc(ADM, "admin_retention")["cohorts"] if x["day"] == str(d0)), {"n": 0, "d1": 0, "d7": 0})
+before = coh()
+C, D = player("Cid"), player("Dan")
+db.sql("update profiles set created_at = now() - interval '20 days' where id in (%s, %s)", str(C), str(D))
+db.sql("insert into active_day(u, day) values (%s, %s::date + 1), (%s, %s::date + 7), (%s, %s::date + 1)", str(C), d0, str(C), d0, str(D), d0)
+after, R2 = coh(), db.rpc(ADM, "admin_retention")
+check("taux de retour : inscrits du jour, revenus le lendemain et 7 jours après",
+      after["n"] == (before["n"] or 0) + 2 and after["d1"] == (before["d1"] or 0) + 2 and after["d7"] == (before["d7"] or 0) + 1 and after.get("d30") is None, (before, after))
+today = db.sql("select (now() at time zone 'Europe/Paris')::date")[0][0]
+exp = db.sql("select count(*) from profiles where (created_at at time zone 'Europe/Paris')::date = %s and id not in (select id from admins)", today)[0][0]
+got = next((x["n"] for x in R2["cohorts"] if x["day"] == str(today)), 0)
+check("taux de retour : l'admin n'est pas compté", got == exp and exp >= 1, (got, exp))
+E = player("Eve"); db.sql("delete from active_day where u=%s", str(E))
+db.rpc(E, "open_booster", p_kind="welcome")
+check("taux de retour : chaque visite du joueur marque le jour comme actif", db.sql("select count(*) from active_day where u=%s", str(E))[0][0] == 1)
 print(f"\n{sum(R)}/{len(R)} OK")
