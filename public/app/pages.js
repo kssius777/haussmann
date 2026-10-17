@@ -58,7 +58,7 @@ function renderWallet() {
   $("#rate").textContent = netRate() ? `+${fmtE(netRate())}/j` : "";
   const cb = $("#credbar"); if (cb && s.loan_cap != null) {   // crédit encore disponible, sous la barre du haut
     const cap = Math.max(0, +s.loan_cap || 0), loans = +s.loans || 0, pct = loans + cap ? Math.round(loans / (loans + cap) * 100) : 0;
-    cb.innerHTML = `<span>🏦 Crédit dispo <b>${fmtE(cap)}</b></span><i class="trk"><i style="width:${pct}%" class="${pct < 50 ? "" : pct < 80 ? "mid" : "hi"}"></i></i><span class="pc">${pct} % utilisé</span>`;
+    cb.innerHTML = `<span>🏦 Crédit dispo <b>${fmtE(cap)}</b></span><i class="trk"><i style="width:${pct}%" class="${pct < 60 ? "" : pct < 90 ? "mid" : "hi"}"></i></i><span class="pc">${pct} % du plafond</span>`;
     cb.hidden = false; document.body.classList.add("hascred");
   }
   const pr = PARTIES[s.profile.party]; const av = $("#avatar");
@@ -106,7 +106,12 @@ async function renderAssets0() {
   const rank = ST.board ? ST.board.findIndex(x => x.id === ME) + 1 : 0;
   const loans = +s.loans || 0, debt = +s.debt || 0;
   const debtHTML = (loans || debt) ? (() => { const v = +s.value || 0, ratio = v ? Math.round((loans + debt) / v * 100) : 0, cap = Math.max(0, +s.loan_cap || 0), pct = loans + cap ? Math.round(loans / (loans + cap) * 100) : 0;
-    return `<div class="debt2" title="Vos dettes représentent ${ratio} % de la valeur de vos biens. Les crédits se remboursent tout seuls avec 70 % du loyer des biens achetés à crédit."><div class="d2h"><span>Endettement <b>${ratio} %</b> <em class="${ratio < 50 ? "ok" : ratio < 80 ? "mid" : "hi"}">${ratio < 50 ? "sain" : ratio < 80 ? "élevé" : "très élevé"}</em></span><span>Encore empruntable : <b>${fmtE(cap)}</b></span></div><div class="dbar"><i style="width:${pct}%"></i></div></div>`; })() : "";
+    const lvl = pct < 60 ? "" : pct < 90 ? "mid" : "hi";
+    return `<div class="debt2">
+      <div class="d2h"><span>Endettement <b>${ratio} %</b> <em class="${ratio < 50 ? "ok" : ratio < 80 ? "mid" : "hi"}">${ratio < 50 ? "sain" : ratio < 80 ? "élevé" : "très élevé"}</em></span><small class="muted">vos dettes ÷ la valeur de vos biens</small></div>
+      <div class="d2h"><span>Plafond d'emprunt <b>${pct} %</b> utilisé</span><span>Encore empruntable : <b>${fmtE(cap)}</b></span></div>
+      <div class="dbar ${lvl}"><i style="width:${pct}%"></i></div>
+      <small class="muted">${pct >= 90 ? "Votre plafond est presque atteint : il remonte à mesure que vos loyers augmentent et que vos crédits se remboursent." : "Le plafond augmente avec vos loyers ; les crédits se remboursent tout seuls avec 70 % du loyer des biens achetés à crédit."}</small></div>`; })() : "";
   const distHTML = dist.length ? `<div class="dh2"><h2 class="h3">Où sont vos biens</h2>${assetArr ? `<button class="lnk" data-aa="0">Tous les arrondissements</button>` : `<span class="muted">${dist.length} arr. · touchez pour filtrer</span>`}</div>
     <div class="drows">${(distAll || assetArr ? dist : dist.slice(0, 5)).map(d => { const m = ST.mayors[d.a - 1], my = m?.mayor === ME; return `<button class="drow" data-aa="${d.a}" aria-pressed="${assetArr === d.a}"><span class="dn${my ? " may" : ""}">${d.a}<sup>${d.a === 1 ? "er" : "e"}</sup>${my ? `<em title="Vous êtes maire">👑</em>` : ""}</span><span class="dmid"><span class="dtop"><b class="num">${fmtE(d.v)}</b><small>${d.n} bien${d.n > 1 ? "s" : ""}</small></span><i class="dbar"><i style="width:${Math.max(3, d.v / vmax * 100)}%"></i></i></span><span class="dr num">+${fmtE(d.rent)}<small>/jour</small></span></button>`; }).join("")}</div>
     ${!assetArr && dist.length > 5 ? `<button class="dmore" data-dall>${distAll ? "Réduire" : `Voir les ${dist.length} arrondissements`}</button>` : ""}` : "";
@@ -119,7 +124,7 @@ async function renderAssets0() {
       <div class="kpi"><span>Trésorerie</span><b class="num" id="cash2">${fmtE(liveCash())}</b><small class="muted">disponible</small></div>
       <div class="kpi"><span>Loyers / jour</span><b class="green num">+${fmtE(netRate())}</b><small class="muted">${s.loan_rate > 0 ? `+ ${fmtE(s.loan_rate)} remboursent vos crédits` : s.taxes > 0 ? `après ${fmtE(s.taxes)} de taxe des maires` : "versés en continu"}</small></div>
       <div class="kpi"><span>Valeur des biens</span><b class="num">${fmtE(+s.value || 0)}</b><small class="muted">${nLots} logement${nLots > 1 ? "s" : ""}</small></div>
-      <div class="kpi ${loans || debt ? "warn" : ""}"><span>Dettes</span><b class="num">${fmtE(loans + debt)}</b><small class="muted">${loans ? `${s.credits || 0} crédit${(s.credits || 0) > 1 ? "s" : ""} en cours` : "aucun crédit"}${debt ? ` · hypothèques ${fmtE(debt)}` : ""}</small></div>
+      <div class="kpi ${loans || debt ? "warn" : ""}" ${loans ? `data-af="loan" data-scroll="1" role="button" title="Voir mes biens à crédit" style="cursor:pointer"` : ""}><span>Dettes${loans ? " ›" : ""}</span><b class="num">${fmtE(loans + debt)}</b><small class="muted">${loans ? `${s.credits || 0} crédit${(s.credits || 0) > 1 ? "s" : ""} en cours` : "aucun crédit"}${debt ? ` · hypothèques ${fmtE(debt)}` : ""}</small></div>
     </div>
     ${debtHTML}
     ${distHTML}
@@ -139,7 +144,7 @@ async function renderAssets0() {
   if (!ST.board) rpc("leaderboard").then(b => { ST.board = b; if (cur() === "assets") renderAssets(); }).catch(() => { });
 }
 $("#p-assets").addEventListener("click", e => {
-  const f = e.target.closest("[data-af]"); if (f) { assetF = f.dataset.af; assetN = 30; return renderAssets(); }
+  const f = e.target.closest("[data-af]"); if (f) { assetF = f.dataset.af; assetN = 30; renderAssets(); if (f.dataset.scroll) setTimeout(() => $("#p-assets .chips")?.scrollIntoView({ behavior: "smooth", block: "start" }), 30); return; }
   if (e.target.closest("[data-dall]")) { distAll = !distAll; return renderAssets(); }
   const a = e.target.closest("[data-aa]"); if (a) { const v = +a.dataset.aa; assetArr = assetArr === v ? 0 : v; assetN = 30; renderAssets(); if (assetArr) setTimeout(() => $("#p-assets .chips")?.scrollIntoView({ behavior: "smooth", block: "start" }), 30); return; }
   if (e.target.closest("[data-dall]")) { distAll = !distAll; return renderAssets(); }

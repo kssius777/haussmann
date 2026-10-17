@@ -1737,3 +1737,8 @@ body.hascred #bar{height:calc(58px + env(safe-area-inset-top,0px))}
 .drows .drow{border:0!important;box-shadow:none!important;min-height:0}
 .drow .dn{display:flex;align-items:baseline;justify-content:center;padding-top:10px;box-sizing:border-box}
 .drow .dn sup{top:-6px}
+.debt2 .dbar{display:block;height:6px;border-radius:9px;background:#E8EEF8;overflow:hidden}
+.debt2 .dbar i{display:block;height:100%;border-radius:9px;background:var(--act)}
+.debt2 .dbar.mid i{background:#F59E0B}.debt2 .dbar.hi i{background:#EF4444}
+.debt2>small{font-size:11.5px;line-height:1.35}
+.kpi[data-af]:hover{border-color:var(--act)}
