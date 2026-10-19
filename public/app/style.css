@@ -1941,3 +1941,34 @@ body.mapfull #bar,body.mapfull #credbar,body.mapfull #tabs{backdrop-filter:none!
 .landing.v2 .lleg i.free{border:1.5px solid rgba(255,255,255,.45)}
 @media (min-width:960px){.landing.v2 .lvis .fan{margin-top:-20%}.landing.v2 .lvis .fan-c{margin:0 -38px}}
 .landing.v2 .lleg i{box-shadow:0 0 0 1px rgba(255,255,255,.4)}
+/* Marché sans onglets (19/10/2026, demande du propriétaire : « 4 onglets, c'est trop ») */
+.mhead{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.mhead .h1{margin:0}
+.mhead .btn{flex:none;height:40px;padding:0 16px;font-size:14px}
+#p-market .h3{margin:22px 0 10px}
+.mback{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px 0 8px;margin:0 0 10px;border-radius:999px;background:#fff;border:1px solid var(--line);font-weight:700;font-size:14px;cursor:pointer}
+.mback svg{width:18px;height:18px}
+/* acheter en glissant (case après le dé) */
+.slide{position:relative;display:block;width:100%;height:58px;padding:0;border:0;border-radius:29px;background:var(--act);color:#fff;font:800 15.5px/1 var(--f);overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;--p:0;box-shadow:0 6px 16px rgba(37,99,235,.28)}
+.slide.cash{background:#16A34A;box-shadow:0 6px 16px rgba(22,163,74,.28)}
+.slide::before{content:"";position:absolute;left:0;top:0;bottom:0;width:calc(58px + var(--p) * (100% - 58px));border-radius:29px;background:rgba(255,255,255,.16);pointer-events:none}
+.slide .sl-t{position:absolute;inset:0;display:grid;place-items:center;padding:0 16px 0 64px;opacity:calc(1 - var(--p) * 1.6);pointer-events:none;white-space:nowrap}
+.slide .sl-k{position:absolute;left:4px;top:4px;width:50px;height:50px;border-radius:50%;background:#fff;color:var(--act);display:grid;place-items:center;box-shadow:0 2px 8px rgba(0,0,0,.22);transition:transform .25s cubic-bezier(.2,.9,.3,1.2);pointer-events:none}
+.slide.cash .sl-k{color:#16A34A}
+.slide .sl-k svg{width:24px;height:24px}
+.slide.drag{cursor:grabbing}
+.slide.drag .sl-k{transition:none}
+.slide:focus-visible{outline:3px solid #0B0C10;outline-offset:3px}
+@media (prefers-reduced-motion:no-preference){.slide:not(.drag):not([data-ok]) .sl-k{animation:slHint 2.6s ease-in-out infinite}}
+@keyframes slHint{0%,64%,100%{translate:0}76%{translate:12px}88%{translate:0}}
+.slide[data-ok] .sl-t{opacity:0}
+/* onglet Paris : choisir son parti, au même endroit, un vrai bouton */
+.pcard{display:grid;gap:4px;margin:10px 0 4px;text-align:left}
+.pcard .pc-em{display:flex;gap:4px;margin-bottom:4px}
+.pcard>b{font-size:17px}
+.pcard>span{font-size:13.5px;color:var(--muted)}
+.pcard .btn.block{margin-top:10px}
+.pcard.on{grid-template-columns:auto 1fr auto;align-items:center;gap:12px;border-left:5px solid var(--pc)!important}
+.pcard.on .pc-t{display:grid;gap:1px}
+.pcard.on .pc-t small{font-size:12px;font-weight:700;color:var(--muted)}
+.pcard.on .pc-t b{font-size:17px}

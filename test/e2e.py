@@ -13,6 +13,11 @@ async def main():
         pg.on("pageerror", lambda e: errs.append("ERR " + str(e)[:300]))
         pg.on("console", lambda m: m.type == "error" and errs.append("console: " + m.text[:200]))
         E = pg.evaluate; W = lambda js, t=30000: pg.wait_for_function(js, timeout=t, polling=50)
+        async def slide(sel):   # acheter en glissant : on pousse le rond jusqu'au bout, comme un joueur
+            box = await pg.locator(sel).first.bounding_box(); y = box["y"] + box["height"] / 2
+            await pg.mouse.move(box["x"] + 28, y); await pg.mouse.down()
+            for i in range(1, 13): await pg.mouse.move(box["x"] + 28 + (box["width"] - 40) * i / 12, y)
+            await pg.mouse.up()
         t = time.time(); await pg.goto("http://localhost:8780/?local")
         await W("!document.querySelector('#onb').hidden", 60000)
         check(f"écran de connexion ({time.time()-t:.1f} s)", True)
@@ -68,7 +73,10 @@ async def main():
         await W("document.querySelector('#movebar .land')", 30000); await pg.wait_for_timeout(900); await pg.screenshot(path=T + "05e_landed.png")
         check("dé lancé : le pion marche et s'arrête sur un immeuble", await E("ST.state.profile.rolls===9 && ST.state.profile.land===ST.state.profile.pos && ST.state.profile.pos!==300658"), await E("document.querySelector('#movebar').innerText.replace(/\\n/g,' · ').slice(0,160)"))
         if await E("!!document.querySelector('[data-lbuy]:not([disabled])')"):
-            ng = await E("+document.querySelector('[data-lbuy]').dataset.lbuy"); await pg.click("[data-lbuy]")
+            ng = await E("+document.querySelector('[data-lbuy]').dataset.lbuy")
+            await pg.click("[data-lbuy]"); await pg.wait_for_timeout(400)
+            check("un simple toucher sur le bouton d'achat n'achète pas", await E(f"!(ST.mine.get({ng})||[]).length"))
+            await slide("[data-lbuy]")
             try: await W(f"(ST.mine.get({ng})||[]).length>=1 || ST.mineParts.has({ng})", 10000)
             except Exception: print("ACHAT KO:", await E("document.querySelector('#toast')?.innerText"), await E("document.querySelector('#movebar').innerText.slice(0,300)")); raise
             await pg.wait_for_timeout(500); await pg.screenshot(path=T + "05f_bought.png"); check("achat en un clic sur la case où l'on tombe", True)
@@ -86,7 +94,7 @@ async def main():
         check("ailleurs que sur sa case : pas d'achat à la banque", await E("document.querySelector('#movebar').innerText.includes('tombez dessus') && !document.querySelector('#movebar [data-lbuy]')"))
         db.sql(f"update profiles set land={fg}, cash=cash+1000000"); await E("refreshState().then(()=>placePawn(false)).then(()=>1)")
         await E(f"previewBuilding({fg}); 1"); await W("document.querySelector('#movebar [data-lbuy]:not([disabled])')"); await pg.wait_for_timeout(300); await pg.screenshot(path=T + "06b_preview_buy.png")
-        await pg.click("#movebar [data-lbuy]"); await W(f"(ST.mine.get({fg})||[]).length===1")
+        await slide("#movebar [data-lbuy]"); await W(f"(ST.mine.get({fg})||[]).length===1")
         check("achat direct depuis la carte, sans booster", True)
         db.sql("update profiles set cash = cash + 2000000"); await E("refreshState().then(()=>1)")
         await E(f"push('b',{fg}); 1"); await W("document.querySelector('#actbar [data-act=bank]:not([disabled])')"); await pg.wait_for_timeout(300); await pg.screenshot(path=T + "08a_building_buy.png")
@@ -128,8 +136,8 @@ async def main():
         await pg.click("[data-back]"); await E("setMovebar(''); 1"); await pg.click("#tabs [data-tab=market]"); await W("document.querySelector('[data-buy]')")
         await pg.wait_for_timeout(300); await pg.screenshot(path=T + "10_market.png")
         await pg.click("[data-buy]:not([disabled])"); await W(f"(ST.mine.get({h[0]})||[]).includes({h[1]})"); check("achat sur le marché à un autre joueur", True)
-        await pg.click("#tabs [data-tab=paris]"); await W("document.querySelector('#p-paris .party-cta')")
-        await pg.click(".party-cta"); await W("document.querySelector('.spectrum')"); await pg.click(".sp-node[data-party=rempart]"); await pg.wait_for_timeout(200); await pg.screenshot(path=T + "11b_party.png")
+        await pg.click("#tabs [data-tab=paris]"); await W("document.querySelector('#p-paris .pcard [data-push=party]')")
+        await pg.click("#p-paris .pcard [data-push=party]"); await W("document.querySelector('.spectrum')"); await pg.click(".sp-node[data-party=rempart]"); await pg.wait_for_timeout(200); await pg.screenshot(path=T + "11b_party.png")
         await pg.click(".sp-node[data-party=milieu]"); await pg.click("#party-save"); await W("ST.state.profile.party==='milieu'"); check("choix du parti plus tard, depuis Paris", True)
         await W("document.querySelector('#p-paris .pmap')")
         await pg.wait_for_timeout(300); await pg.screenshot(path=T + "11_paris.png")

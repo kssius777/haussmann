@@ -184,13 +184,13 @@ function paintOfferBadge() {
 let ofSeen = null;
 async function refreshOffers() {
   try { const r = await rpc("my_offers"); const before = ofSeen; setOffers(r); const ids = new Set(ST.offers.received.filter(o => o.status === "open").map(o => o.id).concat(ST.offers.sent.filter(o => o.status === "countered").map(o => -o.id)));
-    if (before) { const nw = [...ids].filter(x => !before.has(x)); if (nw.length) toast(`🤝 ${nw.length > 1 ? nw.length + " nouvelles réponses ou offres" : "Nouvelle offre ou contre-proposition"} : voir le Marché → Offres`, "good"); }
+    if (before) { const nw = [...ids].filter(x => !before.has(x)); if (nw.length) toast(`🤝 ${nw.length > 1 ? nw.length + " nouvelles réponses ou offres" : "Nouvelle offre ou contre-proposition"} : voir le Marché`, "good"); }
     ofSeen = ids; } catch (e) { }
 }
 function lotLabel(c, k) { return `${lotName(c, k)}${c.lk === "l" ? " · " + ord(floorOfLot(c, k)) + " étage" : ""}`; }
 const OST = { open: "en attente", countered: "contre-proposition", accepted: "✓ vendu", refused: "refusée", expired: "expirée", cancelled: "annulée" };
-async function offersHTML() {
-  try { setOffers(await rpc("my_offers")); } catch (e) { return `<div class="empty">Les offres arrivent bientôt (mise à jour en cours).</div>`; }
+async function offersBlocks() {
+  try { setOffers(await rpc("my_offers")); } catch (e) { return { todo: "", rest: "" }; }
   const all = ST.offers.received.concat(ST.offers.sent); await ensureCards(all.map(o => o.card));
   const left = o => { const s = (new Date(o.expires_at) - Date.now()) / 1000; return s > 0 ? `encore ${hm(s)}` : ""; };
   const row = (o, mine) => { const c = card(o.card); if (!c) return "";
@@ -206,9 +206,10 @@ async function offersHTML() {
         <span class="num"><b>${fmtE(o.price)}</b>${o.counter ? ` → contre-proposition <b>${fmtE(o.counter)}</b>` : ""} · ${o.credit ? "à crédit" : "comptant"} · <em class="st-${o.status}">${OST[o.status] || o.status}</em>${live ? " · " + left(o) : ""}</span></div>
       ${act ? `<div class="oacts2">${act}</div>` : ""}</div>`; };
   const R = ST.offers.received, S = ST.offers.sent;
-  return `<p class="sub" style="margin:4px 0 10px">Proposez à un joueur de lui racheter son logement depuis la fiche de l'immeuble (« Faire une offre »). Il a 24 h pour accepter, refuser ou faire une contre-proposition.</p>
-    <h2 class="h3">Reçues</h2>${R.length ? `<div class="rows">${R.map(o => row(o, true)).join("")}</div>` : `<div class="empty">Aucune offre reçue.</div>`}
-    <h2 class="h3">Envoyées</h2>${S.length ? `<div class="rows">${S.map(o => row(o, false)).join("")}</div>` : `<div class="empty">Aucune offre envoyée.</div>`}`;
+  const todo = R.filter(o => o.status === "open").map(o => row(o, true)).concat(S.filter(o => o.status === "countered").map(o => row(o, false))).filter(Boolean);
+  const rest = S.filter(o => o.status !== "countered").map(o => row(o, false)).concat(R.filter(o => o.status !== "open").map(o => row(o, true))).filter(Boolean).slice(0, 6);
+  return { todo: todo.length ? `<h2 class="h3">À vous de répondre</h2><div class="rows">${todo.join("")}</div>` : "",
+    rest: rest.length ? `<h2 class="h3">Mes offres de rachat</h2><div class="rows">${rest.join("")}</div>` : "" };
 }
 async function offerAct(b) {
   const a = b.dataset.of, id = +b.dataset.id;
@@ -230,12 +231,12 @@ async function offerAct(b) {
   renderMarket();
 }
 // ---------------- MARCHÉ ----------------
-let marketTab = "all", sellAll = false;
+let marketSell = false, sellAll = false;   // marketSell : la liste « Vendre un bien » à la place du Marché
 function sellList() {   // mes biens qu'on peut mettre en vente : un toucher ouvre la fiche, formulaire de vente déjà ouvert
   const hs = holdings().filter(h => !ST.loan.has(h.g) && (h.c.lk === "p" ? !ST.mort.has(h.g + ":-1") : h.ks.some(k => !ST.mort.has(h.g + ":" + k)))).sort((a, b) => b.c.v * unitsOf(b) - a.c.v * unitsOf(a));
   if (!hs.length) return `<div class="empty">Aucun bien à vendre pour l'instant : les biens achetés à crédit se vendent une fois le crédit remboursé.</div>`;
   const shown = sellAll ? hs : hs.slice(0, 12);
-  return `<h2 class="h3">Mettre un de mes biens en vente</h2><div class="rows">${shown.map(h => `<button class="lrow" data-sellg="${h.g}"><div class="th">${photo(h.c)}</div><div class="t"><b>${esc(title(h.c))}</b><span>${esc(ownSentence(h.c, h.ks, h.n))} · ${ord(h.c.arr)} arr.</span></div><div class="v"><b class="num">${fmtE(h.c.v * unitsOf(h))}</b><span class="btn sm amber">Vendre</span></div></button>`).join("")}</div>
+  return `<div class="rows">${shown.map(h => `<button class="lrow" data-sellg="${h.g}"><div class="th">${photo(h.c)}</div><div class="t"><b>${esc(title(h.c))}</b><span>${esc(ownSentence(h.c, h.ks, h.n))} · ${ord(h.c.arr)} arr.</span></div><div class="v"><b class="num">${fmtE(h.c.v * unitsOf(h))}</b><span class="btn sm amber">Vendre</span></div></button>`).join("")}</div>
     ${hs.length > shown.length ? `<button class="btn light gmore" data-sellall>Voir les ${hs.length} biens</button>` : ""}`;
 }
 async function renderMarket() {
@@ -249,16 +250,20 @@ async function renderMarket() {
       <div class="t"><b>${esc(title(c))}</b><span>${l.k != null ? lotName(c, l.k) : l.n + " part" + (l.n > 1 ? "s" : "")} · ${ord(c.arr)} arr. · ${own ? "votre annonce" : "par " + esc(l.pseudo)}</span>
       <span><span class="pill" style="height:20px;font-size:11px;${d <= 0 ? "background:#DCFCE7;color:#15803D" : d > .25 ? "background:#FEE2E2;color:#B91C1C" : ""}">${d <= 0 ? "Bonne affaire" : "+" + Math.round(d * 100) + " % vs estimation"}</span></span></div>
       <div class="v"><b class="num">${fmtE(l.price)}</b>${own ? `<button class="btn sm ghost" data-unlist="${l.id}">Retirer</button>` : listingBuy(l, (id, cr) => `data-buy="${id}" data-cr="${cr}"`)}</div></div>`; }).join("");
-  const sales = ST.market.sales.map(s => { const c = card(s.card); return c ? `<button class="lrow" data-push="b" data-arg="${s.card}"><div class="th">${photo(c)}</div><div class="t"><b>${esc(title(c))}</b><span>${s.k != null ? lotName(c, s.k) : s.n + " parts"} · acheté par ${esc(s.buyer || "?")} · ${ago(s.at)}</span></div><div class="v num"><b>${fmtE(s.price)}</b></div></button>` : ""; }).join("");
-  el.innerHTML = `<div class="wrap"><h1 class="h1">Marché</h1><p class="sub">Les biens mis en vente par les joueurs. Le vendeur reçoit le prix moins 5 % de commission.</p>
-    <div class="seg" role="tablist"><button data-mt="all" aria-selected="${marketTab === "all"}">Annonces${others.length ? " · " + others.length : ""}</button><button data-mt="mine" aria-selected="${marketTab === "mine"}">Vendre${mineL.length ? " · " + mineL.length : ""}</button><button data-mt="offers" aria-selected="${marketTab === "offers"}">Offres${offersBadge() ? ` <i class="obadge">${offersBadge()}</i>` : ""}</button><button data-mt="sales" aria-selected="${marketTab === "sales"}">Ventes</button></div>
-    ${marketTab === "all" ? (others.length ? `<div class="rows">${rows(others, false)}</div>` : `<div class="empty"><b>Aucune annonce pour l'instant.</b><br><span class="muted">Les joueurs peuvent vendre leurs biens ici, 5 % de commission. Soyez le premier !</span><br><br><button class="btn sm light" data-mt="mine">Vendre un de mes biens</button></div>${sales ? `<h2 class="h3">Dernières ventes</h2><div class="rows">${sales}</div>` : ""}`) : ""}
-    ${marketTab === "mine" ? (mineL.length ? `<div class="rows">${rows(mineL, true)}</div>` : "") + sellList() : ""}
-    ${marketTab === "offers" ? await offersHTML() : ""}
-    ${marketTab === "sales" ? (sales ? `<div class="rows">${sales}</div>` : `<div class="empty">Pas encore de vente entre joueurs.</div>`) : ""}</div>`;
+  const sales = ST.market.sales.slice(0, 5).map(s => { const c = card(s.card); return c ? `<button class="lrow" data-push="b" data-arg="${s.card}"><div class="th">${photo(c)}</div><div class="t"><b>${esc(title(c))}</b><span>${s.k != null ? lotName(c, s.k) : s.n + " parts"} · acheté par ${esc(s.buyer || "?")} · ${ago(s.at)}</span></div><div class="v num"><b>${fmtE(s.price)}</b></div></button>` : ""; }).join("");
+  if (marketSell) { el.innerHTML = `<div class="wrap"><button class="mback" data-msell="0">${ICON.back}Marché</button><h1 class="h1">Vendre un bien</h1><p class="sub" style="margin:0 0 12px">Touchez le bien à vendre.</p>${sellList()}</div>`; return; }
+  const of = await offersBlocks();
+  // une seule page, sans onglets : ce qui attend une réponse, ce qui est à vendre, puis le reste s'il y en a
+  el.innerHTML = `<div class="wrap"><div class="mhead"><h1 class="h1">Marché</h1><button class="btn amber" data-msell="1">Vendre un bien</button></div>
+    ${of.todo}
+    <h2 class="h3">À vendre${others.length ? ` · ${others.length}` : ""}</h2>
+    ${others.length ? `<div class="rows">${rows(others, false)}</div>` : `<div class="empty">Rien à vendre pour l'instant.</div>`}
+    ${mineL.length ? `<h2 class="h3">Mes annonces</h2><div class="rows">${rows(mineL, true)}</div>` : ""}
+    ${of.rest}
+    ${sales ? `<h2 class="h3">Dernières ventes</h2><div class="rows">${sales}</div>` : ""}</div>`;
 }
 $("#p-market").addEventListener("click", async e => {
-  const t = e.target.closest("[data-mt]"); if (t) { marketTab = t.dataset.mt; return renderMarket(); }
+  const ms = e.target.closest("[data-msell]"); if (ms) { marketSell = ms.dataset.msell === "1"; $("#p-market").scrollTop = 0; return renderMarket(); }
   const of = e.target.closest("[data-of]"); if (of) return offerAct(of);
   const sg = e.target.closest("[data-sellg]"); if (sg) { sellNext = +sg.dataset.sellg; sel = null; return push("b", sellNext); }
   if (e.target.closest("[data-sellall]")) { sellAll = true; return renderMarket(); }
@@ -311,7 +316,7 @@ async function renderParis() {
   const medal = i => ["🥇", "🥈", "🥉"][i] || `<span class="n">${i + 1}</span>`;
   el.innerHTML = `<div class="wrap">
     <h1 class="h1">Paris</h1>
-    ${!ST.state?.profile?.party ? `<button class="box party-cta" data-push="party"><div class="pc-em">${PARTY_ORDER.map(k => emblemSVG(k, 26)).join("")}</div><b>Choisissez votre camp</b><span>+${MEMBER_BONUS} % de loyers là où votre parti tient la mairie.</span></button>` : ""}
+    ${partyCard()}
     <div class="box pbox">
       <div class="pb-h"><p class="eyebrow">Les 20 mairies</p>${w?.party ? `<button class="pill" data-push="results" style="background:${PARTIES[w.party].c};color:#fff;border:0">🏛 Hôtel de Ville : ${esc(PARTIES[w.party].n)} ›</button>` : ""}</div>
       <div data-push="results" style="cursor:pointer">${mayorsMapSVG()}</div>
@@ -719,6 +724,14 @@ async function profilePage() {
     <button class="btn block ghost" id="logout">Se déconnecter</button>
     <p class="sub" style="margin-top:16px;text-align:center"><a href="/terms" target="_blank">Conditions d'utilisation</a> · <a href="/privacy" target="_blank">Confidentialité</a></p>
   </div>`;
+}
+// le seul endroit pour choisir son parti : en haut de l'onglet Paris (le profil y renvoie aussi)
+function partyCard() {
+  const p = ST.state?.profile; if (!p) return "";
+  const pr = PARTIES[p.party];
+  if (!pr) return `<div class="box pcard"><div class="pc-em">${PARTY_ORDER.map(k => emblemSVG(k, 30)).join("")}</div><b>Choisissez votre parti</b><span>+${MEMBER_BONUS} % de loyers là où il tient la mairie.</span><button class="btn block" data-push="party">Choisir mon parti</button></div>`;
+  const wait = p.party_at ? Math.max(0, 48 * 3600 - (Date.now() - new Date(p.party_at).getTime()) / 1000) : 0;
+  return `<div class="box pcard on" style="--pc:${pr.c}">${emblemSVG(p.party, 40)}<div class="pc-t"><small>Votre parti</small><b>${esc(pr.n)}</b></div><button class="btn sm light" data-push="party" ${wait > 0 ? "disabled" : ""}>${wait > 0 ? `Changer dans ${hm(wait)}` : "Changer"}</button></div>`;
 }
 async function partyPage() {
   return dhead("Choisir un parti") + `<div class="wrap">${partyPickerHTML(ST.state.profile.party)}</div>`;

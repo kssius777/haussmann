@@ -256,8 +256,9 @@ function showLand(L, gv) {
       const need = cash >= down(c.v) ? 0 : down(c.v) - cash, rate = netRate(), days = rate > 0 ? Math.ceil(need / rate) : 0;
       btns = `<div class="nomoney"><b>Pas assez pour celui-ci</b><span>${cash < down(c.v) ? `Il manque ${fmtE(need)} pour l'apport${days ? ` (dans ${days} jour${days > 1 ? "s" : ""} avec vos loyers)` : ""}.` : `Pas assez de crédit : ${fmtE(Math.max(0, cap))} max.`}</span></div>`;
     } else {
-      const seg = creditOK ? `<div class="pay"><button data-paymode="1" aria-selected="${cr}"><b>À crédit</b><small>apport ${fmtE(down(c.v))} · <em>+${fmtE(Math.round(c.rent * .3))}/j</em></small></button><button data-paymode="0" aria-selected="${!cr}" ${cashOK ? "" : "disabled"}><b>Comptant</b><small>${fmtE(c.v)} · ${cashOK ? `<em>+${fmtE(c.rent)}/j</em>` : "pas assez"}</small></button></div>` : "";
-      btns = `${seg}<button class="btn block ${cr ? "blue2" : "green"} buy" data-lbuy="${g}"><span>Acheter ${unit} · ${cr ? "apport " : ""}${fmtE(cr ? down(c.v) : c.v)}</span><small>${cr ? `La banque prête ${fmtE(c.v - down(c.v))}, remboursé par le loyer` : "Tout le loyer est pour vous"}</small></button>`;
+      const seg = `<div class="pay"><button data-paymode="1" aria-selected="${cr}" ${creditOK ? "" : "disabled"}><b>À crédit</b><small>${creditOK ? fmtE(down(c.v)) : "pas assez"}</small></button><button data-paymode="0" aria-selected="${!cr}" ${cashOK ? "" : "disabled"}><b>Comptant</b><small>${cashOK ? fmtE(c.v) : "pas assez"}</small></button></div>`;
+      const again = jb && free > 0 && !justBought.whole;
+      btns = `${seg}${slideHTML(`data-lbuy="${g}"`, cr ? "" : "cash", again ? "Glissez pour en acheter un autre" : "Glissez pour acheter", `Acheter ${unit} · ${fmtE(cr ? down(c.v) : c.v)}`)}`;
       if (allFree && (cr ? cash >= down(total) && total - down(total) <= cap : cash >= total)) btns += `<button class="btn block light" data-lbuild="${g}">Tout l'immeuble · ${fmtE(cr ? down(total) : total)} <small class="muted">(+60 % de loyer)</small></button>`;
     }
     landCreditNow = cr;
@@ -274,7 +275,7 @@ function showLand(L, gv) {
     const gain = justBought.credit ? `+${fmtE(Math.round(rent * .3))} / jour, puis ${fmtE(Math.round(rent))} une fois le crédit remboursé` : `+${fmtE(Math.round(rent))} / jour de loyer en plus`;
     lines.unshift(`<span class="ln good">${paid}<br><b>${gain}</b></span>`);
     if (free > 0 && !justBought.whole && btns.includes("data-lbuy")) {
-      btns = btns.replace(/Acheter (1 |une |un )/, (m, w) => `Acheter ${w === "1 " ? "1 autre " : w === "une " ? "une autre " : "un autre "}`) + `<button class="btn block light" data-mvclose>Continuer</button>`;
+      btns += `<button class="btn block light" data-mvclose>Continuer</button>`;
     } else if (free > 0 && btns.includes("nomoney")) {   // plus assez pour en acheter un autre : on dit pourquoi
       btns = btns.replace("Pas assez pour celui-ci", "Pas assez pour en acheter un autre") + `<button class="btn block light" data-mvclose>Continuer</button>`;
     } else btns = `<button class="btn block buy" data-mvclose><span>Continuer</span></button>`;
@@ -286,6 +287,25 @@ function showLand(L, gv) {
   landView = view; sel = view ? g : null; if (view) paintAll();
   $("#movebar").scrollTop = 0;
   if (L?.chance && window.confetti && !BAD.has(L.chance.k)) confetti("#A855F7", 24);
+}
+// acheter en glissant : on pousse le rond de gauche à droite pour valider (pas d'achat par erreur d'un simple toucher)
+function slideHTML(attrs, cls, label, aria) {
+  return `<button class="slide ${cls}" ${attrs} aria-label="${esc(aria)} (glisser vers la droite, ou Entrée)"><span class="sl-t">${esc(label)}</span><span class="sl-k" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg></span></button>`;
+}
+function initSlides(root) {
+  root.addEventListener("pointerdown", e => {
+    const s = e.target.closest(".slide"); if (!s || s.disabled || s.dataset.ok) return;
+    const k = s.querySelector(".sl-k"), max = s.clientWidth - k.offsetWidth - 8, x0 = e.clientX; let dx = 0;
+    try { s.setPointerCapture(e.pointerId); } catch (x) { }
+    s.classList.add("drag");
+    const mv = ev => { dx = Math.max(0, Math.min(max, ev.clientX - x0)); k.style.transform = `translateX(${dx}px)`; s.style.setProperty("--p", (dx / max).toFixed(3)); };
+    const up = () => {
+      s.removeEventListener("pointermove", mv); s.removeEventListener("pointerup", up); s.removeEventListener("pointercancel", up); s.classList.remove("drag");
+      if (dx >= max * .85) { k.style.transform = `translateX(${max}px)`; s.style.setProperty("--p", 1); s.dataset.ok = "1"; sfx?.("coin"); s.click(); }
+      else { k.style.transform = ""; s.style.setProperty("--p", 0); }
+    };
+    s.addEventListener("pointermove", mv); s.addEventListener("pointerup", up); s.addEventListener("pointercancel", up);
+  });
 }
 // le plan de l'immeuble : une case par logement (à vous / à d'autres / libre) — aussi utilisé par la fiche
 function occHTML(c, mine, others, free) {
@@ -330,12 +350,13 @@ async function animDice(n) {   // le même dé que sur le bouton : il tourne en 
 
 function initPawnUI() {
   $("#b-roll").addEventListener("click", doRoll);
-  $("#minipack").innerHTML = packHTML("mini"); setDieIcon(5);
+  $("#minipack").innerHTML = packHTML("mini"); setDieIcon(5); initSlides($("#movebar"));
   $("#movebar").addEventListener("click", async e => {
     if (e.target.closest("[data-mvclose]")) { justBought = null; return setMovebar(""); }
     if (e.target.closest("[data-buyrolls]")) { if (await act("buy_rolls", {}, "5 lancers en plus !")) { setMovebar(""); renderDice(); } return; }
     const pm = e.target.closest("[data-paymode]"); if (pm) { landCredit = pm.dataset.paymode === "1"; return showLand(); }
     const lb = e.target.closest("[data-lbuy],[data-lbuild]"); if (lb) {
+      if (lb.classList.contains("slide") && !lb.dataset.ok && e.detail !== 0) return;   // un simple toucher ne suffit pas : il faut pousser jusqu'au bout (au clavier, Entrée suffit)
       const g = +(lb.dataset.lbuy || lb.dataset.lbuild), whole = !!lb.dataset.lbuild, credit = landCreditNow; lb.disabled = true; lb.textContent = "Achat…";
       if (await act(whole ? "buy_building" : "bank_buy", Object.assign(whole ? { p_card: g } : { p_card: g, p_k: null }, credit ? { p_credit: true } : {}), null)) { justBought = { g, whole, credit: !!credit }; sfx("buy"); if (window.confetti) confetti("#2563EB", 30); }
       return showLand();
