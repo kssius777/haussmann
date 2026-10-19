@@ -258,7 +258,7 @@ function showLand(L, gv) {
     } else {
       const seg = `<div class="pay"><button data-paymode="1" aria-selected="${cr}" ${creditOK ? "" : "disabled"}><b>À crédit</b><small>${creditOK ? fmtE(down(c.v)) : "pas assez"}</small></button><button data-paymode="0" aria-selected="${!cr}" ${cashOK ? "" : "disabled"}><b>Comptant</b><small>${cashOK ? fmtE(c.v) : "pas assez"}</small></button></div>`;
       const again = jb && free > 0 && !justBought.whole;
-      btns = `${seg}${slideHTML(`data-lbuy="${g}"`, cr ? "" : "cash", again ? "Glissez pour en acheter un autre" : "Glissez pour acheter", `Acheter ${unit} · ${fmtE(cr ? down(c.v) : c.v)}`)}`;
+      btns = `${seg}${slideHTML(`data-lbuy="${g}"`, cr ? "" : "cash", again ? `Glissez pour en acheter ${isP ? "une autre" : "un autre"}` : "Glissez pour acheter", `Acheter ${unit} · ${fmtE(cr ? down(c.v) : c.v)}`)}`;
       if (allFree && (cr ? cash >= down(total) && total - down(total) <= cap : cash >= total)) btns += `<button class="btn block light" data-lbuild="${g}">Tout l'immeuble · ${fmtE(cr ? down(total) : total)} <small class="muted">(+60 % de loyer)</small></button>`;
     }
     landCreditNow = cr;

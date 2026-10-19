@@ -64,9 +64,10 @@ function sunAlt(date) {
   return Math.asin(Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(ha)) / r;
 }
 // mode choisi : « auto » (heure réelle, par défaut) ou « jour » (profil) ; ?ciel=jour|soir|nuit pour tester
+// toujours le jour (choix du propriétaire, 19/10/2026 : la nuit « déprime ») ; ?ciel=auto|soir|nuit seulement pour tester
 function skyMode() {
   const q = new URLSearchParams(location.search).get("ciel"); if (q) return q;
-  try { return localStorage.getItem("hm_ciel") || "auto"; } catch (e) { return "auto"; }
+  return "jour";
 }
 function skyPhase(now = new Date()) {
   const m = skyMode();
