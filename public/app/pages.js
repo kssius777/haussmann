@@ -15,8 +15,16 @@ function go(t) {
   tab = t;
   for (const x of TABS) { const el = $("#p-" + x); const on = x === t; if (on && el.hidden) { el.hidden = false; el.classList.remove("enter"); void el.offsetWidth; el.classList.add("enter"); } else el.hidden = !on; }
   $$("#tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === t));
+  setMapFull();
   if (t === "map") { if (map) { map.resize(); pumpGeo(); if (paintAll.pending) setTimeout(paintAll, 0); renderTags(); } } else { hidePreview?.(); if (!moving && panelKind) { justBought = null; setMovebar(""); } }   // changer d'onglet ferme la case ouverte
   renderTab(t);
+}
+// carte plein écran : sur l'onglet Carte (sans page ouverte par-dessus), la carte passe sous les barres, qui flottent dessus
+function setMapFull() {
+  const on = tab === "map" && $("#p-detail").hidden;
+  if (document.body.classList.contains("mapfull") === on) return;
+  document.body.classList.toggle("mapfull", on);
+  if (map) requestAnimationFrame(() => map.resize());
 }
 function renderTab(t) {
   if (t === "booster") renderBoosterPage();
@@ -28,12 +36,12 @@ function renderTab(t) {
 function push(kind, arg) { stack.push({ kind, arg }); renderDetail(true); }
 function back() {
   stack.pop(); if (stack.length) return renderDetail(true);
-  $("#p-detail").hidden = true; sel = null; renderTab(tab);
+  $("#p-detail").hidden = true; sel = null; setMapFull(); renderTab(tab);
   if (tab === "map" && map) { pumpGeo(); paintAll(); if (pawnPos() != null && !moving) map.easeTo({ center: centerOf(pawnPos()), duration: 500 }); }   // retour sur la carte : recentrée sur la montgolfière
 }
 async function renderDetail(anim) {
   const top = stack[stack.length - 1]; if (!top) return; const el = $("#p-detail");
-  el.hidden = false; if (anim) { el.classList.remove("enter"); void el.offsetWidth; el.classList.add("enter"); el.scrollTop = 0; }
+  el.hidden = false; setMapFull(); if (anim) { el.classList.remove("enter"); void el.offsetWidth; el.classList.add("enter"); el.scrollTop = 0; }
   const K = { b: buildingPage, arr: arrPage, shop: shopPage, money: moneyPage, profile: profilePage, results: resultsPage, party: partyPage, gifts: giftsPage, admin: adminPage }[top.kind];
   if (!K) return;
   const html = await K(top.arg);
@@ -161,7 +169,7 @@ function listingBuy(l, attr) {
 function creditWhy(price) {
   const cash = liveCash(), cap = Math.max(0, ST.state?.loan_cap ?? 1e12), down = Math.ceil(price * downRate()), loan = price - down;
   const E = n => `<span class="nw">${fmtE(n)}</span>`;
-  if (loan > cap) return `Crédit trop gros : il faudrait emprunter ${E(loan)}, la banque peut encore vous prêter ${E(cap)}.`;
+  if (loan > cap) return `Pas assez de crédit : ${E(cap)} max.`;
   if (cash < down) return `Il vous manque ${E(down - cash)} pour l'apport.`;
   return "";
 }
@@ -446,7 +454,7 @@ function planHTML(c, owners, listed, myN, othersN, free) {
     const groups = new Map(); for (let k = 0; k < c.lots; k++) { const f = floorOfLot(c, k); if (!groups.has(f)) groups.set(f, []); groups.get(f).push(k); }
     grid = `<div class="floors${small ? " small" : ""}">${[...groups.entries()].sort((a, b) => b[0] - a[0]).map(([f, ks]) => `<div class="floor"><span>${c.lk === "l" ? ord(f) : "RDC"}</span><div>${ks.map(k => { const o = owners.get(k); const cls = o ? (o.o === ME ? "mine" : "theirs") : ""; return `<button class="lot ${cls}${o?.m ? " mort" : ""}${listed.has(k) ? " sale" : ""}" data-k="${k}" data-pick="1" aria-pressed="${selLot === k}" aria-label="${lotName(c, k)}, ${o ? (o.o === ME ? "à vous" : "à " + esc(o.ps)) : "libre"}">${small ? "" : k + 1}</button>`; }).join("")}</div></div>`).join("")}</div>`;
   }
-  const hints = othersN && selLot === null ? [`Touchez le ${w1} d'un autre joueur pour lui proposer de le racheter.`] : [];
+  const hints = othersN && selLot === null ? [`Touchez un ${w1} rose pour faire une offre.`] : [];
   const panel = selLot !== null ? lotPanel(c, owners, notLanded(sel)) : "";
   if (!grid && !panel) return "";
   return `<section class="bplan"><div class="bph"><b>${c.lots > 1 ? `Immeuble de ${c.lots} ${lotWord(c, c.lots)}` : `1 seul ${w1}`}</b>${leg ? `<div class="bleg">${leg}</div>` : ""}</div>
@@ -463,7 +471,7 @@ function lotPanel(c, owners, far) {
     body = tg + `<button class="btn block buy" data-act="bank" data-k="${k}" ${liveCash() < need ? "disabled" : ""}><span>Acheter celui-ci · ${cr ? "apport " : ""}${fmtE(need)}</span>${buySub(cr, c.v)}</button>${payWhy(c.v)}`; }
   else if (o.o === ME) body = l ? `<p class="bhint">En vente au Marché à ${fmtE(l.price)}.</p>` : o.m ? `<p class="bhint">Hypothéqué.</p>` : "";
   else body = l ? `<p class="bhint">En vente par ${esc(l.pseudo)} : ${fmtE(l.price)}</p>${listingBuy(l, (id, cr) => `data-act="buyl" data-id="${id}" data-k="${cr}"`)}`
-    : `<p class="bhint">${esc(o.ps)} ne le vend pas, mais vous pouvez lui faire une offre.</p>${offerForm(c, k, o)}`;
+    : `<p class="bhint">Pas en vente : faites une offre.</p>${offerForm(c, k, o)}`;
   return `<div class="lotp lbx" id="lotbar"><div class="lotph"><b>${where}</b><span class="pill${o ? (o.o === ME ? " me" : "") : " fr"}">${who}</span><button class="x" data-act="unpick" aria-label="Fermer">×</button></div>${body ? `<div class="lb">${body}</div>` : ""}</div>`;
 }
 // ---------------- ADMIN : liens cadeaux (le premier qui ouvre le lien gagne) ----------------
@@ -548,11 +556,11 @@ function payToggle(price, rent) {
   const cr = can && (bCredit === null ? true : bCredit || !cashOK);
   return [cr, `<div class="pay" role="tablist"><button data-act="paymode" data-k="1" aria-selected="${cr}" ${can ? "" : "disabled"}><b>À crédit</b><small><span>apport ${fmtE(down)}</span> <em>+${fmtE(Math.round(rent * .3))}/j</em></small></button><button data-act="paymode" data-k="0" aria-selected="${!cr}" ${cashOK || !can ? "" : "disabled"}><b>Comptant</b><small><span>${fmtE(price)}</span> ${cashOK ? `<em>+${fmtE(rent)}/j</em>` : "<span>pas assez</span>"}</small></button></div>`];
 }
-const buySub = (cr, price) => `<small>${cr ? `À crédit : la banque prête ${fmtE(price - Math.ceil(price * downRate()))}, remboursé tout seul par le loyer` : "Comptant : tout le loyer est pour vous, et le bien peut être revendu"}</small>`;
+const buySub = (cr, price) => `<small>${cr ? `La banque prête ${fmtE(price - Math.ceil(price * downRate()))}, remboursé par le loyer` : "Tout le loyer est pour vous"}</small>`;
 // sous le bouton d'achat : pourquoi le crédit n'est pas possible, et s'il ne reste rien de possible, combien il manque
 function payWhy(price) {
   const why = creditWhy(price), cash = liveCash();
-  return why ? `<small class="why">${why}${cash < price ? ` Comptant, il faut <span class="nw">${fmtE(price)}</span> et vous avez <span class="nw">${fmtE(cash)}</span>.` : ""}</small>` : "";
+  return why ? `<small class="why">${why}</small>` : "";
 }
 function buyActions(c, g, owners, free, isP, far) {
   const cash = liveCash();
@@ -572,7 +580,7 @@ function offerForm(c, k, o) {
     <div class="oprice"><input class="inp num" id="ofp" type="number" inputmode="numeric" min="${min}" step="1000" value="${price}" aria-label="Votre offre"><span>€</span></div>
     <div class="ochips">${presets.map(([v, l]) => `<button data-act="ofpreset" data-k="${v}" aria-pressed="${v === price}">${l}<small>${fmtE(v)}</small></button>`).join("")}</div>
     <div class="pay"><button data-act="ofmode" data-k="1" aria-selected="${ofCredit}"><b>À crédit</b><small>apport ${Math.round(downRate() * 100)} %</small></button><button data-act="ofmode" data-k="0" aria-selected="${!ofCredit}"><b>Comptant</b><small>tout de suite</small></button></div>
-    <p class="onote">Au moins ${fmtE(min)} (80 % de sa valeur). <b id="ofhold">${fmtE(hold)}</b> sont mis de côté pendant 24 h au plus, et rendus si ${esc(o.ps)} refuse. Il peut aussi vous faire une contre-proposition.</p>
+    <p class="onote">Au moins ${fmtE(min)}. <b id="ofhold">${fmtE(hold)}</b> mis de côté 24 h max, rendus s'il refuse.</p>
     <button class="btn block buy" data-act="offer" data-k="${k}"><span>Envoyer l'offre</span></button></div>`;
 }
 $("#p-detail").addEventListener("click", async e => {
@@ -642,9 +650,9 @@ async function arrPage(i) {
   const rival = iAmMayor ? top[1] : lead, mx = Math.max(1, mine, rival?.v || 0);
   const vs = (name, v, c, me) => `<div class="ar-vs${me ? " me" : ""}"><span>${name}</span><i><i style="width:${Math.max(1.5, v / mx * 100)}%;background:${c}"></i></i><b class="num">${fmtE(v)}</b></div>`;
   let goal;
-  if (iAmMayor) goal = `<p class="ar-line">Vous êtes le maire. Vous touchez ${MAYOR_TAX} % des loyers des autres propriétaires d'ici.</p>${rival ? `<div class="ar-bars">${vs("Vous", mine, myCol, true)}${vs(esc(rival.pseudo), rival.v, col(rival.party))}</div><p class="ar-note">Votre avance : <b class="num">${fmtE(Math.max(0, mine - rival.v))}</b>. Gardez la première place.</p>` : ""}`;
-  else if (!lead) goal = `<p class="ar-line">Personne n'est maire ici. Achetez un bien dans le ${ord(a.n)} pour le devenir.</p>`;
-  else goal = `<div class="ar-bars">${vs("Vous", mine, myCol, true)}${vs(esc(lead.pseudo), lead.v, col(lead.party))}</div><p class="ar-note">Il vous manque <b class="num">${fmtE(gap)}</b> de biens ici pour passer devant ${esc(lead.pseudo)}.</p>`;
+  if (iAmMayor) goal = `<p class="ar-line">Vous touchez ${MAYOR_TAX} % des loyers d'ici.</p>${rival ? `<div class="ar-bars">${vs("Vous", mine, myCol, true)}${vs(esc(rival.pseudo), rival.v, col(rival.party))}</div><p class="ar-note">Votre avance : <b class="num">${fmtE(Math.max(0, mine - rival.v))}</b></p>` : ""}`;
+  else if (!lead) goal = `<p class="ar-line">Achetez un bien ici pour devenir maire.</p>`;
+  else goal = `<div class="ar-bars">${vs("Vous", mine, myCol, true)}${vs(esc(lead.pseudo), lead.v, col(lead.party))}</div><p class="ar-note">Il vous manque <b class="num">${fmtE(gap)}</b> pour être maire.</p>`;
   const evl = ev?.arr === a.n ? (() => { const pct = Math.round(Math.abs(ev.m - 1) * 100); return `<p class="ar-ev"><i class="${ev.m >= 1 ? "up" : ""}"></i><span><b>Aujourd'hui</b> · ${esc((EVENTS[ev.ev] || ["Événement"])[0])} : loyers ${ev.m >= 1 ? "+" : "−"}${pct} % ici.</span></p>`; })() : "";
   return dhead("") + `<div class="wrap"><div class="arp">
     <div class="ar-h"><h1 class="h1">${ord(a.n)} arrondissement</h1>
@@ -654,7 +662,7 @@ async function arrPage(i) {
     <h2 class="ar-t">Plus gros propriétaires</h2>
     ${top.length ? `<ol class="ar-list">${top.map((t, k) => `<li class="${t.owner === ME ? "me" : ""}"><span class="n">${k + 1}</span>${emb(t.party)}<span class="who">${esc(t.pseudo)}${t.owner === ME ? " (vous)" : ""}${k === 0 ? `<small>maire</small>` : ""}</span><b class="num">${fmtE(t.v)}</b></li>`).join("")}</ol>` : `<p class="ar-note">Personne ne possède encore de bien ici.</p>`}
     ${mine && !top.some(t => t.owner === ME) ? `<p class="ar-note">Vos biens ici : <b class="num">${fmtE(mine)}</b></p>` : ""}
-    ${pc ? `<p class="ar-note">Les membres de ${esc(pc.n)} touchent +${MEMBER_BONUS} % de loyers dans cet arrondissement.</p>` : ""}
+    ${pc ? `<p class="ar-note">${esc(pc.n)} : +${MEMBER_BONUS} % de loyers ici.</p>` : ""}
     <button class="btn block light ar-map" data-arrmap="${i}">Voir sur la carte</button>
   </div></div>`;
 }

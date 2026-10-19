@@ -254,24 +254,24 @@ function showLand(L, gv) {
     const cr = creditOK && (landCredit === null ? true : landCredit) || (!cashOK && creditOK);
     if (!cashOK && !creditOK) {
       const need = cash >= down(c.v) ? 0 : down(c.v) - cash, rate = netRate(), days = rate > 0 ? Math.ceil(need / rate) : 0;
-      btns = `<div class="nomoney"><b>Pas assez pour celui-ci</b><span>${cash < down(c.v) ? `Il manque ${fmtE(need)} pour l'apport${days ? ` · vos loyers l'apportent dans ${days} jour${days > 1 ? "s" : ""}` : ""}.` : `Comptant : il faut ${fmtE(c.v)}, vous avez ${fmtE(cash)}. À crédit : la banque peut encore vous prêter ${fmtE(Math.max(0, cap))}, il faudrait ${fmtE(c.v - down(c.v))}. Votre capacité remonte avec vos loyers et vos remboursements.`}</span></div>`;
+      btns = `<div class="nomoney"><b>Pas assez pour celui-ci</b><span>${cash < down(c.v) ? `Il manque ${fmtE(need)} pour l'apport${days ? ` (dans ${days} jour${days > 1 ? "s" : ""} avec vos loyers)` : ""}.` : `Pas assez de crédit : ${fmtE(Math.max(0, cap))} max.`}</span></div>`;
     } else {
       const seg = creditOK ? `<div class="pay"><button data-paymode="1" aria-selected="${cr}"><b>À crédit</b><small>apport ${fmtE(down(c.v))} · <em>+${fmtE(Math.round(c.rent * .3))}/j</em></small></button><button data-paymode="0" aria-selected="${!cr}" ${cashOK ? "" : "disabled"}><b>Comptant</b><small>${fmtE(c.v)} · ${cashOK ? `<em>+${fmtE(c.rent)}/j</em>` : "pas assez"}</small></button></div>` : "";
-      btns = `${seg}<button class="btn block ${cr ? "blue2" : "green"} buy" data-lbuy="${g}"><span>Acheter ${unit} · ${cr ? "apport " : ""}${fmtE(cr ? down(c.v) : c.v)}</span><small>${cr ? `À crédit : la banque prête ${fmtE(c.v - down(c.v))}, remboursé tout seul par le loyer` : "Comptant : tout le loyer est pour vous, et le bien peut être revendu"}</small></button>`;
+      btns = `${seg}<button class="btn block ${cr ? "blue2" : "green"} buy" data-lbuy="${g}"><span>Acheter ${unit} · ${cr ? "apport " : ""}${fmtE(cr ? down(c.v) : c.v)}</span><small>${cr ? `La banque prête ${fmtE(c.v - down(c.v))}, remboursé par le loyer` : "Tout le loyer est pour vous"}</small></button>`;
       if (allFree && (cr ? cash >= down(total) && total - down(total) <= cap : cash >= total)) btns += `<button class="btn block light" data-lbuild="${g}">Tout l'immeuble · ${fmtE(cr ? down(total) : total)} <small class="muted">(+60 % de loyer)</small></button>`;
     }
     landCreditNow = cr;
   }
   if (view) {
     const listed = ST.sale.has(g);
-    btns = `${free > 0 ? `<div class="farbuy">🎲 Pour l'acheter à la banque, tombez dessus avec le dé.${listed ? "" : " Ou trouvez-le dans un booster."}</div>` : ""}<button class="btn block ${listed ? "buy" : "light"}" data-lopen="${g}"><span>${listed ? "En vente au Marché · voir l'offre" : "Voir la fiche de l'immeuble"}</span></button>`;
+    btns = `${free > 0 ? `<div class="farbuy">🎲 Pour l'acheter, tombez dessus avec le dé.</div>` : ""}<button class="btn block ${listed ? "buy" : "light"}" data-lopen="${g}"><span>${listed ? "En vente au Marché · voir l'offre" : "Voir la fiche de l'immeuble"}</span></button>`;
   }
   // racheter à un autre joueur : faire une offre (pas pendant l'écran « Acheté ! »)
   if (!jb && others > 0 && !isP && !ST.sale.has(g)) btns += `<button class="btn block light" data-lofr="${g}">🤝 Proposer de racheter ${owners.length === 1 ? "au propriétaire" : "à un propriétaire"}</button>`;
   if (jb) {   // juste acheté : ce qui a été payé, ce que ça rapporte ; s'il reste des logements libres, on peut continuer à acheter ici
     const n = justBought.whole ? tot : 1, price = c.v * n, dn = Math.ceil(price * downRate()), rent = c.rent * n * (justBought.whole ? 1.6 : 1);
-    const paid = justBought.credit ? `Apport payé ${fmtE(dn)} · la banque a prêté ${fmtE(price - dn)}` : `Payé ${fmtE(price)}`;
-    const gain = justBought.credit ? `+${fmtE(Math.round(rent * .3))} / jour tout de suite, ${fmtE(Math.round(rent))} / jour une fois le crédit remboursé` : `+${fmtE(Math.round(rent))} / jour de loyer en plus`;
+    const paid = justBought.credit ? `Apport ${fmtE(dn)} · prêt ${fmtE(price - dn)}` : `Payé ${fmtE(price)}`;
+    const gain = justBought.credit ? `+${fmtE(Math.round(rent * .3))} / jour, puis ${fmtE(Math.round(rent))} une fois le crédit remboursé` : `+${fmtE(Math.round(rent))} / jour de loyer en plus`;
     lines.unshift(`<span class="ln good">${paid}<br><b>${gain}</b></span>`);
     if (free > 0 && !justBought.whole && btns.includes("data-lbuy")) {
       btns = btns.replace(/Acheter (1 |une |un )/, (m, w) => `Acheter ${w === "1 " ? "1 autre " : w === "une " ? "une autre " : "un autre "}`) + `<button class="btn block light" data-mvclose>Continuer</button>`;

@@ -1882,3 +1882,50 @@ body.legon #score{display:none}
 @media (max-width:699px){.arp{padding:18px 16px 16px;border-radius:16px}.ar-h .h1{font-size:26px}}
 /* la légende « Qui gouverne Paris » de la carte ne passe plus par-dessus les pages */
 body:has(#p-detail:not([hidden])) #partyleg{display:none!important}
+/* ---------- Carte plein écran (19/10/2026, choix du propriétaire) ----------
+   Onglet Carte seulement (body.mapfull, posé par setMapFull dans pages.js) : la carte passe sous les barres, qui flottent dessus.
+   Téléphone et tablette (< 900 px) : « dock flottant » — barre du haut en capsule, crédit en pastille, onglets en deux capsules
+   de part et d'autre du dé, boosters au-dessus à droite. Ordinateur : logo, onglets et argent en capsules séparées, crédit sous l'argent.
+   Pas de flou d'arrière-plan : sur une carte 3D qui se redessine sans arrêt, il coûte cher aux téléphones. */
+body.mapfull #map{position:fixed;inset:0}
+body.mapfull #p-map.enter{animation:none}
+body.mapfull #pawnoff{position:fixed}
+body.mapfull #bar,body.mapfull #credbar,body.mapfull #tabs{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+@media (max-width:899px){
+  body.mapfull{--bar-h:72px;--tab-h:84px}
+  body.mapfull.hascred{--bar-h:102px}
+  body.mapfull #bar{top:calc(env(safe-area-inset-top,0px) + 8px);left:8px;right:8px;height:56px!important;padding:0 7px 0 6px;border-radius:18px;border:0!important;background:rgba(255,255,255,.97)!important;box-shadow:0 6px 20px rgba(15,23,42,.16),0 0 0 1px rgba(15,23,42,.05)!important}
+  body.mapfull #credbar{top:calc(env(safe-area-inset-top,0px) + 70px);left:50%;right:auto;transform:translateX(-50%);width:max-content;max-width:calc(100% - 24px);height:26px;padding:0 12px;border:0;border-radius:999px;background:rgba(255,255,255,.97);box-shadow:0 4px 14px rgba(15,23,42,.14),0 0 0 1px rgba(15,23,42,.05);white-space:nowrap}
+  body.mapfull #credbar .trk{flex:0 0 46px}
+  body.mapfull #pages{bottom:0}
+  /* les onglets : deux capsules de part et d'autre du dé ; le milieu reste libre et laisse passer le toucher jusqu'au dé */
+  body.mapfull #tabs{left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);height:66px;padding:0;grid-template-columns:1fr 1fr 104px 1fr 1fr;gap:0;background:transparent!important;border:0!important;box-shadow:none!important;pointer-events:none;isolation:isolate}
+  body.mapfull #tabs::before,body.mapfull #tabs::after{content:"";position:absolute;top:0;bottom:0;width:calc(50% - 52px);z-index:-1;border-radius:20px;background:rgba(255,255,255,.97);box-shadow:0 6px 20px rgba(15,23,42,.16),0 0 0 1px rgba(15,23,42,.05)}
+  body.mapfull #tabs::before{left:0}
+  body.mapfull #tabs::after{right:0}
+  body.mapfull #tabs button{pointer-events:auto}
+  body.mapfull #tabs button:nth-child(3){grid-column:4}
+  body.mapfull #tabs button:nth-child(4){grid-column:5}
+  /* le dé au milieu, entre les onglets ; les boosters au-dessus, à droite */
+  body.mapfull .mapbottom{bottom:calc(env(safe-area-inset-bottom,0px) + 16px)}
+  body.mapfull .dicebar{position:relative;width:100%;justify-content:center}
+  body.mapfull .dside.dspace{display:none}
+  body.mapfull #b-pack{position:absolute;right:0;bottom:84px;margin:0}
+  body.mapfull .mapside{bottom:calc(env(safe-area-inset-bottom,0px) + 170px)}
+  /* case ouverte ou choix de la destination : les onglets s'effacent, comme avant */
+  body.mapfull.landopen #tabs,body.mapfull.picking #tabs,body.mapfull.picksel #tabs{transform:translateY(calc(100% + 30px))}
+}
+@media (min-width:900px){
+  body.mapfull{--bar-h:68px}
+  body.mapfull.hascred{--bar-h:104px}
+  body.mapfull #bar{height:calc(58px + env(safe-area-inset-top,0px))!important;background:transparent!important;border:0!important;box-shadow:none!important;pointer-events:none}
+  body.mapfull #bar>*{pointer-events:auto}
+  body.mapfull #bar .brand{padding:5px 12px 5px 5px;border-radius:16px;background:rgba(255,255,255,.97);box-shadow:0 6px 20px rgba(15,23,42,.16),0 0 0 1px rgba(15,23,42,.05)}
+  body.mapfull #bar .money{border-color:transparent!important;box-shadow:0 6px 20px rgba(15,23,42,.16),0 0 0 1px rgba(15,23,42,.05)}
+  body.mapfull #bar .avatar{box-shadow:0 6px 16px rgba(15,23,42,.2)}
+  body.mapfull #tabs{background:rgba(255,255,255,.97)!important;border-color:transparent!important;box-shadow:0 6px 20px rgba(15,23,42,.16),0 0 0 1px rgba(15,23,42,.05)!important}
+  body.mapfull #credbar{top:calc(env(safe-area-inset-top,0px) + 66px);left:auto;right:14px;width:max-content;height:30px;padding:0 12px;border:0;border-radius:12px;background:rgba(255,255,255,.97);box-shadow:0 6px 20px rgba(15,23,42,.14),0 0 0 1px rgba(15,23,42,.05);justify-content:flex-start}
+  body.mapfull #credbar .trk{flex:0 0 70px}
+}
+.mapbtns{margin-left:auto}
+@media (max-width:699px){body.mapfull.landopen #movebar.k-land{top:calc(var(--bar-h) + 56px)}}
