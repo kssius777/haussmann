@@ -646,19 +646,11 @@ grant execute on function roll(), roll(float8), go_to(int) to anon, authenticate
 
 drop function if exists move(int);
 
--- Se téléporter sur un de ses biens (on peut alors y acheter les logements encore libres)
+-- La téléportation est retirée du jeu (19/10/2026, migration_sans_teleport.sql) : seul le dé déplace la montgolfière
 create or replace function teleport(p_card int) returns json
 language plpgsql security definer set search_path = public as $$
-#variable_conflict use_column
-declare u uuid := _need_me(); pr profiles;
 begin
-  perform _sync(u); perform _regen(u);
-  select * into pr from profiles where id=u for update;
-  if pr.tp <= 0 then raise exception 'Plus de téléportation aujourd''hui (3 par jour)'; end if;
-  if not exists (select 1 from lots where card=p_card and owner=u) and not exists (select 1 from parts where card=p_card and owner=u) then
-    raise exception 'On ne peut se téléporter que sur un de ses biens'; end if;
-  update profiles set pos = p_card, land = p_card, dice = null, moves = null, pend = null, pend_die = null, tp = tp - 1 where id=u;
-  return state();
+  raise exception 'La téléportation a été retirée du jeu : seul le dé déplace la montgolfière.';
 end $$;
 
 -- Acheter des lancers de dé avec l'argent du jeu : 5 lancers, prix qui double à chaque achat dans la journée
@@ -694,7 +686,8 @@ begin
 end $$;
 
 revoke all on function roll(), teleport(int) from public;
-grant execute on function roll(), teleport(int) to anon, authenticated;
+revoke all on function teleport(int) from anon, authenticated;
+grant execute on function roll() to anon, authenticated;
 revoke all on function _dist(int,int), _is_chance(int), _regen(uuid), _reach(int,int), _near_or_fail(uuid,int), pawn_cfg(), _square(uuid,int), _walk(uuid,int,int) from public, anon, authenticated;
 
 -- =====================================================================
@@ -1253,7 +1246,7 @@ $$;
 revoke all on all functions in schema public from public, anon, authenticated;
 alter default privileges in schema public revoke execute on functions from public, anon, authenticated;
 do $$ declare f text; begin
-  foreach f in array array['join_game(text,text)','set_party(text)','state()','open_booster(text)','bank_buy(int,int,boolean)','buy_building(int,boolean)','repay(int)','roll()','teleport(int)','buy_rolls()',
+  foreach f in array array['join_game(text,text)','set_party(text)','state()','open_booster(text)','bank_buy(int,int,boolean)','buy_building(int,boolean)','repay(int)','roll()','buy_rolls()',
     'list_item(int,int,int,bigint)','unlist(bigint)','buy_listing(bigint,boolean)','mortgage(int,int)','lift(int,int)',
     'map_state()','my_holdings()','building(int)','market()','feed()','leaderboard()','arr_info(int)','my_ledger()'] loop
     execute format('grant execute on function %s to anon, authenticated', f);

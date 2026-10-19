@@ -85,7 +85,6 @@ function renderDice() {
   const wait = Math.max(0, (ST.state.roll_in || 0) - (performance.now() - ST.stAt) / 1000);
   $("#rolls").textContent = left > 0 ? `${left} lancer${left > 1 ? "s" : ""}` : `dans ${hm(wait)}`;
   r.disabled = moving; r.classList.toggle("empty", left <= 0);
-  $("#tps").textContent = p.tp ?? 0; $("#b-tp").disabled = !(p.tp > 0);
   $("#dicebar").classList.toggle("off", moving);
 }
 
@@ -234,7 +233,7 @@ function showLand(L, gv) {
   let head, cls;
   const jb = !view && justBought && justBought.g === g;
   if (view) { head = mine > 0 ? (free > 0 ? "À vous en partie" : "À vous") : free > 0 ? (isP ? "Parts disponibles" : "Libre") : owners.length ? "Déjà pris" : "Tout est vendu"; cls = mine > 0 ? "home" : free > 0 ? "free" : ""; }
-  else if (jb) { head = justBought.whole ? "✓ Acheté ! Tout l'immeuble est à vous" : `✓ Acheté ! ${isP ? "Une part" : tot > 1 ? "Un " + word(1) : "Il"} est à vous`; cls = "home"; }
+  else if (jb) { head = (justBought.whole ? "✓ Tout l'immeuble acheté" : "✓ Acheté") + (justBought.credit ? " à crédit !" : " comptant !"); cls = "home"; }
   else if (L?.toll > 0) { head = `Chez ${L.payees.map(p => esc(p.pseudo)).join(", ")}`; cls = "bad"; }
   else if (mine > 0 && free > 0) { head = "Vous êtes chez vous"; cls = "home"; }
   else if (mine > 0) { head = "Tout l'immeuble est à vous"; cls = "home"; }
@@ -255,10 +254,10 @@ function showLand(L, gv) {
     const cr = creditOK && (landCredit === null ? true : landCredit) || (!cashOK && creditOK);
     if (!cashOK && !creditOK) {
       const need = cash >= down(c.v) ? 0 : down(c.v) - cash, rate = netRate(), days = rate > 0 ? Math.ceil(need / rate) : 0;
-      btns = `<div class="nomoney"><b>Pas assez pour celui-ci</b><span>${cash < down(c.v) ? `Il manque ${fmtE(need)} pour l'apport${days ? ` · vos loyers l'apportent dans ${days} jour${days > 1 ? "s" : ""}` : ""}.` : `Capacité d'emprunt atteinte. Elle remonte à mesure que vos crédits se remboursent.`}</span></div>`;
+      btns = `<div class="nomoney"><b>Pas assez pour celui-ci</b><span>${cash < down(c.v) ? `Il manque ${fmtE(need)} pour l'apport${days ? ` · vos loyers l'apportent dans ${days} jour${days > 1 ? "s" : ""}` : ""}.` : `Comptant : il faut ${fmtE(c.v)}, vous avez ${fmtE(cash)}. À crédit : la banque peut encore vous prêter ${fmtE(Math.max(0, cap))}, il faudrait ${fmtE(c.v - down(c.v))}. Votre capacité remonte avec vos loyers et vos remboursements.`}</span></div>`;
     } else {
-      const seg = creditOK && cashOK ? `<div class="pay"><button data-paymode="1" aria-selected="${cr}"><b>À crédit</b><small>${fmtE(down(c.v))} · <em>+${fmtE(Math.round(c.rent * .3))}/j</em></small></button><button data-paymode="0" aria-selected="${!cr}"><b>Comptant</b><small>${fmtE(c.v)} · <em>+${fmtE(c.rent)}/j</em></small></button></div>` : "";
-      btns = `${seg}<button class="btn block ${cr ? "blue2" : "green"} buy" data-lbuy="${g}"><span>Acheter ${unit} · ${fmtE(cr ? down(c.v) : c.v)}</span><small>${cr ? "La banque prête le reste, remboursé tout seul par le loyer" : "Tout le loyer est pour vous, et le bien peut être revendu"}</small></button>`;
+      const seg = creditOK ? `<div class="pay"><button data-paymode="1" aria-selected="${cr}"><b>À crédit</b><small>apport ${fmtE(down(c.v))} · <em>+${fmtE(Math.round(c.rent * .3))}/j</em></small></button><button data-paymode="0" aria-selected="${!cr}" ${cashOK ? "" : "disabled"}><b>Comptant</b><small>${fmtE(c.v)} · ${cashOK ? `<em>+${fmtE(c.rent)}/j</em>` : "pas assez"}</small></button></div>` : "";
+      btns = `${seg}<button class="btn block ${cr ? "blue2" : "green"} buy" data-lbuy="${g}"><span>Acheter ${unit} · ${cr ? "apport " : ""}${fmtE(cr ? down(c.v) : c.v)}</span><small>${cr ? `À crédit : la banque prête ${fmtE(c.v - down(c.v))}, remboursé tout seul par le loyer` : "Comptant : tout le loyer est pour vous, et le bien peut être revendu"}</small></button>`;
       if (allFree && (cr ? cash >= down(total) && total - down(total) <= cap : cash >= total)) btns += `<button class="btn block light" data-lbuild="${g}">Tout l'immeuble · ${fmtE(cr ? down(total) : total)} <small class="muted">(+60 % de loyer)</small></button>`;
     }
     landCreditNow = cr;
@@ -269,12 +268,16 @@ function showLand(L, gv) {
   }
   // racheter à un autre joueur : faire une offre (pas pendant l'écran « Acheté ! »)
   if (!jb && others > 0 && !isP && !ST.sale.has(g)) btns += `<button class="btn block light" data-lofr="${g}">🤝 Proposer de racheter ${owners.length === 1 ? "au propriétaire" : "à un propriétaire"}</button>`;
-  if (jb) {   // juste acheté : s'il reste des logements libres, on peut continuer à acheter ici sans quitter la case
-    const gain = `+${fmtE(Math.round(c.rent * (landCreditNow ? .3 : 1)))} / jour de loyer en plus`;
+  if (jb) {   // juste acheté : ce qui a été payé, ce que ça rapporte ; s'il reste des logements libres, on peut continuer à acheter ici
+    const n = justBought.whole ? tot : 1, price = c.v * n, dn = Math.ceil(price * downRate()), rent = c.rent * n * (justBought.whole ? 1.6 : 1);
+    const paid = justBought.credit ? `Apport payé ${fmtE(dn)} · la banque a prêté ${fmtE(price - dn)}` : `Payé ${fmtE(price)}`;
+    const gain = justBought.credit ? `+${fmtE(Math.round(rent * .3))} / jour tout de suite, ${fmtE(Math.round(rent))} / jour une fois le crédit remboursé` : `+${fmtE(Math.round(rent))} / jour de loyer en plus`;
+    lines.unshift(`<span class="ln good">${paid}<br><b>${gain}</b></span>`);
     if (free > 0 && !justBought.whole && btns.includes("data-lbuy")) {
-      lines.unshift(`<span class="ln good">${gain}</span>`);
       btns = btns.replace(/Acheter (1 |une |un )/, (m, w) => `Acheter ${w === "1 " ? "1 autre " : w === "une " ? "une autre " : "un autre "}`) + `<button class="btn block light" data-mvclose>Continuer</button>`;
-    } else btns = `<button class="btn block buy" data-mvclose><span>Continuer</span><small>${gain}</small></button>`;
+    } else if (free > 0 && btns.includes("nomoney")) {   // plus assez pour en acheter un autre : on dit pourquoi
+      btns = btns.replace("Pas assez pour celui-ci", "Pas assez pour en acheter un autre") + `<button class="btn block light" data-mvclose>Continuer</button>`;
+    } else btns = `<button class="btn block buy" data-mvclose><span>Continuer</span></button>`;
   }
   setMovebar(`<div class="land${lines.length ? " hasln" : ""}"><div class="grab"></div><div class="lc" data-lopen="${g}">${cardHTML(c)}</div>
     <div class="lr"><b class="lh ${cls}">${head}</b>${lines.length ? `<div class="lns">${lines.join("")}</div>` : ""}${occ}<div class="lb">${btns}</div></div>
@@ -304,26 +307,6 @@ function showBuyRolls() {
     <small class="muted" style="text-align:center">Le prix double à chaque achat dans la journée.</small>`, "buy");
 }
 
-// ---- téléportation ------------------------------------------------------------
-function openTeleport() {
-  // téléportation aléatoire sur un de ses biens (de préférence un immeuble où il reste des logements libres) ; on prévient d'abord
-  const hs = holdings().filter(h => h.g !== pawnPos()); if (!hs.length) return toast("Vous n'avez pas encore de bien où vous téléporter");
-  if (panelKind === "tp") return setMovebar("");
-  const tp = ST.state?.profile?.tp ?? 0;
-  setMovebar(`<div class="mvh"><span class="pin">✨</span><div><b>Se téléporter ?</b><span>Votre personnage sera envoyé <b>au hasard</b> sur l'un de vos immeubles. Vous pourrez y acheter les logements restés libres.</span></div><button class="x" data-mvclose aria-label="Fermer">×</button></div>
-    <div class="tpb"><button class="btn block" data-tpgo="0">Me téléporter</button><button class="btn light" data-mvclose>Annuler</button></div>
-    <small class="muted" style="text-align:center">Il vous reste ${tp} téléportation${tp > 1 ? "s" : ""} aujourd'hui.</small>`, "tp");
-}
-function teleportRandom() {
-  const hs = holdings().filter(h => h.g !== pawnPos()); if (!hs.length) return toast("Vous n'avez pas encore de bien où vous téléporter");
-  const pool = hs.filter(h => freeOf(h.g) > 0); const pick = (pool.length ? pool : hs)[Math.floor(Math.random() * (pool.length ? pool : hs).length)];
-  doTeleport(pick.g);
-}
-async function doTeleport(g) {
-  try { setState(await rpc("teleport", { p_card: g })); clearDest(); } catch (e) { return toast(e.message, "bad"); }
-  lastLanding = null; setMovebar(""); hidePreview(); sfx("coin"); await placePawn(true); renderDice(); showLand();
-}
-
 // ---- le dé : un vrai cube en 3D qui roule puis s'arrête sur la bonne face ----
 const PIPS = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6 };
 const PIPXY = { 1: [[.5, .5]], 2: [[.27, .27], [.73, .73]], 3: [[.27, .27], [.5, .5], [.73, .73]], 4: [[.27, .27], [.73, .27], [.27, .73], [.73, .73]], 5: [[.27, .27], [.73, .27], [.5, .5], [.27, .73], [.73, .73]], 6: [[.27, .25], [.73, .25], [.27, .5], [.73, .5], [.27, .75], [.73, .75]] };
@@ -347,16 +330,14 @@ async function animDice(n) {   // le même dé que sur le bouton : il tourne en 
 
 function initPawnUI() {
   $("#b-roll").addEventListener("click", doRoll);
-  $("#b-tp").addEventListener("click", openTeleport);
   $("#minipack").innerHTML = packHTML("mini"); setDieIcon(5);
   $("#movebar").addEventListener("click", async e => {
     if (e.target.closest("[data-mvclose]")) { justBought = null; return setMovebar(""); }
-    const tp = e.target.closest("[data-tpgo]"); if (tp) return teleportRandom();
     if (e.target.closest("[data-buyrolls]")) { if (await act("buy_rolls", {}, "5 lancers en plus !")) { setMovebar(""); renderDice(); } return; }
     const pm = e.target.closest("[data-paymode]"); if (pm) { landCredit = pm.dataset.paymode === "1"; return showLand(); }
     const lb = e.target.closest("[data-lbuy],[data-lbuild]"); if (lb) {
       const g = +(lb.dataset.lbuy || lb.dataset.lbuild), whole = !!lb.dataset.lbuild, credit = landCreditNow; lb.disabled = true; lb.textContent = "Achat…";
-      if (await act(whole ? "buy_building" : "bank_buy", Object.assign(whole ? { p_card: g } : { p_card: g, p_k: null }, credit ? { p_credit: true } : {}), null)) { justBought = { g, whole }; sfx("buy"); if (window.confetti) confetti("#2563EB", 30); }
+      if (await act(whole ? "buy_building" : "bank_buy", Object.assign(whole ? { p_card: g } : { p_card: g, p_k: null }, credit ? { p_credit: true } : {}), null)) { justBought = { g, whole, credit: !!credit }; sfx("buy"); if (window.confetti) confetti("#2563EB", 30); }
       return showLand();
     }
     const lf = e.target.closest("[data-lofr]"); if (lf) { offerNext = +lf.dataset.lofr; sel = null; return push("b", offerNext); }

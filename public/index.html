@@ -30,12 +30,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.css" rel="stylesheet">
-<link href="/app/style.css?v=20261019a" rel="stylesheet">
+<link href="/app/style.css?v=20261019d" rel="stylesheet">
 </head>
 <body>
 <div id="credbar" hidden data-push="money" role="button" aria-label="Crédit encore disponible"></div>
 <header id="bar">
-  <button class="brand" data-go="map" aria-label="Proprio, retour à la carte"><span class="plaque-mini" id="plaque" data-sub="Paris">PROPRIO</span></button>
+  <button class="brand" data-go="map" aria-label="Proprio, retour à la carte"><img class="bico" src="/icons/logo.svg" alt="" width="36" height="36"><span class="plaque-mini" data-sub="7ᵉ Arrᵗ">PROPRIO</span></button>
   <div class="wallet">
     <button class="money" data-push="money" aria-label="Mon argent : trésorerie et historique">
       <span class="mv"><span class="num" id="cash">—</span><span class="rate num" id="rate"></span></span><i class="plus">+</i>
@@ -76,7 +76,7 @@
       <div id="preview" hidden></div>
       <div id="destcard" hidden></div>
       <div class="dicebar" id="dicebar">
-        <button class="dside" id="b-tp" aria-label="Se téléporter sur un de ses biens"><span class="ic">✨</span><small>Téléport · <b id="tps">3</b></small></button>
+        <span class="dside dspace" aria-hidden="true"></span>
         <button class="dmain" id="b-roll" aria-label="Lancer le dé"><span class="cube" id="dieico"></span><b>Lancer</b><small id="rolls">10</small></button>
         <button class="dside pk" id="b-pack" data-tab="booster" aria-label="Mes boosters"><span class="ic" id="minipack"></span><small>Boosters</small><b class="badge" id="packbadge" hidden></b></button>
       </div>
@@ -101,23 +101,23 @@
 <div id="reveal" hidden></div>
 <div id="onb" hidden></div>
 <div id="toast" role="status" aria-live="polite"></div>
-<div id="loading"><span class="plaque-mini big" data-sub="Paris">PROPRIO</span><p id="loadmsg">Chargement de Paris…</p></div>
+<div id="loading"><img class="bico big" src="/icons/logo.svg" alt="" width="84" height="84"><span class="plaque-mini big" data-sub="7ᵉ Arrᵗ">PROPRIO</span><p id="loadmsg">Chargement de Paris…</p></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/app/models.js?v=20261019a"></script>
-<script src="/app/core.js?v=20261019a"></script>
-<script src="/app/api.js?v=20261019a"></script>
-<script src="/app/cards.js?v=20261019a"></script>
-<script src="/app/map.js?v=20261019a"></script>
-<script src="/app/pawn.js?v=20261019a"></script>
-<script src="/app/life.js?v=20261019a"></script>
-<script src="/app/decor.js?v=20261019a"></script>
-<script src="/app/pages.js?v=20261019a"></script>
-<script src="/app/booster.js?v=20261019a"></script>
-<script src="/app/onboard.js?v=20261019a"></script>
-<script src="/app/landing.js?v=20261019a"></script>
-<script src="/app/main.js?v=20261019a"></script>
+<script src="/app/models.js?v=20261019d"></script>
+<script src="/app/core.js?v=20261019d"></script>
+<script src="/app/api.js?v=20261019d"></script>
+<script src="/app/cards.js?v=20261019d"></script>
+<script src="/app/map.js?v=20261019d"></script>
+<script src="/app/pawn.js?v=20261019d"></script>
+<script src="/app/life.js?v=20261019d"></script>
+<script src="/app/decor.js?v=20261019d"></script>
+<script src="/app/pages.js?v=20261019d"></script>
+<script src="/app/booster.js?v=20261019d"></script>
+<script src="/app/onboard.js?v=20261019d"></script>
+<script src="/app/landing.js?v=20261019d"></script>
+<script src="/app/main.js?v=20261019d"></script>
 </body>
 </html>

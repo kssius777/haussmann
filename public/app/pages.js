@@ -56,10 +56,6 @@ function renderWallet() {
   const s = ST.state; if (!s?.profile) return;
   $("#cash").textContent = fmtE(liveCash());
   $("#rate").textContent = netRate() ? `+${fmtE(netRate())}/j` : "";
-  const pl = $("#plaque"); if (pl) {   // la plaque du logo indique l'arrondissement où se trouve la montgolfière
-    const a = s.profile.pos != null && typeof IDX !== "undefined" ? IDX?.arr?.[ai(s.profile.pos)]?.n : null;
-    pl.dataset.sub = a ? (a === 1 ? "1ᵉʳ Arrᵗ" : a + "ᵉ Arrᵗ") : "Paris";
-  }
   const cb = $("#credbar"); if (cb && s.loan_cap != null) {   // crédit encore disponible, sous la barre du haut
     const cap = Math.max(0, +s.loan_cap || 0), loans = +s.loans || 0, pct = loans + cap ? Math.round(loans / (loans + cap) * 100) : 0;
     cb.innerHTML = `<span>🏦 Crédit dispo <b>${fmtE(cap)}</b></span><i class="trk"><i style="width:${pct}%" class="${pct < 60 ? "" : pct < 90 ? "mid" : "hi"}"></i></i><span class="pc">${pct} % du plafond</span>`;
@@ -158,8 +154,16 @@ $("#p-assets").addEventListener("change", e => { if (e.target.id === "asort") { 
 
 // acheter une annonce : à crédit (apport 10 %) ou comptant ; attr = attributs du bouton selon la page
 function listingBuy(l, attr) {
-  const cash = liveCash(), cap = ST.state?.loan_cap ?? 1e12, down = Math.ceil(l.price * downRate()), crOK = cash >= down && l.price - down <= cap;
-  return `<span class="lbuy"><button class="btn sm blue2" ${attr(l.id, 1)} ${crOK ? "" : "disabled"} title="La banque prête 90 %, remboursé tout seul par le loyer">À crédit · ${fmtE(down)}</button><button class="lnk" ${attr(l.id, 0)} ${cash < l.price ? "disabled" : ""}>ou comptant ${fmtE(l.price)}</button></span>`;
+  const cash = liveCash(), down = Math.ceil(l.price * downRate()), why = creditWhy(l.price);
+  return `<span class="lbuy"><button class="btn sm blue2" ${attr(l.id, 1)} ${why ? "disabled" : ""} title="La banque prête le reste, remboursé tout seul par le loyer">À crédit · apport ${fmtE(down)}</button><button class="lnk" ${attr(l.id, 0)} ${cash < l.price ? "disabled" : ""}>ou comptant ${fmtE(l.price)}</button>${why ? `<small class="lwhy">${why}</small>` : ""}</span>`;
+}
+// pourquoi on ne peut pas acheter à crédit, en une phrase ("" si le crédit passe)
+function creditWhy(price) {
+  const cash = liveCash(), cap = Math.max(0, ST.state?.loan_cap ?? 1e12), down = Math.ceil(price * downRate()), loan = price - down;
+  const E = n => `<span class="nw">${fmtE(n)}</span>`;
+  if (loan > cap) return `Crédit trop gros : il faudrait emprunter ${E(loan)}, la banque peut encore vous prêter ${E(cap)}.`;
+  if (cash < down) return `Il vous manque ${E(down - cash)} pour l'apport.`;
+  return "";
 }
 // ---------------- OFFRES DE RACHAT ----------------
 let ofCounter = null;
@@ -233,7 +237,7 @@ async function renderMarket() {
   const L = ST.market.listings; await ensureCards([...L.map(l => l.card), ...ST.market.sales.map(s => s.card)]);
   const mineL = L.filter(l => l.seller === ME), others = L.filter(l => l.seller !== ME);
   const rows = (arr, own) => arr.map(l => { const c = card(l.card); if (!c) return ""; const est = c.v * (l.n || 1); const d = (l.price - est) / est;
-    return `<div class="lrow"><button class="th" data-push="b" data-arg="${l.card}" aria-label="Voir la fiche">${photo(c)}</button>
+    return `<div class="lrow${own ? "" : " mk"}"><button class="th" data-push="b" data-arg="${l.card}" aria-label="Voir la fiche">${photo(c)}</button>
       <div class="t"><b>${esc(title(c))}</b><span>${l.k != null ? lotName(c, l.k) : l.n + " part" + (l.n > 1 ? "s" : "")} · ${ord(c.arr)} arr. · ${own ? "votre annonce" : "par " + esc(l.pseudo)}</span>
       <span><span class="pill" style="height:20px;font-size:11px;${d <= 0 ? "background:#DCFCE7;color:#15803D" : d > .25 ? "background:#FEE2E2;color:#B91C1C" : ""}">${d <= 0 ? "Bonne affaire" : "+" + Math.round(d * 100) + " % vs estimation"}</span></span></div>
       <div class="v"><b class="num">${fmtE(l.price)}</b>${own ? `<button class="btn sm ghost" data-unlist="${l.id}">Retirer</button>` : listingBuy(l, (id, cr) => `data-buy="${id}" data-cr="${cr}"`)}</div></div>`; }).join("");
@@ -354,7 +358,6 @@ async function buildingPage(g) {
   const isP = c.lk === "p"; const myKs = ST.mine.get(g) || []; const myN = ST.mineParts.get(g) || 0;
   const sold = bInfo.parts.reduce((a, x) => a + x[2], 0);
   const free = isP ? c.lots - sold : c.lots - owners.size;
-  const unitW = isP ? "part" : c.lk === "l" ? "logement" : "local";
   const listed = new Map(bInfo.listings.filter(l => l.k != null).map(l => [l.k, l]));
   const loan = ST.loan.get(g) || 0;
   // ce que je possède
@@ -410,29 +413,58 @@ async function buildingPage(g) {
   }
   const offers = bInfo.listings.filter(l => l.seller !== ME);
   const offersHTML = offers.length ? `<h2 class="h3">À vendre par des joueurs</h2><div class="rows">${offers.map(l => `<div class="lrow" style="grid-template-columns:1fr auto"><div class="t"><b>${l.k != null ? lotName(c, l.k) + (c.lk === "l" ? " · " + ord(floorOfLot(c, l.k)) + " étage" : "") : l.n + " part" + (l.n > 1 ? "s" : "")}</b><span>vendu par ${esc(l.pseudo)}</span></div><div class="v"><b class="num">${fmtE(l.price)}</b>${listingBuy(l, (id, cr) => `data-act="buyl" data-id="${id}" data-k="${cr}"`)}</div></div>`).join("")}</div>` : "";
+  // une seule vue de l'immeuble : le plan étage par étage (logements), ou la barre des parts (monuments)
+  const far = notLanded(g), myCount = isP ? myN : myKs.length, othersCount = isP ? Math.max(0, sold - myN) : Math.max(0, owners.size - myKs.length);
   let plan = "";
-  if (!isP) {
-    const groups = new Map(); for (let k = 0; k < c.lots; k++) { const f = floorOfLot(c, k); if (!groups.has(f)) groups.set(f, []); groups.get(f).push(k); }
-    plan = `<details class="plan" ${selLot !== null ? "open" : ""}><summary>Choisir un ${unitW} précis, étage par étage</summary>
-      <div class="floors">${[...groups.entries()].sort((a, b) => b[0] - a[0]).map(([f, ks]) => `<div class="floor"><span>${c.lk === "l" ? ord(f) : "RDC"}</span><div>${ks.map(k => { const o = owners.get(k); const cls = o ? (o.o === ME ? "mine" : "theirs") : ""; return `<button class="lot ${cls}${o?.m ? " mort" : ""}${listed.has(k) ? " sale" : ""}" data-k="${k}" data-pick="1" aria-pressed="${selLot === k}" aria-label="${lotName(c, k)}, ${o ? (o.o === ME ? "à vous" : "à " + esc(o.ps)) : "libre"}">${k + 1}</button>`; }).join("")}</div></div>`).join("")}</div>
-      <div class="legend-s"><span><i style="background:var(--soft);border:1.5px solid var(--line)"></i>Libre</span><span><i style="background:var(--mine)"></i>À vous</span><span><i style="background:#E2E8F0"></i>Autre joueur</span><span><i style="background:var(--sale)"></i>En vente</span></div></details>`;
-  } else {
+  if (!isP) plan = planHTML(c, owners, listed, myCount, othersCount, free);
+  else {
     const gd = bInfo.parts[0];
     plan = bInfo.parts.length ? `<h2 class="h3">Propriétaires</h2>${bInfo.parts.slice(0, 5).map(([u, ps, n], i) => `<div class="rank${u === ME ? " me" : ""}"><span class="n">${i + 1}</span><span>${esc(ps)}${i === 0 && gd[2] * 4 >= c.lots ? " · Gardien (+20 %)" : ""}</span><b class="num">${fmtN(n)} parts</b></div>`).join("")}` : "";
   }
   const ext = MONS?.[g]; const about = ext?.ext ? `<details class="plan"><summary>À propos</summary><div class="about">${esc(ext.ext)}</div></details>` : "";
-  const status = free > 0 ? `<span class="st ok">${isP ? fmtN(free) + " parts libres" : free + " libre" + (free > 1 ? "s" : "") + " sur " + c.lots}</span>` : `<span class="st">Tout est pris</span>`;
+  const acts = buyActions(c, g, owners, free, isP, far);
+  const actbar = acts ? `<div class="actbar2 lbx" id="actbar"><div class="lb">${acts}</div></div>` : "";
   return `${dhead("")}<div class="wrap bp">
     <div class="bp-card">${cardHTML(c, { item: myKs.length || myN ? { t: "own", ks: myKs, n: myN } : null })}${goodPhoto(c) && c.cr ? `<small class="credit2">${esc(c.cr)}</small>` : ""}</div>
     <div class="bp-info">
       <h1 class="h1">${esc(title(c))}</h1>
       <p class="sub">${esc(kindLabel(c))} · ${ord(c.arr)} arr.${c.y ? ` · vers ${esc(c.y)}` : ""} · <button class="lnk" data-mapto="${g}">voir sur la carte</button></p>
-      ${occHTML(c, isP ? myN : myKs.length, isP ? Math.max(0, sold - myN) : Math.max(0, owners.size - myKs.length), free)}
-      <div class="actbar2 lbx" id="actbar"><div class="lb">${buyActions(c, g, owners, free, isP)}</div></div>
-      ${mine}${offersHTML}${plan}${about}
+      ${isP ? occHTML(c, myCount, othersCount, free) : ""}
+      ${far ? mine + actbar : actbar + mine}${offersHTML}${plan}${about}
       ${ST.admin ? adminGiftBox(c, g, free) : ""}
     </div>
   </div>`;
+}
+// le plan de l'immeuble, étage par étage : une case par logement, les nombres dans la légende ;
+// toucher une case affiche ce logement juste en dessous (à qui il est, ce qu'on peut en faire)
+function planHTML(c, owners, listed, myN, othersN, free) {
+  const w1 = lotWord(c, 1), small = c.lots > 48;
+  const leg = [myN && `<span><i class="me"></i>${myN} à vous</span>`, othersN && `<span><i class="th"></i>${othersN} à d'autres joueurs</span>`,
+    free && `<span><i class="fr"></i>${free} libre${free > 1 ? "s" : ""}</span>`, listed.size && `<span><i class="sa"></i>${listed.size} en vente</span>`].filter(Boolean).join("");
+  let grid = "";
+  if (c.lots > 1) {
+    const groups = new Map(); for (let k = 0; k < c.lots; k++) { const f = floorOfLot(c, k); if (!groups.has(f)) groups.set(f, []); groups.get(f).push(k); }
+    grid = `<div class="floors${small ? " small" : ""}">${[...groups.entries()].sort((a, b) => b[0] - a[0]).map(([f, ks]) => `<div class="floor"><span>${c.lk === "l" ? ord(f) : "RDC"}</span><div>${ks.map(k => { const o = owners.get(k); const cls = o ? (o.o === ME ? "mine" : "theirs") : ""; return `<button class="lot ${cls}${o?.m ? " mort" : ""}${listed.has(k) ? " sale" : ""}" data-k="${k}" data-pick="1" aria-pressed="${selLot === k}" aria-label="${lotName(c, k)}, ${o ? (o.o === ME ? "à vous" : "à " + esc(o.ps)) : "libre"}">${small ? "" : k + 1}</button>`; }).join("")}</div></div>`).join("")}</div>`;
+  }
+  const hints = othersN && selLot === null ? [`Touchez le ${w1} d'un autre joueur pour lui proposer de le racheter.`] : [];
+  const panel = selLot !== null ? lotPanel(c, owners, notLanded(sel)) : "";
+  if (!grid && !panel) return "";
+  return `<section class="bplan"><div class="bph"><b>${c.lots > 1 ? `Immeuble de ${c.lots} ${lotWord(c, c.lots)}` : `1 seul ${w1}`}</b>${leg ? `<div class="bleg">${leg}</div>` : ""}</div>
+    ${grid}${hints.map(h => `<p class="bhint">${h}</p>`).join("")}${panel}</section>`;
+}
+// le logement touché sur le plan
+function lotPanel(c, owners, far) {
+  const k = selLot, o = owners.get(k), l = bInfo.listings.find(x => x.k === k);
+  const where = `${lotName(c, k)}${c.lk === "l" ? " · " + ord(floorOfLot(c, k)) + " étage" : ""}`;
+  const who = o ? (o.o === ME ? "À vous" : "À " + esc(o.ps)) : "Libre";
+  let body;
+  if (!o && far) body = "";
+  else if (!o) { const [cr, tg] = payToggle(c.v, c.rent), need = cr ? Math.ceil(c.v * downRate()) : c.v;
+    body = tg + `<button class="btn block buy" data-act="bank" data-k="${k}" ${liveCash() < need ? "disabled" : ""}><span>Acheter celui-ci · ${cr ? "apport " : ""}${fmtE(need)}</span>${buySub(cr, c.v)}</button>${payWhy(c.v)}`; }
+  else if (o.o === ME) body = l ? `<p class="bhint">En vente au Marché à ${fmtE(l.price)}.</p>` : o.m ? `<p class="bhint">Hypothéqué.</p>` : "";
+  else body = l ? `<p class="bhint">En vente par ${esc(l.pseudo)} : ${fmtE(l.price)}</p>${listingBuy(l, (id, cr) => `data-act="buyl" data-id="${id}" data-k="${cr}"`)}`
+    : `<p class="bhint">${esc(o.ps)} ne le vend pas, mais vous pouvez lui faire une offre.</p>${offerForm(c, k, o)}`;
+  return `<div class="lotp lbx" id="lotbar"><div class="lotph"><b>${where}</b><span class="pill${o ? (o.o === ME ? " me" : "") : " fr"}">${who}</span><button class="x" data-act="unpick" aria-label="Fermer">×</button></div>${body ? `<div class="lb">${body}</div>` : ""}</div>`;
 }
 // ---------------- ADMIN : liens cadeaux (le premier qui ouvre le lien gagne) ----------------
 let adminN = 1, adminLink = null;
@@ -511,33 +543,27 @@ async function adminAct(a, btn, g) {   // actions admin, sur la fiche ou la page
   } catch (e) { toast(e.message, "bad"); }
   renderDetail(false);
 }
-function farHTML(d, g) { return `<div class="buyfar"><b>🎲 Pour l'acheter à la banque, tombez dessus avec le dé.</b><span class="muted">Ou trouvez-le dans un booster, ou au Marché si un joueur le vend.</span></div>`; }
 function payToggle(price, rent) {
-  const cap = ST.state?.loan_cap ?? 1e12, cash = liveCash(), down = Math.ceil(price * downRate()), can = price - down <= cap && cash >= down;
-  const cr = can && (bCredit === null ? true : bCredit);
-  return [cr, `<div class="pay" role="tablist"><button data-act="paymode" data-k="1" aria-selected="${cr}" ${can ? "" : "disabled"}><b>À crédit</b><small>${fmtE(down)} · <em>+${fmtE(Math.round(rent * .3))}/j</em></small></button><button data-act="paymode" data-k="0" aria-selected="${!cr}"><b>Comptant</b><small>${fmtE(price)} · <em>+${fmtE(rent)}/j</em></small></button></div>`];
+  const cash = liveCash(), down = Math.ceil(price * downRate()), can = !creditWhy(price), cashOK = cash >= price;
+  const cr = can && (bCredit === null ? true : bCredit || !cashOK);
+  return [cr, `<div class="pay" role="tablist"><button data-act="paymode" data-k="1" aria-selected="${cr}" ${can ? "" : "disabled"}><b>À crédit</b><small><span>apport ${fmtE(down)}</span> <em>+${fmtE(Math.round(rent * .3))}/j</em></small></button><button data-act="paymode" data-k="0" aria-selected="${!cr}" ${cashOK || !can ? "" : "disabled"}><b>Comptant</b><small><span>${fmtE(price)}</span> ${cashOK ? `<em>+${fmtE(rent)}/j</em>` : "<span>pas assez</span>"}</small></button></div>`];
 }
-const buySub = cr => `<small>${cr ? "La banque prête le reste, remboursé tout seul par le loyer" : "Tout le loyer est pour vous, et le bien peut être revendu"}</small>`;
-function buyActions(c, g, owners, free, isP) {
-  const cash = liveCash(), far = notLanded(g);
-  if (selLot !== null && !isP) {
-    const k = selLot, o = owners.get(k), l = bInfo.listings.find(x => x.k === k);
-    const head = `<div class="what"><b>${lotName(c, k)}${c.lk === "l" ? " · " + ord(floorOfLot(c, k)) + " étage" : ""}</b><span class="num">${o ? (o.o === ME ? "À vous" : "À " + esc(o.ps)) : "Libre"}</span></div>`;
-    let btn;
-    if (!o && far) btn = farHTML(far, g);
-    else if (!o) { const [cr, tg] = payToggle(c.v, c.rent); btn = tg + `<button class="btn block buy" data-act="bank" data-k="${k}" ${cash < (cr ? Math.ceil(c.v * downRate()) : c.v) ? "disabled" : ""}><span>Acheter · ${fmtE(cr ? Math.ceil(c.v * downRate()) : c.v)}</span>${buySub(cr)}</button>`; }
-    else if (o.o === ME) btn = `<div class="sub" style="margin:0">Il est à vous.</div>`;
-    else btn = l ? `<div class="sub" style="margin:0 0 6px">En vente par ${esc(l.pseudo)} : ${fmtE(l.price)}</div>${listingBuy(l, (id, cr) => `data-act="buyl" data-id="${id}" data-k="${cr}"`)}` : `<div class="sub" style="margin:0">Appartient à ${esc(o.ps)}, pas en vente.</div>${offerForm(c, k, o)}`;
-    return head + btn + `<button class="btn sm ghost" data-act="unpick">Annuler</button>`;
-  }
+const buySub = (cr, price) => `<small>${cr ? `À crédit : la banque prête ${fmtE(price - Math.ceil(price * downRate()))}, remboursé tout seul par le loyer` : "Comptant : tout le loyer est pour vous, et le bien peut être revendu"}</small>`;
+// sous le bouton d'achat : pourquoi le crédit n'est pas possible, et s'il ne reste rien de possible, combien il manque
+function payWhy(price) {
+  const why = creditWhy(price), cash = liveCash();
+  return why ? `<small class="why">${why}${cash < price ? ` Comptant, il faut <span class="nw">${fmtE(price)}</span> et vous avez <span class="nw">${fmtE(cash)}</span>.` : ""}</small>` : "";
+}
+function buyActions(c, g, owners, free, isP, far) {
+  const cash = liveCash();
   const canOffer = !isP && [...owners.values()].some(o => o.o !== ME);
   const offerLink = canOffer ? `<button class="btn block light" data-act="ofpick">🤝 Faire une offre à un propriétaire</button>` : "";
   if (free <= 0) return `<div class="what"><span>Tout est pris. ${canOffer ? "Proposez à un propriétaire de lui racheter son logement :" : "Surveillez le Marché : les propriétaires peuvent mettre leurs biens en vente."}</span></div>${offerLink}`;
-  if (far) return farHTML(far, g);
+  if (far) return "";   // on n'achète à la banque que sur sa case
   const total = c.v * c.lots, allFree = !isP && owners.size === 0 && c.lots > 1, [cr, tg] = payToggle(c.v, c.rent), need = p => cr ? Math.ceil(p * downRate()) : p;
-  return tg + `<button class="btn block buy" data-act="bank" ${cash < need(c.v) ? "disabled" : ""}><span>${isP ? "Acheter 1 part" : `Acheter 1 ${c.lk === "l" ? "logement" : "local"}`} · ${fmtE(need(c.v))}</span>${buySub(cr)}</button>
-    ${allFree && cash >= need(total) && (!cr || total - need(total) <= (ST.state?.loan_cap ?? 1e12)) ? `<button class="btn block light" data-act="bbuild">Tout l'immeuble · ${fmtE(need(total))} <small class="muted">(+60 % de loyer)</small></button>` : ""}
-    ${!cr && cash < c.v ? `<small class="muted">Il vous manque ${fmtE(c.v - cash)}.</small>` : ""}${offerLink}`;
+  return tg + `<button class="btn block buy" data-act="bank" ${cash < need(c.v) ? "disabled" : ""}><span>${isP ? "Acheter 1 part" : `Acheter 1 ${c.lk === "l" ? "logement" : "local"}`} · ${cr ? "apport " : ""}${fmtE(need(c.v))}</span>${buySub(cr, c.v)}</button>
+    ${allFree && cash >= need(total) && (!cr || total - need(total) <= (ST.state?.loan_cap ?? 1e12)) ? `<button class="btn block light" data-act="bbuild">Tout l'immeuble · ${cr ? "apport " : ""}${fmtE(need(total))} <small class="muted">(+60 % de loyer)</small></button>` : ""}
+    ${payWhy(c.v)}${offerLink}`;
 }
 function offerForm(c, k, o) {
   const min = Math.ceil(c.v * .8), price = ofPrice || Math.round(c.v * 1.1 / 1000) * 1000, hold = ofCredit ? Math.ceil(price * downRate()) : price;
@@ -557,7 +583,7 @@ $("#p-detail").addEventListener("click", async e => {
   if (top.kind === "shop") { const o = e.target.closest("[data-offer]"); if (o) toast("Le paiement arrive bientôt : la boutique sera ouverte au lancement.", ""); return; }
   if (top.kind !== "b") return;
   const g = top.arg; const c = card(g);
-  const pick = e.target.closest("[data-pick]"); if (pick) { selLot = +pick.dataset.k; saleMode = false; return renderDetail(false); }
+  const pick = e.target.closest("[data-pick]"); if (pick) { const k = +pick.dataset.k; selLot = selLot === k ? null : k; saleMode = false; await renderDetail(false); $("#lotbar")?.scrollIntoView({ behavior: "smooth", block: "nearest" }); return; }
   const btn = e.target.closest("[data-act]"); if (!btn) return; const a = btn.dataset.act;
   const k = btn.dataset.k != null ? +btn.dataset.k : null; const id = +btn.dataset.id;
   if (a === "osopen") { ownSheet = btn.dataset.k; ownN = 1; ownPrice = 0; return renderDetail(false); }
@@ -592,7 +618,7 @@ $("#p-detail").addEventListener("click", async e => {
     return renderDetail(false); }
   btn.disabled = true;
   const before = (ST.mine.get(g) || []).length + (ST.mineParts.get(g) || 0);
-  const credit = btn.closest("#actbar")?.querySelector('.pay [aria-selected="true"]')?.dataset.k === "1";
+  const credit = btn.closest(".lbx")?.querySelector('.pay [aria-selected="true"]')?.dataset.k === "1";
   if (a === "bank") { if (await act("bank_buy", Object.assign({ p_card: g, p_k: c.lk === "p" ? null : k }, credit ? { p_credit: true } : {}), null)) { celebrate(c); selLot = null; } }
   if (a === "bbuild") { if (await act("buy_building", Object.assign({ p_card: g }, credit ? { p_credit: true } : {}), null)) toast(`Tout l'immeuble est à vous ! Loyers +60 %`, "good"); }
   if (a === "repay") await act("repay", { p_card: g }, "Crédit remboursé : tout le loyer est à vous !");

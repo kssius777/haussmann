@@ -29,7 +29,7 @@ async function landingHTML() {
     : `<div class="lcta"><button class="btn block goldb" data-l="guest">Jouer tout de suite</button><button class="btn block ghostw" data-l="email">Créer un compte avec un e-mail</button></div>`;
   return `<div class="landing v2">
     <div class="lhero2"><div class="glow"></div>
-      <header class="lhead"><span class="plaque-mini" data-sub="Paris">PROPRIO</span><button class="btn sm ghostw" data-l="signin">Se connecter</button></header>
+      <header class="lhead"><span class="lbrand"><img class="bico" src="/icons/logo.svg" alt="" width="40" height="40"><span class="plaque-mini" data-sub="7ᵉ Arrᵗ">PROPRIO</span></span><button class="btn sm ghostw" data-l="signin">Se connecter</button></header>
       <div class="ltop"><section class="lhero">
         ${giftB}<p class="eyebrow">Jeu gratuit · ordinateur et mobile</p>
         <h1>Tout Paris<br>est à prendre.</h1>

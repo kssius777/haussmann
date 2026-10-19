@@ -1787,3 +1787,66 @@ body.legon #score{display:none}
 /* case : immeuble entièrement libre, juste les cases vides */
 .occ.mini{padding:8px 10px;display:flex;justify-content:center}
 .occ.mini .oc{justify-content:center}
+/* bouton Google : toujours blanc, texte noir (une règle générale des boutons le passait en noir sur noir) */
+.btn.gbtn{background:#fff!important;color:#0B0C10!important;border:1.5px solid #E5E7EB!important}
+.btn.gbtn:hover{background:#F3F4F6!important}
+/* logo Proprio : l'immeuble haussmannien + la plaque « 7ᵉ Arrᵗ · PROPRIO » (l'arrondissement préféré du propriétaire) */
+.brand{display:inline-flex;align-items:center;gap:8px}
+.bico{display:block;flex:none;width:36px;height:36px;border-radius:9px;box-shadow:0 2px 6px rgba(15,23,42,.18)}
+.bico.big{width:84px;height:84px;border-radius:20px;margin:0 auto 14px}
+.lbrand{display:inline-flex;align-items:center;gap:9px}.lbrand .bico{width:40px;height:40px;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.4)}
+@media (max-width:360px){.bico{width:30px;height:30px;border-radius:8px}}
+#loading{flex-direction:column}
+/* ---------- fiche immeuble : une seule vue de l'immeuble (le plan), le logement touché juste en dessous ---------- */
+.bplan{margin-top:14px;padding:14px;border-radius:16px;background:#fff;border:1px solid var(--line)}
+.bph{display:grid;gap:6px}
+.bph>b{font-size:15.5px;font-weight:800}
+.bleg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;font-weight:700;color:var(--ink2)}
+.bleg i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.bleg i.me{background:var(--mine)}
+.bleg i.th{background:#E2E8F0;border:1px solid #CBD5E1}
+.bleg i.fr{background:var(--soft);border:1.5px solid #C9CDD4}
+.bleg i.sa{background:var(--sale)}
+.bplan .floors{box-shadow:none;background:none;padding:12px 0 0;border-radius:0}
+.floors.small{gap:4px}
+.floors.small .floor{grid-template-columns:34px 1fr;gap:6px}
+.floors.small .floor>span{font-size:10.5px}
+.floors.small .floor>div{gap:3px}
+.floors.small .lot{min-width:0;width:15px;height:15px;padding:0;border-radius:4px;border-width:1px}
+.floors.small .lot.sale{box-shadow:inset 0 -3px 0 var(--sale)}
+.floors.small .lot[aria-pressed="true"]{outline-width:2px}
+.bhint{margin:10px 0 0;font-size:13px;line-height:1.4;color:var(--muted)}
+.lotp{margin-top:12px;padding:12px;border-radius:14px;background:var(--soft);border:1px solid var(--line)}
+.lotph{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.lotph b{font-size:15px;flex:0 1 auto}
+.lotph .pill.fr{background:#DCFCE7;color:#15803D}
+.lotph .pill.me{background:var(--mine);color:#fff}
+.lotph .x{margin-left:auto;flex:0 0 30px;width:30px;height:30px;border-radius:50%;background:#fff;border:1px solid var(--line);font-size:17px;line-height:28px;cursor:pointer}
+.lotp .bhint{margin:0}
+.lotp .lbuy{justify-items:start}
+.lotp .ofr{margin-top:4px}
+.bp-info .mine-box+.actbar2,.bp-info .actbar2+.mine-box{margin-top:12px}
+.bp-info>.actbar2{margin-top:12px}
+/* pourquoi on ne peut pas acheter : écrit sous le bouton */
+.why,.lwhy{display:block;font-size:12.5px;line-height:1.35;font-weight:600;color:#9A3412}
+.why{text-align:center}
+.lwhy{max-width:250px;text-align:right;font-size:11.5px;margin-top:2px}
+.lotp .lwhy{text-align:left;max-width:none}
+/* un bouton impossible est vraiment grisé (avant, les couleurs ci-dessus le laissaient bleu ou noir) */
+.btn:disabled{background:#E5E7EB!important;color:#9CA3AF!important;border-color:#E5E7EB!important;box-shadow:none!important;filter:none!important;cursor:not-allowed}
+.btn:disabled small,.btn:disabled em{color:#9CA3AF!important}
+/* plus de téléportation : une place vide garde le dé au milieu */
+.dside.dspace{visibility:hidden;pointer-events:none;box-shadow:none;background:none}
+/* plan : les logements des autres joueurs en rose, comme leurs immeubles sur la carte */
+.lot.theirs{background:#FCEDE9;border-color:#F4B4A5;color:#B4533F}
+.bleg i.th{background:#FCEDE9;border:1px solid #F4B4A5}
+/* Marché sur téléphone : le nom en entier, le prix et les boutons sur une ligne à part */
+@media (max-width:620px){
+  .lrow.mk{grid-template-columns:56px minmax(0,1fr);row-gap:10px}
+  .lrow.mk .th{width:56px;height:56px}
+  .lrow.mk .v{grid-column:1/-1;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;text-align:left;white-space:normal;padding-top:10px;border-top:1px solid var(--line)}
+  .lrow.mk .v>b{font-size:18px;padding-top:6px}
+  .lrow.mk .lwhy{max-width:230px}
+}
+.nw,.lbx .pay small em,.lbx .pay small span{white-space:nowrap}
+.lotph:last-child{margin-bottom:0}

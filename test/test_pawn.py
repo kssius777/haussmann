@@ -13,7 +13,7 @@ def roll_go(u, q=None, pick=None):
 A, B = uuid.uuid4(), uuid.uuid4()
 for u in (A, B): db.sql("insert into auth.users(id) values (%s)", str(u))
 s = db.rpc(A, "join_game", p_pseudo="Pion" + str(A)[:4], p_party=None); db.rpc(B, "join_game", p_pseudo="Rival" + str(B)[:4], p_party="poing")
-p = s["profile"]; check("nouveau joueur : pion posé devant Notre-Dame, 10 lancers, 3 téléportations", p["pos"] == 400761 and p["rolls"] == 10 and p["tp"] == 3, (p["pos"], p["rolls"], p["tp"]))
+p = s["profile"]; check("nouveau joueur : pion posé devant Notre-Dame, 10 lancers", p["pos"] == 400761 and p["rolls"] == 10, (p["pos"], p["rolls"]))
 far = db.sql("select id from cards where lk='l' and id not in (select card from lots) and _dist(400761, id) > 2000 limit 1")[0][0]
 check("avant de lancer : pas d'achat à la banque", "tomber dessus" in (err(lambda: db.rpc(A, "bank_buy", p_card=far, p_k=None)) or ""))
 t = time.time(); r0 = db.rpc(A, "roll"); dt = time.time() - t
@@ -35,10 +35,12 @@ if L["free"] > 0:
 check("achat ailleurs refusé", "tomber dessus" in (err(lambda: db.rpc(A, "bank_buy", p_card=far, p_k=None)) or ""))
 # loyer de passage : B possède l'immeuble d'arrivée → on force l'arrivée en mettant tout autour à B
 db.sql("update profiles set pos=400761, heading=0 where id=%s", str(A))
-def land_on_b():
-    for _ in range(12):
-        x = roll_go(A); t2 = x["landing"]["card"]
-        if not db.sql("select 1 from lots where card=%s and owner=%s", t2, str(A)): return x
+def land_on_b():   # on repart de Notre-Dame et on choisit une destination qui appartient à B (pas une case Chance)
+    ownB = lambda g: bool(db.sql("select 1 from lots where card=%s and owner=%s", g, str(B))) and not db.sql("select _is_chance(%s)", g)[0][0]
+    for _ in range(20):
+        db.sql("update profiles set pos=400761, rolls=10 where id=%s", str(A))
+        x = roll_go(A, pick=lambda opts: next((o for o in opts if ownB(o["card"])), opts[0])); t2 = x["landing"]["card"]
+        if ownB(t2): return x
     return None
 # donne à B tous les immeubles proches pour être sûr de payer
 near = [g for (g,) in db.sql("select id from cards where lk<>'p' and _dist(400761, id) < 600 and id not in (select card from lots where owner=%s)", str(A))]
@@ -50,11 +52,9 @@ check("tomber chez un autre joueur : on lui paie son loyer", x and x["landing"][
 check("loyer plafonné à 20 % de la trésorerie", x and x["landing"]["toll"] <= 0.2 * 1e8 + 1e6)
 # chez soi : bonus
 mine_card = db.sql("select card from lots where owner=%s limit 1", str(A))
-if mine_card:
-    db.rpc(A, "teleport", p_card=mine_card[0][0]); st = db.rpc(A, "state")["profile"]
-    check("téléportation sur son bien : on peut y acheter", st["pos"] == st["land"] == mine_card[0][0] and st["tp"] == 2)
-check("téléportation refusée vers un bien qui n'est pas à soi", "ses biens" in (err(lambda: db.rpc(A, "teleport", p_card=far)) or ""))
-db.sql("update profiles set tp=0 where id=%s", str(A)); check("3 téléportations par jour", "Plus de téléportation" in (err(lambda: db.rpc(A, "teleport", p_card=far)) or ""))
+pos0 = db.rpc(A, "state")["profile"]["pos"]
+check("téléportation retirée du jeu : refusée, le pion ne bouge pas", "retirée" in (err(lambda: db.rpc(A, "teleport", p_card=mine_card[0][0] if mine_card else far)) or "") and db.rpc(A, "state")["profile"]["pos"] == pos0)
+check("téléportation : plus aucun joueur ne peut l'appeler", not db.sql("select has_function_privilege('authenticated', 'teleport(int)', 'execute') or has_function_privilege('anon', 'teleport(int)', 'execute')")[0][0])
 db.sql("update profiles set rolls=0, rolls_at=now() where id=%s", str(A))
 check("plus de lancers : message avec le délai", "prochain arrive" in (err(lambda: db.rpc(A, "roll")) or ""))
 db.sql("update profiles set rolls_at=now() - interval '75 minutes' where id=%s", str(A))
