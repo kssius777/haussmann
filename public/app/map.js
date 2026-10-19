@@ -100,7 +100,7 @@ function updateArrFill() {
 function applyMode() {
   if (!mapReady) return; const e = colorExprs(mode);
   for (let i = 0; i < 20; i++) { if (map.getLayer("rf" + i)) map.setPaintProperty("rf" + i, "fill-extrusion-color", e.roof); if (map.getLayer("bd" + i)) map.setPaintProperty("bd" + i, "fill-extrusion-color", e.body); }
-  map.setPaintProperty("arrfill", "fill-opacity", mode === "all" ? ["interpolate", ["linear"], ["zoom"], 11, .62, 12.6, .5, 13.6, .18, 14.4, .04, 15, 0] : ["interpolate", ["linear"], ["zoom"], 11, .18, 14, 0]);
+  map.setPaintProperty("arrfill", "fill-opacity", mode === "all" ? ["interpolate", ["linear"], ["zoom"], 11, .62, 12.6, .45, 13.2, .12, 13.8, 0] : ["interpolate", ["linear"], ["zoom"], 11, .18, 14, 0]);
   renderTags(); renderMarks();
 }
 
@@ -119,7 +119,7 @@ function buildMap(base) {
       sources: { water: { type: "geojson", data: polysGeo(base.water) }, parks: { type: "geojson", data: polysGeo(base.parks) }, major: { type: "geojson", data: linesGeo(base.major) }, arr: { type: "geojson", data: outline }, mfill: { type: "geojson", data: mfill } },
       layers: [
         { id: "bg", type: "background", paint: { "background-color": GROUND.bg } },
-        { id: "arrfill", type: "fill", source: "arr", paint: { "fill-color": partyFill(), "fill-opacity": ["interpolate", ["linear"], ["zoom"], 11, .62, 12.6, .5, 13.6, .18, 14.4, .04, 15, 0] } },
+        { id: "arrfill", type: "fill", source: "arr", paint: { "fill-color": partyFill(), "fill-opacity": ["interpolate", ["linear"], ["zoom"], 11, .62, 12.6, .45, 13.2, .12, 13.8, 0] } },
         { id: "parks", type: "fill", source: "parks", paint: { "fill-color": GROUND.parks, "fill-opacity": 1 } },
         { id: "water", type: "fill", source: "water", paint: { "fill-color": GROUND.water } },
         { id: "major-case", type: "line", source: "major", paint: { "line-color": GROUND.majorCase, "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "k"], 3, 1.6, .6], 18, ["match", ["get", "k"], 3, 34, 20]] } },
@@ -190,6 +190,7 @@ function buildMonMarkers() {
 function renderPartyLegend(z) {
   let el = $("#partyleg"); if (!el) { el = document.createElement("div"); el.id = "partyleg"; el.onclick = () => { go("paris"); setTimeout(() => push("results"), 30); }; $("#p-map").appendChild(el); }
   const show = z < 13.4 && mode === "all" && !document.body.classList.contains("mymode") && !document.body.classList.contains("picking");
+  document.body.classList.toggle("legon", show);
   el.hidden = !show; if (!show) return;
   const n = {}; ST.mayors.forEach(m => m && PARTIES[m.party] && (n[m.party] = (n[m.party] || 0) + 1));
   const free = 20 - Object.values(n).reduce((a, b) => a + b, 0);
@@ -203,14 +204,15 @@ function renderMarks() {
   IDX.arr.forEach((a, i) => {
     const el = a.marker?.getElement(); if (!el) return; el.style.display = z < 14 && mode === "all" ? "" : "none";
     const m = ST.mayors[i]; el.style.setProperty("--pc", m ? PARTIES[m.party]?.c || "#64748B" : "#94A3B8");
-    const s = document.getElementById("am" + i); if (s) s.innerHTML = stripByArr ? (stripByArr[i] ? `${stripByArr[i]} bien${stripByArr[i] > 1 ? "s" : ""}` : "") : m ? `${emblemSVG(m.party, 15)}${esc(m.pseudo)}` : "Siège libre";
+    const s = document.getElementById("am" + i); if (s) s.innerHTML = stripByArr ? (stripByArr[i] ? `${stripByArr[i]} bien${stripByArr[i] > 1 ? "s" : ""}` : "") : "";   // le nom du maire : en touchant l'arrondissement (moins chargé)
     el.classList.toggle("has", !!(stripByArr && stripByArr[i])); el.classList.toggle("none", !!(stripByArr && !stripByArr[i]));
     const bb = el.querySelector("b"), key = (m?.party || "") + a.n; if (bb && bb.dataset.k !== key) { bb.dataset.k = key; bb.innerHTML = (m && PARTIES[m.party] ? emblemSVG(m.party, 16) : "") + ord(a.n); }
   });
   renderPartyLegend(z);
-  for (const p of parkMarks) { const show = z >= p.minz && z < 17.5; if (show && !p.on) { p.mk.addTo(map); p.on = true; } else if (!show && p.on) { p.mk.remove(); p.on = false; } }
+  // noms des quartiers et des parcs : un peu plus tard qu'avant (carte moins chargée)
+  for (const p of parkMarks) { const show = z >= p.minz + (p.minz < 12.6 ? 0 : .6) && z < 17.5; if (show && !p.on) { p.mk.addTo(map); p.on = true; } else if (!show && p.on) { p.mk.remove(); p.on = false; } }
   for (const m of monMarks) {
-    const show = z >= (m.r === "M" ? (innerWidth < 700 ? 13.3 : 11.4) : 14); m.el.classList.toggle("far", z < (m.r === "M" ? (innerWidth < 700 ? 14.5 : 13.8) : 15.5)); if (show && !m.on) { m.mk.addTo(map); m.on = true; } else if (!show && m.on) { m.mk.remove(); m.on = false; }
+    const show = z >= (m.r === "M" ? (innerWidth < 700 ? 13.8 : 13.4) : 14.4); m.el.classList.toggle("far", z < (m.r === "M" ? (innerWidth < 700 ? 14.8 : 14.4) : 15.5)); if (show && !m.on) { m.mk.addTo(map); m.on = true; } else if (!show && m.on) { m.mk.remove(); m.on = false; }
     if (show && !m.ph) { const c = card(m.g); if (c) { m.ph = true; if (c.ph) m.el.querySelector("i").setAttribute("style", phStyle(c)); } }
   }
 }

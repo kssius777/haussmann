@@ -1781,3 +1781,9 @@ html.dbtest body::after{content:"SITE DE TEST · base de test";position:fixed;le
 body.night .plabel{color:#BFE3B4;text-shadow:0 1px 0 #0E1420,0 -1px 0 #0E1420,1px 0 0 #0E1420,-1px 0 0 #0E1420,0 0 6px #0E1420}
 body.night .plabel.w{color:#8EC5FF!important;text-shadow:0 0 3px #0E1420,0 0 6px #0E1420}
 body.night .plabel.q{color:#AAB4C8!important;text-shadow:0 0 3px #0E1420,0 0 6px #0E1420}
+/* carte plus légère : pas de pastille vide sous le numéro d'arrondissement, pas de bandeau en double avec la légende */
+.amark span:empty{display:none}
+body.legon #score{display:none}
+/* case : immeuble entièrement libre, juste les cases vides */
+.occ.mini{padding:8px 10px;display:flex;justify-content:center}
+.occ.mini .oc{justify-content:center}
