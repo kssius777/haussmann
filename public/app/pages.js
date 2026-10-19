@@ -12,7 +12,7 @@ const cur = () => stack.length ? "detail" : tab;
 
 function go(t) {
   stack.length = 0; $("#p-detail").hidden = true;
-  tab = t;
+  tab = t; if (t === "assets") assetMort = false; if (t === "market") marketSell = false;
   for (const x of TABS) { const el = $("#p-" + x); const on = x === t; if (on && el.hidden) { el.hidden = false; el.classList.remove("enter"); void el.offsetWidth; el.classList.add("enter"); } else el.hidden = !on; }
   $$("#tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === t));
   setMapFull();
@@ -75,7 +75,21 @@ function renderWallet() {
 }
 
 // ---------------- PATRIMOINE ----------------
-let assetF = "all", assetArr = 0, assetSort = "v", assetN = innerWidth < 700 ? 18 : 30, distAll = false;
+let assetF = "all", assetArr = 0, assetSort = "v", assetN = innerWidth < 700 ? 18 : 30, distAll = false, assetMort = false, mortAll = false;   // assetMort : la liste « Hypothéquer un bien » à la place du Patrimoine
+// ce qu'on peut hypothéquer : les biens sans crédit, logements pas encore hypothéqués ; la banque verse la moitié de la valeur (comme mortgage() en SQL)
+function mortables() {
+  return holdings().filter(h => !ST.loan.has(h.g)).map(h => {
+    const isP = h.c.lk === "p", units = isP ? (ST.mort.has(h.g + ":-1") ? 0 : h.n) : h.ks.filter(k => !ST.mort.has(h.g + ":" + k)).length;
+    return { h, units, gain: isP ? Math.floor(h.c.v * units * .5) : Math.floor(h.c.v * .5) * units, rent: Math.round(h.c.rent * units) };
+  }).filter(x => x.units > 0);
+}
+function mortList() {   // un toucher ouvre la fiche, formulaire d'hypothèque déjà ouvert ; les plus grosses sommes d'abord
+  const xs = mortables().sort((a, b) => b.gain - a.gain);
+  if (!xs.length) return `<div class="empty">Rien à hypothéquer : les biens achetés à crédit ne peuvent pas l'être.</div>`;
+  const shown = mortAll ? xs : xs.slice(0, 12);
+  return `<div class="rows">${shown.map(({ h, units, gain, rent }) => `<button class="lrow" data-mortg="${h.g}"><div class="th">${photo(h.c)}</div><div class="t"><b>${esc(title(h.c))}</b><span>${units} ${h.c.lk === "p" ? "part" : h.c.lk === "l" ? "logement" : "local"}${units > 1 ? "s" : ""}</span><span style="color:#B91C1C">−${fmtE(rent)}/j de loyer</span></div><div class="v"><b class="num green">+${fmtE(gain)}</b><span class="btn sm light">Hypothéquer</span></div></button>`).join("")}</div>
+    ${xs.length > shown.length ? `<button class="btn light gmore" data-mortall>Voir les ${xs.length} biens</button>` : ""}`;
+}
 function worthNow() { const s = ST.state; return liveCash() + (+s.value || 0) - (+s.debt || 0) - (+s.loans || 0); }
 function logWorth() {
   try { const d = new Date().toISOString().slice(0, 10); const h = JSON.parse(localStorage.getItem("hm_hist") || "{}"); h[d] = Math.round(worthNow());
@@ -94,6 +108,7 @@ async function renderAssets() {
 }
 async function renderAssets0() {
   const s = ST.state; if (!s?.profile) return;
+  if (assetMort) { $("#p-assets").innerHTML = `<div class="wrap"><button class="mback" data-amort="0">${ICON.back}Patrimoine</button><h1 class="h1">Hypothéquer un bien</h1><p class="sub" style="margin:0 0 12px">Touchez le bien à hypothéquer.</p>${mortList()}</div>`; return; }
   const val = h => h.c.v * unitsOf(h);
   const hs = holdings();
   const counts = { C: 0, U: 0, R: 0, L: 0, M: 0 }; for (const h of hs) counts[h.c.r]++;
@@ -113,13 +128,12 @@ async function renderAssets0() {
   const nLots = hs.reduce((a, h) => a + h.ks.length, 0);
   const rank = ST.board ? ST.board.findIndex(x => x.id === ME) + 1 : 0;
   const loans = +s.loans || 0, debt = +s.debt || 0;
-  const debtHTML = (loans || debt) ? (() => { const v = +s.value || 0, ratio = v ? Math.round((loans + debt) / v * 100) : 0, cap = Math.max(0, +s.loan_cap || 0), pct = loans + cap ? Math.round(loans / (loans + cap) * 100) : 0;
-    const lvl = pct < 60 ? "" : pct < 90 ? "mid" : "hi";
-    return `<div class="debt2">
-      <div class="d2h"><span>Endettement <b>${ratio} %</b> <em class="${ratio < 50 ? "ok" : ratio < 80 ? "mid" : "hi"}">${ratio < 50 ? "sain" : ratio < 80 ? "élevé" : "très élevé"}</em></span><small class="muted">vos dettes ÷ la valeur de vos biens</small></div>
-      <div class="d2h"><span>Plafond d'emprunt <b>${pct} %</b> utilisé</span><span>Encore empruntable : <b>${fmtE(cap)}</b></span></div>
-      <div class="dbar ${lvl}"><i style="width:${pct}%"></i></div>
-      <small class="muted">${pct >= 90 ? "Votre plafond est presque atteint : il remonte à mesure que vos loyers augmentent et que vos crédits se remboursent." : "Le plafond augmente avec vos loyers ; les crédits se remboursent tout seuls avec 70 % du loyer des biens achetés à crédit."}</small></div>`; })() : "";
+  // hypothèques = un levier pour piloter (19/10/2026, demande du propriétaire) : ce qu'on peut obtenir tout de suite, et ce qui reste à rembourser.
+  // Le crédit encore disponible n'est pas répété ici : il est déjà dans la barre du haut.
+  const mortMax = mortables().reduce((t, x) => t + x.gain, 0), nMortd = nMort;
+  const debtHTML = mortMax || debt ? `<div class="levers">
+      ${mortMax ? `<button class="lever" data-amort="1"><span>🔒 Hypothéquer${ICON.chev}</span><b class="num green">+${fmtE(mortMax)}</b><small class="muted">possible tout de suite</small></button>` : ""}
+      ${debt ? `<button class="lever" data-af="mort" data-scroll="1"><span>Hypothèques${ICON.chev}</span><b class="num">${fmtE(debt)}</b><small class="muted">à rembourser · ${nMortd} bien${nMortd > 1 ? "s" : ""}</small></button>` : ""}</div>` : "";
   const distHTML = dist.length ? `<div class="dh2"><h2 class="h3">Où sont vos biens</h2>${assetArr ? `<button class="lnk" data-aa="0">Tous les arrondissements</button>` : `<span class="muted">${dist.length} arr. · touchez pour filtrer</span>`}</div>
     <div class="drows">${(distAll || assetArr ? dist : dist.slice(0, 5)).map(d => { const m = ST.mayors[d.a - 1], my = m?.mayor === ME; return `<button class="drow" data-aa="${d.a}" aria-pressed="${assetArr === d.a}"><span class="dn${my ? " may" : ""}">${d.a}<sup>${d.a === 1 ? "er" : "e"}</sup>${my ? `<em title="Vous êtes maire">👑</em>` : ""}</span><span class="dmid"><span class="dtop"><b class="num">${fmtE(d.v)}</b><small>${d.n} bien${d.n > 1 ? "s" : ""}</small></span><i class="dbar"><i style="width:${Math.max(3, d.v / vmax * 100)}%"></i></i></span><span class="dr num">+${fmtE(d.rent)}<small>/jour</small></span></button>`; }).join("")}</div>
     ${!assetArr && dist.length > 5 ? `<button class="dmore" data-dall>${distAll ? "Réduire" : `Voir les ${dist.length} arrondissements`}</button>` : ""}` : "";
@@ -152,6 +166,9 @@ async function renderAssets0() {
   if (!ST.board) rpc("leaderboard").then(b => { ST.board = b; if (cur() === "assets") renderAssets(); }).catch(() => { });
 }
 $("#p-assets").addEventListener("click", e => {
+  const am = e.target.closest("[data-amort]"); if (am) { assetMort = am.dataset.amort === "1"; mortAll = false; $("#p-assets").scrollTop = 0; return renderAssets(); }
+  const mg = e.target.closest("[data-mortg]"); if (mg) { mortNext = +mg.dataset.mortg; sel = null; return push("b", mortNext); }
+  if (e.target.closest("[data-mortall]")) { mortAll = true; return renderAssets(); }
   const f = e.target.closest("[data-af]"); if (f) { assetF = f.dataset.af; assetN = 30; renderAssets(); if (f.dataset.scroll) setTimeout(() => $("#p-assets .chips")?.scrollIntoView({ behavior: "smooth", block: "start" }), 30); return; }
   if (e.target.closest("[data-dall]")) { distAll = !distAll; return renderAssets(); }
   const a = e.target.closest("[data-aa]"); if (a) { const v = +a.dataset.aa; assetArr = assetArr === v ? 0 : v; assetN = 30; renderAssets(); if (assetArr) setTimeout(() => $("#p-assets .chips")?.scrollIntoView({ behavior: "smooth", block: "start" }), 30); return; }
@@ -360,11 +377,11 @@ async function resultsPage() {
 }
 
 // ---------------- FICHE IMMEUBLE ----------------
-let sellNext = null, offerNext = null, ofPrice = 0, ofCredit = true;
+let sellNext = null, mortNext = null, sheetScroll = false, offerNext = null, ofPrice = 0, ofCredit = true;
 let selLot = null, saleMode = false, bInfo = null, bCredit = null, ownSheet = null, ownN = 1, ownPrice = 0;
 async function buildingPage(g) {
   await ensureCards([g]); const c = card(g); if (!c) return dhead("Immeuble") + `<div class="wrap"><p class="sub">Introuvable.</p></div>`;
-  if (sel !== g) { sel = g; selLot = null; saleMode = false; bCredit = null; ownSheet = sellNext === g ? "sale" : null; ownN = 1; ownPrice = 0; ofPrice = 0; ofCredit = true; } sellNext = null;
+  if (sel !== g) { sel = g; selLot = null; saleMode = false; bCredit = null; ownSheet = sellNext === g ? "sale" : mortNext === g ? "mort" : null; sheetScroll = !!ownSheet; ownN = 1; ownPrice = 0; ofPrice = 0; ofCredit = true; } sellNext = null; mortNext = null;
   try { bInfo = await rpc("building", { p_card: g }); } catch (e) { bInfo = { lots: [], parts: [], listings: [], sales: [] }; }
   const owners = new Map(bInfo.lots.map(([k, o, ps, m]) => [k, { o, ps, m }]));
   if (offerNext === g) { offerNext = null; const lk = new Set(bInfo.listings.map(x => x.k)); const t = [...owners.entries()].find(([k, o]) => o.o !== ME && !o.m && !lk.has(k)); if (t) selLot = t[0]; }
@@ -762,7 +779,9 @@ async function partyClick(e) {
   if (e.target.closest("#lifeb")) { try { localStorage.setItem("hm_life", localStorage.getItem("hm_life") === "0" ? "1" : "0"); } catch (x) { } return renderDetail(false); }
   if (e.target.closest("#mute")) { try { localStorage.setItem("hm_sound", localStorage.getItem("hm_sound") === "1" ? "0" : "1"); } catch (x) { } return renderDetail(false); }
 }
-function afterDetail(top) { }
+function afterDetail(top) {
+  if (sheetScroll && top.kind === "b") { sheetScroll = false; $("#p-detail .osheet")?.scrollIntoView({ block: "center" }); }
+}
 // offre de rachat : l'argent mis de côté suit le prix tapé
 $("#p-detail").addEventListener("input", e => {
   if (e.target.id !== "ofp") return; const p = +e.target.value || 0; ofPrice = p;
