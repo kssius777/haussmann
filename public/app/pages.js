@@ -315,7 +315,7 @@ async function renderParis() {
     <div class="box pbox">
       <div class="pb-h"><p class="eyebrow">Les 20 mairies</p>${w?.party ? `<button class="pill" data-push="results" style="background:${PARTIES[w.party].c};color:#fff;border:0">🏛 Hôtel de Ville : ${esc(PARTIES[w.party].n)} ›</button>` : ""}</div>
       <div data-push="results" style="cursor:pointer">${mayorsMapSVG()}</div>
-      <div class="pleg">${PARTY_ORDER.map(k => `<span><i style="background:${PARTIES[k].c}"></i>${esc(PARTIES[k].n)} <em>(${esc(PARTIES[k].side.toLowerCase())})</em> <b>${seats[k] || 0}</b></span>`).join("")}</div>
+      <div class="pleg">${PARTY_ORDER.map(k => `<span><i style="background:${PARTIES[k].c}"></i>${esc(PARTIES[k].n)} <b>${seats[k] || 0}</b></span>`).join("")}</div>
       <p class="sub" style="margin:8px 0 0;font-size:12.5px">Le maire d'un arrondissement est le joueur qui y possède le plus. Chaque lundi, le parti qui a le plus de maires gagne l'Hôtel de Ville.</p>
       <button class="hdvbtn" data-push="results"><span>🏛</span><b>La course à l'Hôtel de Ville</b><em>Résultats, prime de la semaine ›</em></button>
     </div>
@@ -349,7 +349,7 @@ async function resultsPage() {
     <div class="box">${hemicycle(seats)}</div>
     ${w?.party ? `<div class="box" style="margin-top:12px;border-left:6px solid ${PARTIES[w.party].c}"><p class="eyebrow">Vainqueur de la semaine</p><div style="display:flex;gap:10px;align-items:center;margin-top:4px">${emblemSVG(w.party, 40)}<b style="font-size:18px;color:${PARTIES[w.party].c}">${esc(PARTIES[w.party].n)}</b></div><div class="sub" style="margin:4px 0 0">${w.mayors} maires · chaque membre touche ${fmtE(w.bonus)} par jour</div></div>` : `<div class="box" style="margin-top:12px"><b>Pas de vainqueur cette semaine</b><div class="sub" style="margin:4px 0 0">Aucun parti n'avait seul la majorité des maires lundi.</div></div>`}
     <h2 class="h2">Les partis, de gauche à droite</h2>
-    <div class="parties">${PARTY_ORDER.map(k => { const p = PARTIES[k]; return `<div class="prow">${emblemSVG(k, 40)}<div><b>${esc(p.n)}</b><small>${esc(p.side)} · « ${esc(p.motto)} »</small><small>Protège de : ${esc(shieldText(k))}</small></div><span class="seats num" style="color:${p.c}">${seats[k] || 0}</span></div>`; }).join("")}</div>
+    <div class="parties">${PARTY_ORDER.map(k => { const p = PARTIES[k]; return `<div class="prow">${emblemSVG(k, 40)}<div><b>${esc(p.n)}</b><small>« ${esc(p.motto)} »</small><small>Protège de : ${esc(shieldText(k))}</small></div><span class="seats num" style="color:${p.c}">${seats[k] || 0}</span></div>`; }).join("")}</div>
     <h2 class="h2">Arrondissements</h2><div class="atiles">${IDX.arr.map((a, i) => arrTile(i)).join("")}</div>
   </div>`;
 }
@@ -707,7 +707,7 @@ async function profilePage() {
     </div>
     <h2 class="h2">Mon parti</h2>
     ${!pr ? `<div class="box"><b>Vous n'avez pas encore de parti</b><p class="sub" style="margin:4px 0 0">Rejoignez un camp pour toucher +${MEMBER_BONUS} % de loyers dans les arrondissements qu'il tient, et jouer pour l'Hôtel de Ville.</p></div>` : ""}
-    ${pr ? `<div class="box" style="border-left:6px solid ${pr.c};display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center">${emblemSVG(p.party, 56)}<div><b style="color:${pr.c};font-size:17px">${esc(pr.n)}</b> <span class="muted">· ${esc(pr.side)}</span><div class="motto">« ${esc(pr.motto)} »</div><div class="sub" style="margin:4px 0 0;font-size:13px"><b>Pouvoir :</b> ${esc(pr.power)}</div><p class="sub" style="margin:6px 0 0">Vous protège de : ${esc(shieldText(p.party))}. Dans les arrondissements tenus par ${esc(pr.n)}, vos loyers sont à +${MEMBER_BONUS} %.</p></div></div>` : ""}
+    ${pr ? `<div class="box" style="border-left:6px solid ${pr.c};display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center">${emblemSVG(p.party, 56)}<div><b style="color:${pr.c};font-size:17px">${esc(pr.n)}</b><div class="motto">« ${esc(pr.motto)} »</div><div class="sub" style="margin:4px 0 0;font-size:13px"><b>Pouvoir :</b> ${esc(pr.power)}</div><p class="sub" style="margin:6px 0 0">Vous protège de : ${esc(shieldText(p.party))}. Dans les arrondissements tenus par votre parti, vos loyers sont à +${MEMBER_BONUS} %.</p></div></div>` : ""}
     <div style="margin-top:10px"><button class="btn block ${pr ? "light" : ""}" data-push="party" ${pr && wait > 0 ? "disabled" : ""}>${!pr ? "Choisir mon parti" : wait > 0 ? `Changer de parti possible dans ${hm(wait)}` : "Changer de parti"}</button></div>
     ${ST.admin ? `<h2 class="h2">Admin</h2><button class="btn block" data-push="admin">📊 Tableau de bord</button><button class="btn block light" data-push="gifts" style="margin-top:8px">🎁 Liens cadeaux (giveaway)</button>` : ""}
     <h2 class="h2">Réglages</h2>
@@ -728,14 +728,14 @@ let pickParty = null;
 function partyPickerHTML(current) {
   pickParty = current || PARTY_ORDER[2];
   return `<p class="sub">Chaque arrondissement a pour maire son plus gros propriétaire. Rejoignez un camp : quand un membre devient maire, tous les membres y touchent +${MEMBER_BONUS} % de loyers, et chaque semaine le parti qui a le plus de maires remporte l'Hôtel de Ville.</p>
-    <div class="spectrum"><div class="sp-line"></div>${PARTY_ORDER.map(k => `<button class="sp-node" data-party="${k}" aria-pressed="${pickParty === k}" style="--pc:${PARTIES[k].c}" aria-label="${esc(PARTIES[k].n)}">${emblemSVG(k, 46)}<span>${esc(PARTIES[k].n)}</span><small>${esc(PARTIES[k].side)}</small></button>`).join("")}</div>
+    <div class="spectrum"><div class="sp-line"></div>${PARTY_ORDER.map(k => `<button class="sp-node" data-party="${k}" aria-pressed="${pickParty === k}" style="--pc:${PARTIES[k].c}" aria-label="${esc(PARTIES[k].n)}">${emblemSVG(k, 46)}<span>${esc(PARTIES[k].n)}</span></button>`).join("")}</div>
     
     <div id="pdetail">${partyDetailHTML(pickParty)}</div>`;
 }
 function partyDetailHTML(k) {
   const p = PARTIES[k]; const cur = ST.state?.profile?.party;
   return `<div class="pdet" style="--pc:${p.c}">
-    <div class="pdet-h">${emblemSVG(k, 72)}<div><span class="ps">${esc(p.side)}</span><b>${esc(p.n)}</b><em class="motto">« ${esc(p.motto)} »</em></div></div>
+    <div class="pdet-h">${emblemSVG(k, 72)}<div><b>${esc(p.n)}</b><em class="motto">« ${esc(p.motto)} »</em></div></div>
     <p>${esc(p.pitch)}</p>
     <div class="ppower"><span>Pouvoir du parti</span><b>${esc(p.power)}</b><p>${esc(p.powerTxt)}</p></div>
     <ul><li><b>Protège ses membres</b> contre : ${esc(shieldText(k))}.</li><li><b>Dans ses arrondissements</b>, ses membres touchent +${MEMBER_BONUS} % de loyers.</li></ul>
@@ -744,7 +744,7 @@ function partyDetailHTML(k) {
 }
 async function partyClick(e) {
   const pc = e.target.closest("[data-party]"); if (pc) { pickParty = pc.dataset.party; $$("#p-detail [data-party]").forEach(b => b.setAttribute("aria-pressed", b === pc)); $("#pdetail").innerHTML = partyDetailHTML(pickParty); return; }
-  if (e.target.closest("#party-save")) { if (await act("set_party", { p_party: pickParty }, `Bienvenue chez ${PARTIES[pickParty].n} !`)) { renderWallet(); back(); } return; }
+  if (e.target.closest("#party-save")) { if (await act("set_party", { p_party: pickParty }, `Vous rejoignez : ${PARTIES[pickParty].n}`)) { renderWallet(); back(); } return; }
   if (e.target.closest("#logout")) return signOut();
   if (e.target.closest("#nooffers")) { await act("set_no_offers", { p_on: !ST.state.profile.no_offers }, ST.state.profile.no_offers ? "Vous recevez à nouveau les offres" : "Vous ne recevrez plus d'offres"); return renderDetail(false); }
   if (e.target.closest("#cielb")) { try { localStorage.getItem("hm_ciel") === "jour" ? localStorage.removeItem("hm_ciel") : localStorage.setItem("hm_ciel", "jour"); } catch (x) { } applyDecor(true); return renderDetail(false); }

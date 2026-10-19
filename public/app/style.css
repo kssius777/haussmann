@@ -1929,3 +1929,15 @@ body.mapfull #bar,body.mapfull #credbar,body.mapfull #tabs{backdrop-filter:none!
 }
 .mapbtns{margin-left:auto}
 @media (max-width:699px){body.mapfull.landopen #movebar.k-land{top:calc(var(--bar-h) + 56px)}}
+/* ---------- accueil : une carte de Paris des partis + des cartes à collectionner (les deux côtés du jeu) ---------- */
+.landing.v2 .lvis{position:relative;display:grid;justify-items:center;padding:8px 0 4px}
+.landing.v2 .lmapw{width:min(100%,540px)}
+.landing.v2 .lmap{display:block;width:100%;height:auto;filter:drop-shadow(0 20px 40px rgba(0,0,0,.5))}
+.landing.v2 .lvis .fan{position:relative;margin-top:-22%;padding:0;display:flex;justify-content:center;overflow:visible;pointer-events:none}
+.landing.v2 .lvis .fan-c{margin:0 -30px;pointer-events:auto}
+.landing.v2 .lleg{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 14px;margin-top:18px;font-size:12.5px;font-weight:700;color:rgba(255,255,255,.72)}
+.landing.v2 .lleg span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.landing.v2 .lleg i{display:inline-block;width:10px;height:10px;border-radius:3px}
+.landing.v2 .lleg i.free{border:1.5px solid rgba(255,255,255,.45)}
+@media (min-width:960px){.landing.v2 .lvis .fan{margin-top:-20%}.landing.v2 .lvis .fan-c{margin:0 -38px}}
+.landing.v2 .lleg i{box-shadow:0 0 0 1px rgba(255,255,255,.4)}

@@ -241,7 +241,7 @@ function showLand(L, gv) {
   else { head = "Tout est déjà pris"; cls = ""; }
   // ce qui s'est passé à l'arrivée (on n'affiche que ce qui compte : loyer payé, bonus, Chance)
   const lines = [];
-  if (L?.toll > 0) lines.push(`<span class="ln bad">Vous payez son loyer · <b>−${fmtE(L.toll)}</b>${L.perk === "poing" ? " <small>(−50 % grâce au Poing Levé)</small>" : L.perk === "rempart" ? " <small>(+50 % : propriétaire Rempart National)</small>" : ""}</span>`);
+  if (L?.toll > 0) lines.push(`<span class="ln bad">Vous payez son loyer · <b>−${fmtE(L.toll)}</b>${L.perk === "poing" ? " <small>(−50 % : vous êtes d'extrême gauche)</small>" : L.perk === "rempart" ? " <small>(+50 % : propriétaire d'extrême droite)</small>" : ""}</span>`);
   if (L?.bonus > 0) lines.push(`<span class="ln good">Bonus chez vous · <b>+${fmtE(L.bonus)}</b></span>`);
   if (L?.chance) { const ch = L.chance; const [nm] = CHANCE[ch.k] || ["Chance"]; lines.push(`<span class="ln ${BAD.has(ch.k) ? "bad" : "good"}"><small>Case Chance${BAD.has(ch.k) ? " · pas de chance" : ""}</small>🃏 <b>${esc(nm)}</b> : ${esc(chanceText(ch))}</span>`); }
   // le plan des logements ; immeuble entièrement libre : juste les cases vides (on voit tout de suite combien il y en a)

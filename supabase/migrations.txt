@@ -19,3 +19,4 @@ migration_options.sql
 migration_stats.sql
 migration_retention.sql
 migration_sans_teleport.sql
+migration_partis_noms.sql

@@ -1671,7 +1671,7 @@ declare c cards; sq jsonb; me text := _party(u); sal bigint; perk text := null; 
 begin
   sal := (pawn_cfg()->>'salary')::bigint * case when me = 'tendue' then 2 else 1 end;   -- Gauche Unie : salaire doublé
   update profiles set pos = t, land = t, cash = cash + sal where id = u;   -- petit salaire à chaque lancer
-  perform _log(u, 'salary', sal, case when me = 'tendue' then 'Salaire du tour (doublé : Gauche Unie)' else 'Salaire du tour' end, t);
+  perform _log(u, 'salary', sal, case when me = 'tendue' then 'Salaire du tour (doublé : Gauche)' else 'Salaire du tour' end, t);
   select * into c from cards where id = t;
   -- loyer à payer : chaque propriétaire reçoit une journée de loyer de ses biens ici (plafonné à 20 % de votre trésorerie)
   for o in

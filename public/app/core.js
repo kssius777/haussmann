@@ -27,13 +27,13 @@ const USE = { res: "Résidentiel", ind: "Immeuble", com: "Commerces & services",
 // le maire touche 8 % des loyers de son arrondissement, les membres du parti du maire y gagnent +10 %,
 // et chaque parti protège ses membres contre quelques cartes malus (risques équivalents).
 const PARTIES = {
-  poing:   { n: "Poing Levé",       side: "Extrême gauche",  c: "#D32F2F", motto: "Le toit est un droit.", pitch: "Le logement n'est pas une marchandise.", shield: ["greve", "amende"], power: "−50 % de loyer chez les autres", powerTxt: "Quand vous tombez chez un autre joueur, vous payez moitié moins de loyer. Exemple : 10 000 € → 5 000 €." },
-  tendue:  { n: "Gauche Unie",      side: "Gauche",           c: "#E5679A", motto: "Ensemble, chez nous.", pitch: "Solidarité et services publics.",        shield: ["notaire", "ravalement"], power: "Salaire doublé", powerTxt: "Chaque lancer de dé vous rapporte 40 000 € au lieu de 20 000 €." },
-  milieu:  { n: "Juste Milieu",     side: "Centre",           c: "#F2A33A", motto: "En toute mesure.", pitch: "Entreprendre, réformer, rassembler.",    shield: ["fonciere", "degat"], power: "Ventes sans commission", powerTxt: "Quand vous vendez (Marché ou offre de rachat), vous touchez 100 % du prix au lieu de 95 %." },
-  valeurs: { n: "Droite Libre",     side: "Droite",           c: "#3E7BDC", motto: "Libre d'entreprendre.", pitch: "Propriété, mérite et tradition.",        shield: ["fisc", "termites", "ascenseur"], power: "Crédit facile", powerTxt: "Apport de 5 % au lieu de 10 %, et 50 % de capacité d'emprunt en plus. Exemple : un bien à 1 M€ = 50 000 € d'apport." },
-  rempart: { n: "Rempart National", side: "Extrême droite", c: "#1E2B5E", motto: "Tenir la ville.", pitch: "Sécurité, ordre et souveraineté.",       shield: ["cambriolage", "squat"], power: "+50 % de loyer chez vous", powerTxt: "Quand un joueur tombe chez vous, il vous paie 50 % de loyer en plus. Exemple : 10 000 € → 15 000 €." }
+  poing:   { n: "Extrême gauche",   side: "Extrême gauche",  c: "#D32F2F", motto: "Le toit est un droit.", pitch: "Le logement n'est pas une marchandise.", shield: ["greve", "amende"], power: "−50 % de loyer chez les autres", powerTxt: "Quand vous tombez chez un autre joueur, vous payez moitié moins de loyer. Exemple : 10 000 € → 5 000 €." },
+  tendue:  { n: "Gauche",           side: "Gauche",           c: "#E5679A", motto: "Ensemble, chez nous.", pitch: "Solidarité et services publics.",        shield: ["notaire", "ravalement"], power: "Salaire doublé", powerTxt: "Chaque lancer de dé vous rapporte 40 000 € au lieu de 20 000 €." },
+  milieu:  { n: "Centriste",        side: "Centriste",           c: "#F2A33A", motto: "En toute mesure.", pitch: "Entreprendre, réformer, rassembler.",    shield: ["fonciere", "degat"], power: "Ventes sans commission", powerTxt: "Quand vous vendez (Marché ou offre de rachat), vous touchez 100 % du prix au lieu de 95 %." },
+  valeurs: { n: "Droite",           side: "Droite",           c: "#3E7BDC", motto: "Libre d'entreprendre.", pitch: "Propriété, mérite et tradition.",        shield: ["fisc", "termites", "ascenseur"], power: "Crédit facile", powerTxt: "Apport de 5 % au lieu de 10 %, et 50 % de capacité d'emprunt en plus. Exemple : un bien à 1 M€ = 50 000 € d'apport." },
+  rempart: { n: "Extrême droite",   side: "Extrême droite", c: "#1E2B5E", motto: "Tenir la ville.", pitch: "Sécurité, ordre et souveraineté.",       shield: ["cambriolage", "squat"], power: "+50 % de loyer chez vous", powerTxt: "Quand un joueur tombe chez vous, il vous paie 50 % de loyer en plus. Exemple : 10 000 € → 15 000 €." }
 };
-const downRate = () => ST.state?.profile?.party === "valeurs" ? .05 : .1;   // Droite Libre : apport de 5 %
+const downRate = () => ST.state?.profile?.party === "valeurs" ? .05 : .1;   // Droite : apport de 5 %
 const PARTY_ORDER = ["poing", "tendue", "milieu", "valeurs", "rempart"];
 const MAYOR_TAX = 8, MEMBER_BONUS = 10;
 // Blasons des partis (écusson + emblème blanc)
@@ -108,7 +108,6 @@ let IDX = null, FIELDS = [], ARR = [], BASE = null, MONS = null;
 const DATA = "/data/";
 const DATA_V = "20261017";   // à changer quand les fichiers de public/data changent (sinon le navigateur garde l'ancienne version un jour)
 async function getJSON(u) { const r = await fetch(u); if (!r.ok) throw new Error(u + " : HTTP " + r.status); return r.json(); }
-const atlasURL = a => `${DATA}atlas/a${a}.jpg`;
 function decodeRing(f) { let x = f[0] + 235000, y = f[1] + 4886000; const o = [[x / 1e5, y / 1e5]]; for (let k = 2; k < f.length; k += 2) { x += f[k]; y += f[k + 1]; o.push([x / 1e5, y / 1e5]); } return o; }
 
 function card(g) {

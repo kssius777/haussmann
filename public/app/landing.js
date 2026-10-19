@@ -7,9 +7,9 @@ const G_ICON = '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="tru
 async function landingHTML() {
   const samples = [[1000005, { t: "key", ks: [2] }, "C"], [231, { t: "floor", ks: [0, 1, 2, 3] }, "R"], [483, { t: "title", ks: [] }, "L"], [300658, { t: "part", n: 3 }, "M"]];
   try { await ensureCards(samples.map(x => x[0])); } catch (e) { }
-  const fan = samples.map(([g, it, r], i) => {
+  const fan = samples.slice(1).map(([g, it, r], i) => {
     const c = card(g); if (!c) return ""; if (it.t === "title") it.ks = [...Array(c.lots).keys()];
-    return `<div class="fan-c" style="--i:${i};--a:${(i - 1.5) * 7}deg;--y:${Math.abs(i - 1.5) * 14}px">${cardHTML(c, { w: "min(190px,42vw)", item: it, tier: r })}</div>`;
+    return `<div class="fan-c" style="--i:${i};--a:${(i - 1) * 8}deg;--y:${Math.abs(i - 1) * 12}px">${cardHTML(c, { w: "min(150px,30vw)", item: it, tier: r })}</div>`;
   }).join("");
   const steps = [
     ["Ouvrez des boosters", "4 vrais biens parisiens et 1 carte Chance par booster. 5 offerts, puis un par jour."],
@@ -33,11 +33,15 @@ async function landingHTML() {
       <div class="ltop"><section class="lhero">
         ${giftB}<p class="eyebrow">Jeu gratuit · ordinateur et mobile</p>
         <h1>Tout Paris<br>est à prendre.</h1>
-        <p class="lead"><b>77 835 cartes à collectionner</b> : tous les vrais immeubles de Paris. Achetez-les et touchez leurs loyers, même quand vous ne jouez pas.</p>
+        <p class="lead"><b>77 835 cartes à collectionner</b> : les vrais immeubles de Paris. Touchez leurs loyers, et prenez la mairie de votre arrondissement.</p>
         ${cta}
         <p class="small">Gratuit, sans carte bancaire · 1 M€ virtuel et 5 boosters offerts</p>
       </section>
-      <section class="fan" aria-label="Exemples de cartes">${fan}</section></div>
+      <section class="lvis" aria-label="Le jeu : des cartes à collectionner et une carte de Paris à conquérir">
+        <div class="lmapw">${landingMapSVG()}</div>
+        <div class="fan">${fan}</div>
+        <div class="lleg">${PARTY_ORDER.map(k => `<span><i style="background:${PARTIES[k].c}"></i>${esc(PARTIES[k].n)}</span>`).join("")}<span><i class="free"></i>À prendre</span></div>
+      </section></div>
     </div>
     <section class="lsec"><p class="eyebrow">Comment ça marche</p><h2>Quatre gestes, tout Paris.</h2>
       <div class="lsteps2">${steps.map(([t, d], i) => `<div><span class="n">${String(i + 1).padStart(2, "0")}</span><b>${t}</b><p>${d}</p></div>`).join("")}</div></section>
@@ -49,6 +53,21 @@ async function landingHTML() {
     <section class="lfinal"><h2>Votre premier immeuble vous attend.</h2>${cta}</section>
     <footer class="lfoot"><p>Proprio est un jeu : posséder une carte ne donne aucun droit sur le bien réel. L'argent du jeu est virtuel. <a href="/terms" target="_blank">Conditions</a> · <a href="/privacy" target="_blank">Confidentialité</a></p></footer>
   </div>`;
+}
+// carte de Paris de l'accueil : quelques arrondissements déjà tenus par un parti (une illustration, pas la vraie partie), les autres à prendre
+const LAND_DEMO = { 2: "rempart", 5: "valeurs", 9: "milieu", 15: "tendue", 17: "poing", 10: "valeurs" };
+function landingMapSVG() {
+  if (!IDX?.arr) return "";
+  const kx = 0.6579, rings = IDX.arr.map(a => a.outline.map(r => decodeRing(r))), xs = [], ys = [];
+  rings.flat(2).forEach(([x, y]) => { xs.push(x * kx); ys.push(y); });
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), W = 520, H = W * (y1 - y0) / (x1 - x0);
+  const P = ([x, y]) => [(x * kx - x0) / (x1 - x0) * W, (y1 - y) / (y1 - y0) * H];
+  const polys = IDX.arr.map((a, i) => { const k = LAND_DEMO[a.n], c = k ? PARTIES[k].c : null;
+    return rings[i].map(r => `<polygon points="${r.map(q => P(q).map(v => v.toFixed(1)).join(",")).join(" ")}" fill="${c || "rgba(255,255,255,.06)"}" stroke="${c ? "rgba(255,255,255,.55)" : "rgba(255,255,255,.24)"}" stroke-width="1.5" stroke-linejoin="round"/>`).join(""); }).join("");
+  const marks = IDX.arr.map(a => { const [x, y] = P(a.center), k = LAND_DEMO[a.n];
+    return k ? `<svg x="${(x - 13).toFixed(1)}" y="${(y - 14).toFixed(1)}" width="26" height="28" viewBox="0 0 26 28">${emblemSVG(k, 26)}</svg>`
+      : `<text x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="middle" font-size="11" font-weight="800" fill="rgba(255,255,255,.42)">${a.n}</text>`; }).join("");
+  return `<svg class="lmap" viewBox="-6 -6 ${W + 12} ${(H + 12).toFixed(0)}" aria-hidden="true">${polys}${marks}</svg>`;
 }
 async function showLanding() {
   const O = $("#onb"); O.hidden = false; onbStep = "home";

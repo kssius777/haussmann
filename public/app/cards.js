@@ -3,7 +3,8 @@
 //  Cartes : photo ou dessin de façade, carte « plaque de rue »
 // =====================================================================
 const artCache = new Map();
-function phStyle(c) { const [a, n] = c.ph; return `background-image:url(${atlasURL(a)});background-size:500% 800%;background-position:${(n % 5) * 25}% ${Math.floor(n / 5) * (100 / 7)}%`; }
+// une petite image par photo (public/data/ph/N_k.webp, faite par scripts/split_atlas.py) : le téléphone ne décode plus une planche de 40 photos pour en montrer une
+function phStyle(c) { const [a, n] = c.ph; return `background-image:url(${DATA}ph/${a}_${n}.webp);background-size:cover;background-position:center`; }
 // les photos de rue automatiques (Panoramax) sont souvent ratées : on garde le dessin pour elles
 const goodPhoto = c => c.ph && !/anoramax/.test(c.cr || "");
 function photo(c) {
