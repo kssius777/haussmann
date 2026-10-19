@@ -37,7 +37,7 @@ function push(kind, arg) { stack.push({ kind, arg }); renderDetail(true); }
 function back() {
   stack.pop(); if (stack.length) return renderDetail(true);
   $("#p-detail").hidden = true; sel = null; setMapFull(); renderTab(tab);
-  if (tab === "map" && map) { pumpGeo(); paintAll(); if (pawnPos() != null && !moving) map.easeTo({ center: centerOf(pawnPos()), duration: 500 }); }   // retour sur la carte : recentrée sur la montgolfière
+  if (tab === "map" && map) { pumpGeo(); paintAll(); if (pawnPos() != null && !moving) map.easeTo({ center: centerOf(pawnPos()), offset: pawnView().offset, duration: 500 }); }   // retour sur la carte : recentrée sur la montgolfière
 }
 async function renderDetail(anim) {
   const top = stack[stack.length - 1]; if (!top) return; const el = $("#p-detail");
@@ -72,6 +72,7 @@ function renderWallet() {
   const pr = PARTIES[s.profile.party]; const av = $("#avatar");
   av.textContent = (s.profile.pseudo || "?")[0].toUpperCase(); av.style.background = pr ? pr.c : "#94A3B8";
   const n = packsReady(); const b = $("#packbadge"); b.hidden = !n; b.textContent = n;
+  const pn = $("#packn"); if (pn) { const m = Math.ceil(freeIn() / 60); pn.textContent = n ? n : m >= 60 ? `${Math.floor(m / 60)} h` : `${m} min`; const bp = $("#b-pack"); bp.classList.toggle("zero", !n); bp.setAttribute("aria-label", n ? `Ouvrir mes boosters (${n})` : "Boosters"); }   // sur le sachet : combien il en reste, sinon dans combien de temps le prochain gratuit
 }
 
 // ---------------- PATRIMOINE ----------------

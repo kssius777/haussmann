@@ -21,6 +21,16 @@ function initPawnLayers() {
   map.addLayer({ id: "walked", type: "line", source: "walked", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#0F1B2D", "line-width": 5, "line-dasharray": [1.2, 1.2] } });
   map.on("move", pawnOff); placePawn(true); setTimeout(resumeDest, 1500);
 }
+// la montgolfière bien en vue (19/10/2026, demande du propriétaire : « trop haut, presque sous le menu ») : son point au sol
+// un peu sous le milieu de la zone libre (entre les barres du haut et le dé), pour que le ballon, qui flotte au-dessus, soit au centre de ce qu'on voit
+function pawnView() {
+  const c = map.getContainer().getBoundingClientRect(), mid = c.top + c.height / 2;
+  const rs = s => [...document.querySelectorAll(s)].map(e => e.getBoundingClientRect()).filter(r => r.height > 0 && r.width > 0);
+  const top = Math.max(c.top + 50, ...rs("#bar,#credbar,#filter,.maptop>*").filter(r => r.bottom < mid).map(r => r.bottom)) - c.top;
+  const bot = Math.min(c.bottom - 50, ...rs("#dicebar,#tabs").filter(r => r.top > mid).map(r => r.top)) - c.top;
+  const phone = innerWidth < 700;
+  return { zoom: phone ? 16.1 : 15.9, pitch: 50, offset: [0, Math.round(top + (bot - top) * (phone ? .72 : .66) - c.height / 2)] };
+}
 async function placePawn(fly) {
   const p = pawnPos(); if (p == null || !map) return; await ensureCards([p]);
   const ll = centerOf(p), pr = ST.state.profile, col = PARTIES[pr.party]?.c || "#2F5BD3";
@@ -31,7 +41,7 @@ async function placePawn(fly) {
     <g fill="url(#pzg)"><path d="M9 52h26l-2.5-7h-21z"/><path d="M14.5 45l3-15h9l3 15z"/><circle cx="22" cy="17" r="9.5"/></g></svg><s></s>`;
   pawnMk.setLngLat(ll); paintTargets();
   if (window.pawn3d) { pawn3d.color(col); pawn3d.set(ll[0], ll[1]); pawnMk.getElement().classList.add("is3d"); }
-  if (fly) map.flyTo({ center: ll, zoom: Math.min(15.8, Math.max(map.getZoom(), 15.2)), pitch: 50, duration: 900, offset: [0, -90] });
+  if (fly) { const v = pawnView(); map.flyTo({ center: ll, zoom: v.zoom, pitch: v.pitch, duration: 900, offset: v.offset }); }
 }
 // l'immeuble où l'on se trouve est surligné en jaune
 function paintTargets() {
@@ -60,7 +70,7 @@ function mineOf(g) { return (ST.mine.get(g)?.length || 0) + (ST.mineParts.get(g)
 function setMovebar(html, kind) {
   const m = $("#movebar"), wasLand = panelKind === "land"; panelKind = html ? kind || "" : "";
   m.className = panelKind ? "k-" + panelKind : "";
-  if (!html && wasLand && !landView && !moving && pawnPos() != null && map) map.easeTo({ center: centerOf(pawnPos()), offset: [0, 0], duration: 500 });   // case fermée : on revient sur la montgolfière
+  if (!html && wasLand && !landView && !moving && pawnPos() != null && map) map.easeTo({ center: centerOf(pawnPos()), offset: pawnView().offset, duration: 500 });   // case fermée : on revient sur la montgolfière
   if (!html) { m.hidden = true; m.innerHTML = ""; if (landView) { landView = false; sel = null; paintAll(); if (typeof stripKind !== "undefined" && false) $("#strip").hidden = false; } } else { m.hidden = false; m.innerHTML = html; }
   $("#dicebar").classList.toggle("off", moving);
   document.body.classList.toggle("landopen", panelKind === "land");
@@ -173,9 +183,7 @@ async function showDest(die, opts) {
     map.getSource("destlines").setData(FC(opts.map(o => ({ type: "Feature", properties: { c: COL[destInfo(o)[0]] }, geometry: { type: "LineString", coordinates: [from, centerOf(o.card)] } }))));
     map.on("move", aimArrows); setTimeout(aimArrows, 50);
   }
-  const p = document.createElement("div"); p.id = "pick";
-  p.innerHTML = `<span class="pd">${dieSVG(die, DSIDE[die][0], DSIDE[die][1], 26)}</span><span>Vous avez fait <b>${die}</b> · Touchez une flèche pour y aller</span>`;
-  $("#p-map").appendChild(p); document.body.classList.add("picking");
+  document.body.classList.add("picking");
   if (pawnPos() != null) pts.push(centerOf(pawnPos()));
   const lo = pts.map(x => x[0]), la = pts.map(x => x[1]), mobile = innerWidth < 900;
   map.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], { padding: { top: mobile ? 120 : 130, bottom: mobile ? 190 : 160, left: mobile ? 45 : 140, right: mobile ? 45 : 140 }, maxZoom: 16.2, pitch: 30, duration: 700 });

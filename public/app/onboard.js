@@ -37,29 +37,30 @@ function showOnb(step) {
     };
   }
   if (onbStep === "pseudo") {
-    O.innerHTML = `<div class="onb"><h1>Comment voulez-vous qu'on vous appelle ?</h1><p>C'est le nom que verront les autres joueurs sur la carte et au classement. C'est la seule chose à remplir : vous entrez ensuite directement dans Paris.</p>
+    O.innerHTML = `<div class="onb"><h1>Comment voulez-vous qu'on vous appelle ?</h1><p>C'est le nom que verront les autres joueurs.</p>
       <form id="pf" style="display:grid;gap:10px"><input class="inp" id="ps" maxlength="20" minlength="2" placeholder="Ex. : Baron Haussmann" value="${esc(onbPseudo)}" required autocomplete="nickname">
-      <button class="btn block" type="submit">Entrer dans Paris</button></form><p class="sub" id="perr" style="color:var(--danger)"></p></div>`;
-    O.querySelector("#pf").onsubmit = async e => {
-      e.preventDefault(); const v = $("#ps").value.trim(); if (v.length < 2) return; onbPseudo = v; const b = e.target.querySelector("button"); b.disabled = true;
-      try { setState(await rpc("join_game", { p_pseudo: v, p_party: null })); O.onclick = null; O.hidden = true; startGame(true); }
-      catch (err) { b.disabled = false; $("#perr").textContent = err.message; }
-    };
+      <button class="btn block" type="submit">Continuer</button></form><p class="sub" id="perr" style="color:var(--danger)"></p></div>`;
+    // le pseudo, puis le parti (le cœur du jeu, demande du propriétaire du 19/10/2026) ; le compte n'est créé qu'à la fin
+    O.querySelector("#pf").onsubmit = e => { e.preventDefault(); const v = $("#ps").value.trim(); if (v.length < 2) return; onbPseudo = v; pickParty = null; showOnb("party"); };
     setTimeout(() => $("#ps")?.focus(), 50);
   }
   if (onbStep === "party") {
-    O.innerHTML = `<div class="onb" style="max-width:760px">${steps(3)}<h1>Choisissez votre parti</h1>
-      <p>Chaque arrondissement élit pour maire son plus gros propriétaire. Votre parti décide avec qui vous gagnez : quand un membre devient maire, tous les membres y touchent +${MEMBER_BONUS} % de loyers. Vous pourrez en changer toutes les 48 h.</p>
-      ${partyPickerHTML(null)}
-      <button class="btn block" id="pgo">C'est parti</button><p class="sub" id="perr" style="color:var(--danger)"></p></div>`;
-    O.onclick = async e => {
-      const pc = e.target.closest("[data-party]"); if (pc) { pickParty = pc.dataset.party; O.querySelectorAll("[data-party]").forEach(b => b.setAttribute("aria-pressed", b === pc)); return; }
-      if (e.target.closest("#pgo")) {
-        if (!pickParty) return ($("#perr").textContent = "Choisissez un parti.");
-        const b = $("#pgo"); b.disabled = true;
-        try { setState(await rpc("join_game", { p_pseudo: onbPseudo, p_party: pickParty })); O.onclick = null; O.hidden = true; startGame(true); }
-        catch (err) { b.disabled = false; if (/pseudo/i.test(err.message)) { onbPseudo = ""; showOnb("pseudo"); setTimeout(() => $("#perr").textContent = err.message, 30); } else $("#perr").textContent = err.message; }
-      }
+    // 5 blasons sur l'axe gauche → droite ; toucher un parti montre son pouvoir en une ligne ; « plus tard » reste possible
+    const det = k => k ? `<div class="opdet" style="--pc:${PARTIES[k].c}">${emblemSVG(k, 40)}<div><b>${esc(PARTIES[k].n)}</b><span>${esc(PARTIES[k].power)}</span></div></div>` : `<div class="opdet empty">Touchez un parti</div>`;
+    O.innerHTML = `<div class="onb opty"><h1>Choisissez votre parti</h1><p>C'est le cœur du jeu : les partis se battent pour les mairies de Paris.</p>
+      <div class="spectrum">${PARTY_ORDER.map(k => `<button class="sp-node" data-party="${k}" aria-pressed="${pickParty === k}" style="--pc:${PARTIES[k].c}" aria-label="${esc(PARTIES[k].n)}">${emblemSVG(k, 46)}<span>${esc(PARTIES[k].n)}</span></button>`).join("")}</div>
+      <div id="opd">${det(pickParty)}</div>
+      <button class="btn block" id="pgo" ${pickParty ? `style="background:${PARTIES[pickParty].c}"` : "disabled"}>Je rejoins ce parti</button>
+      <p class="sub" style="text-align:center;margin:-2px 0 0">Vous pourrez en changer plus tard.</p>
+      <button class="lnk" id="plater">Je choisirai plus tard</button>
+      <p class="sub" id="perr" style="color:var(--danger)"></p></div>`;
+    const join = async (party, b) => { b.disabled = true;
+      try { setState(await rpc("join_game", { p_pseudo: onbPseudo, p_party: party })); O.onclick = null; O.hidden = true; startGame(true); }
+      catch (err) { b.disabled = false; if (/pseudo/i.test(err.message)) { showOnb("pseudo"); setTimeout(() => $("#perr").textContent = err.message, 30); } else $("#perr").textContent = err.message; } };
+    O.onclick = e => {
+      const pc = e.target.closest("[data-party]"); if (pc) { pickParty = pc.dataset.party; O.querySelectorAll("[data-party]").forEach(x => x.setAttribute("aria-pressed", x === pc)); $("#opd").innerHTML = det(pickParty); const g = $("#pgo"); g.disabled = false; g.style.background = PARTIES[pickParty].c; return; }
+      if (e.target.closest("#pgo") && pickParty) return join(pickParty, $("#pgo"));
+      if (e.target.closest("#plater")) return join(null, $("#plater"));
     };
   }
 }
