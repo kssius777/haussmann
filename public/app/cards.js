@@ -211,18 +211,20 @@ function cardHTML(c, { w, item, tier, count } = {}) {
       <div class="rn"><span><i class="stars">${"★".repeat(STARS[r])}</i>${RAR[r].n.toUpperCase()}</span><em>N° ${String(c.arr).padStart(2, "0")}-${String(li(c.g)).padStart(5, "0")}</em></div></div>
   </div></div></div>`;
 }
+// montant d'une carte Chance, à l'euro près (« +77 777 € » : l'arrondi de fmtE gâcherait la blague)
+const chanceAmt = a => (a > 0 ? "+" : "−") + (Math.abs(a) < 1e6 ? Math.round(Math.abs(a)).toLocaleString("fr-FR") + " €" : fmtE(Math.abs(a)));
 function chanceText(it) {
   if (it.out) return it.out;
-  if (it.amount) return (it.amount > 0 ? "+" : "−") + fmtE(Math.abs(it.amount));
+  if (it.amount) return chanceAmt(it.amount);
   return CHANCE_TXT[it.k] || "";
 }
 function chanceCardHTML(it, w) {
   const [n, g] = CHANCE[it.k] || ["Carte Chance", "?"]; const bad = BAD.has(it.k);
   const col = bad ? ["#FDECEC", "#C62828", "MALUS"] : ["#E7F6EC", "#15803D", "BONUS"];
-  const amt = it.amount ? (it.amount > 0 ? "+" : "−") + fmtE(Math.abs(it.amount)) : (it.out || "");
-  const desc = it.amount ? "" : (CHANCE_TXT[it.k] || "");
+  const amt = it.amount ? chanceAmt(it.amount) : (it.out || "");
+  const desc = CHANCE_TXT[it.k] || "";   // les cartes à montant n'ont un texte que s'il ajoute quelque chose (« Ça porte bonheur ! »)
   return `<div class="hc chance tC" style="--rc:${col[1]};--rt:${col[1]};--chs:${col[0]};--chc:${col[1]};${w ? `--w:${w}` : ""}"><div class="fr"><div class="in">
-    <div class="plq"><small>Carte Chance · ${col[2]}</small><b>${esc(n)}</b></div>
+    <div class="plq"><small>Carte Chance · ${col[2]}</small><b class="${n.length > 22 ? "long" : ""}">${esc(n)}</b></div>
     <div class="ph"><span class="glyph">${esc(g)}</span></div>
     <div class="bd"><div class="desc">${esc(desc)}</div>${amt ? `<div class="amt num">${esc(amt)}</div>` : ""}</div>
   </div></div></div>`;

@@ -58,15 +58,28 @@ const CHANCE = {
   fisc: ["Contrôle fiscal", "!"], fonciere: ["Taxe foncière", "%"], notaire: ["Frais de notaire", "§"],
   amende: ["Amende de stationnement", "P"], cambriolage: ["Cambriolage", "⚠"], ravalement: ["Ravalement obligatoire", "▦"],
   degat: ["Dégât des eaux", "≈"], greve: ["Grève RATP", "⏸"], ascenseur: ["Panne d'ascenseur", "↕"],
-  termites: ["Termites", "☣"], squat: ["Squat", "✖"]
+  termites: ["Termites", "☣"], squat: ["Squat", "✖"],
+  // cartes fun ajoutées le 19/10/2026 (validées par le propriétaire)
+  ticket: ["Ticket de métro trouvé par terre", "M"], pigeon: ["Un pigeon vous a choisi", "♣"], coloc: ["Votre coloc paie enfin sa part", "½"],
+  caution: ["Caution enfin remboursée", "✓"], squatpartis: ["Les squatteurs sont partis", "✎"], baguette: ["Meilleure baguette de Paris", "♛"],
+  clip: ["Clip de rap tourné dans votre cour", "♪"], fashion: ["Fashion Week", "✂"], bonne: ["Chambre de bonne en héritage", "▲"],
+  punaises: ["Punaises de lit", "⁂"], rats: ["Rats dans la cour", "∾"], perceuse: ["Le voisin perce le dimanche à 8 h", "⚒"],
+  dpe: ["DPE classé G", "G"], controleur: ["Contrôleur dans le métro", "⊘"], encadrement: ["Encadrement des loyers", "⇣"],
+  syndic: ["Le syndic augmente les charges", "⇡"], impaye: ["Locataire parti sans payer", "∅"], manif: ["Manif sous vos fenêtres", "⚑"]
 };
 const CHANCE_TXT = {
   tournage: "Un de vos immeubles rapporte ×1,5 pendant 24 h.", pub: "Un de vos immeubles rapporte ×1,3 pendant 24 h.",
   greve: "Vos loyers sont à ×0,8 pendant 24 h.", ascenseur: "Un de vos immeubles rapporte ×0,7 pendant 24 h.",
   termites: "Un de vos immeubles rapporte ×0,6 pendant 48 h.", degat: "Un logement ne rapporte rien pendant 24 h.",
-  squat: "Un logement est bloqué pendant 48 h.", booster: "Un booster gratuit en plus.", cle: "Une clé en plus, tout de suite."
+  squat: "Un logement est bloqué pendant 48 h.", booster: "Un booster gratuit en plus.", cle: "Une clé en plus, tout de suite.",
+  pigeon: "Ça porte bonheur !", squatpartis: "… et ils ont tout repeint !", baguette: "En bas de chez vous : un immeuble ×1,3 pendant 24 h.",
+  clip: "Un de vos immeubles rapporte ×1,5 pendant 24 h.", fashion: "Tous vos loyers ×1,2 pendant 24 h.", bonne: "Un logement offert, tout de suite.",
+  punaises: "Un logement ne rapporte rien pendant 48 h.", rats: "Un de vos immeubles rapporte ×0,7 pendant 24 h.",
+  perceuse: "Un de vos immeubles rapporte ×0,8 pendant 24 h.", dpe: "Un logement interdit à la location pendant 48 h.",
+  controleur: "Vous n'aviez pas validé.", encadrement: "Un de vos immeubles rapporte ×0,8 pendant 48 h.", manif: "Un de vos immeubles rapporte ×0,8 pendant 24 h."
 };
-const BAD = new Set(["fisc", "fonciere", "notaire", "amende", "cambriolage", "ravalement", "degat", "greve", "ascenseur", "termites", "squat"]);
+const BAD = new Set(["fisc", "fonciere", "notaire", "amende", "cambriolage", "ravalement", "degat", "greve", "ascenseur", "termites", "squat",
+  "punaises", "rats", "perceuse", "dpe", "controleur", "encadrement", "syndic", "impaye", "manif"]);
 const EVENTS = [
   ["Fête de quartier", "🎉"], ["Tournage d'un film", "🎬"], ["Fashion Week", "👗"], ["Brocante géante", "🧺"],
   ["Marché de créateurs", "🛍️"], ["Nuit blanche", "🌙"], ["Ouverture d'une station de métro", "🚇"], ["Travaux de voirie", "🚧"],

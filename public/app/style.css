@@ -2010,6 +2010,18 @@ body.mapfull #bar,body.mapfull #credbar,body.mapfull #tabs{backdrop-filter:none!
   #b-pack.zero .badge{background:#fff;color:#4B5563;font-size:12px;font-weight:700;box-shadow:0 0 0 1px var(--line),0 4px 10px rgba(15,23,42,.16)}
 }
 @keyframes packNudge{0%,80%,100%{transform:rotate(-6deg)}86%{transform:rotate(-11deg) translateY(-3px)}92%{transform:rotate(-2deg)}96%{transform:rotate(-7deg)}}
+/* ordinateur : le dé et le booster en vraie paire (19/10/2026, « pas centrés ») : deux cases de la même taille, centrées ensemble,
+   chacune sa pastille en dessous, au même niveau (« 3 lancers » en bleu, « 2 boosters » en or, sinon « dans 4 h ») */
+@media (min-width:900px){
+  .dicebar{gap:30px!important}
+  #b-pack.dside{width:92px!important;height:92px!important;padding:0!important;place-items:center;align-content:center}
+  #b-pack .ic{display:grid!important;place-items:center;margin-top:-10px!important}
+  #b-pack .sachet.mini{--pw:50px}
+  #b-pack .badge{top:auto!important;right:auto!important;bottom:-8px;left:50%;transform:translateX(-50%);min-width:0;height:auto;padding:3px 10px;border-radius:999px;display:block;font:700 12px/1.35 var(--f);background:var(--gold);color:#3B2A00;border:2px solid #fff;box-shadow:var(--shadow)}
+  #b-pack .badge::after{content:attr(data-l)}
+  #b-pack.zero .badge{background:#fff;color:#4B5563;font:700 12px/1.35 var(--f)}
+  #b-pack.zero .badge::before{content:"dans "}
+}
 @media (max-width:899px){#b-pack.zero .badge{display:none!important}}   /* téléphone : comme avant, pas de pastille quand il n'y a rien à ouvrir */
 /* lancer du dé : plus de zone floutée (19/10/2026, demande du propriétaire) ; le dé seul, avec une lueur douce juste derrière lui */
 #dice3d{background:radial-gradient(circle at 50% 50%,rgba(255,255,255,.85) 0,rgba(255,255,255,.5) 70px,rgba(255,255,255,0) 150px)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}

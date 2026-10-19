@@ -68,9 +68,8 @@ function mineOf(g) { return (ST.mine.get(g)?.length || 0) + (ST.mineParts.get(g)
 
 // ---- panneau du bas ------------------------------------------------------------
 function setMovebar(html, kind) {
-  const m = $("#movebar"), wasLand = panelKind === "land"; panelKind = html ? kind || "" : "";
+  const m = $("#movebar"); panelKind = html ? kind || "" : "";
   m.className = panelKind ? "k-" + panelKind : "";
-  if (!html && wasLand && !landView && !moving && pawnPos() != null && map) map.easeTo({ center: centerOf(pawnPos()), offset: pawnView().offset, duration: 500 });   // case fermée : on revient sur la montgolfière
   if (!html) { m.hidden = true; m.innerHTML = ""; if (landView) { landView = false; sel = null; paintAll(); if (typeof stripKind !== "undefined" && false) $("#strip").hidden = false; } } else { m.hidden = false; m.innerHTML = html; }
   $("#dicebar").classList.toggle("off", moving);
   document.body.classList.toggle("landopen", panelKind === "land");
@@ -360,7 +359,11 @@ function initPawnUI() {
   $("#b-roll").addEventListener("click", doRoll);
   $("#minipack").innerHTML = packHTML("mini"); setDieIcon(5); initSlides($("#movebar"));
   $("#movebar").addEventListener("click", async e => {
-    if (e.target.closest("[data-mvclose]")) { justBought = null; return setMovebar(""); }
+    if (e.target.closest("[data-mvclose]")) {   // croix ou « Continuer » de la case où l'on est tombé : on revient sur la montgolfière
+      const home = panelKind === "land" && !landView; justBought = null; setMovebar("");
+      if (home && !moving && pawnPos() != null && map) map.easeTo({ center: centerOf(pawnPos()), offset: pawnView().offset, duration: 500 });
+      return;
+    }
     if (e.target.closest("[data-buyrolls]")) { if (await act("buy_rolls", {}, "5 lancers en plus !")) { setMovebar(""); renderDice(); } return; }
     const pm = e.target.closest("[data-paymode]"); if (pm) { landCredit = pm.dataset.paymode === "1"; return showLand(); }
     const lb = e.target.closest("[data-lbuy],[data-lbuild]"); if (lb) {

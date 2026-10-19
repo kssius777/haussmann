@@ -96,6 +96,16 @@ async def main():
         fg = await E("(async()=>{ await loadArr(10); for(let k=0;k<4000;k++){ const g=10*1e5+k, c=card(g); if(c&&c.lk==='l'&&c.lots>=4&&c.lots<=12&&!ST.own.has(g)&&c.v<300000) return g; } })()")
         await E(f"previewBuilding({fg}); 1"); await W("document.querySelector('#movebar .farbuy')"); await pg.wait_for_timeout(300); await pg.screenshot(path=T + "06a_preview_far.png")
         check("ailleurs que sur sa case : pas d'achat à la banque", await E("document.querySelector('#movebar').innerText.includes('tombez dessus') && !document.querySelector('#movebar [data-lbuy]')"))
+        # bug du 19/10/2026 : toucher la carte loin de chez soi (ou revenir d'une fiche) ramenait la carte sur la montgolfière
+        await E(f"map.jumpTo({{center: centerOf({fg}), zoom: 16}}); previewBuilding({fg}); 1"); await W("document.querySelector('#movebar .farbuy')"); await pg.wait_for_timeout(600)
+        far = await E("""(async () => { const c0 = map.getCenter(); let pt = null;
+          for (let y = 220; y < 640 && !pt; y += 17) for (let x = 16; x < 384 && !pt; x += 17) if (!map.queryRenderedFeatures([x, y]).some(f => /^(bd|rf)\\d|^mfill$/.test(f.layer.id))) pt = [x, y];
+          map.fire('click', { point: pt, lngLat: map.unproject(pt), originalEvent: {}, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } });
+          await new Promise(r => setTimeout(r, 900)); const c1 = map.getCenter();
+          return { closed: document.querySelector('#movebar').hidden, d: Math.hypot(c1.lng - c0.lng, c1.lat - c0.lat) }; })()""")
+        check("toucher la carte ailleurs ferme l'aperçu, sans ramener sur la montgolfière", far["closed"] and far["d"] < 1e-5, far)
+        c0 = await E("map.getCenter().toArray()"); await E(f"push('b',{fg}); 1"); await W("document.querySelector('#p-detail [data-back]')"); await pg.click("#p-detail [data-back]"); await pg.wait_for_timeout(900)
+        c1 = await E("map.getCenter().toArray()"); check("retour d'une fiche : la carte reste où elle était", abs(c1[0] - c0[0]) + abs(c1[1] - c0[1]) < 1e-5, (c0, c1))
         db.sql(f"update profiles set land={fg}, cash=cash+1000000"); await E("refreshState().then(()=>placePawn(false)).then(()=>1)")
         await E(f"previewBuilding({fg}); 1"); await W("document.querySelector('#movebar [data-lbuy]:not([disabled])')"); await pg.wait_for_timeout(300); await pg.screenshot(path=T + "06b_preview_buy.png")
         await slide("#movebar [data-lbuy]"); await W(f"(ST.mine.get({fg})||[]).length===1")

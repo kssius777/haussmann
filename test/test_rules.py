@@ -162,12 +162,35 @@ check("market", "listings" in db.rpc(A, "market"))
 check("building", "lots" in db.rpc(A, "building", p_card=card))
 check("arr_info", db.rpc(A, "arr_info", p_arr=arr)["state"] is not None)
 
-# chance distribution
+# chance distribution (avec les cartes fun du 19/10/2026 : on rejoue la migration, comme Vercel le fera)
+db.sql(open("supabase/migration_chance_fun.sql", encoding="utf-8").read().replace("%", "%%"))
 import collections
 cnt = collections.Counter()
 for _ in range(400):
     cnt[db.sql("select _chance(%s)->>'k'", str(Cc))[0][0]] += 1
-bad = {"fisc","fonciere","notaire","amende","cambriolage","ravalement","degat","greve","ascenseur","termites","squat"}
+bad = {"fisc","fonciere","notaire","amende","cambriolage","ravalement","degat","greve","ascenseur","termites","squat",
+       "punaises","rats","perceuse","dpe","controleur","encadrement","syndic","impaye","manif"}
 nb = sum(v for k, v in cnt.items() if k in bad)
 check("cartes Chance : environ 65 % bonus / 35 % malus", 0.27 < nb / 400 < 0.43, f"malus {nb/4:.0f} %, contrôle fiscal {cnt['fisc']/4:.1f} %")
+# chaque carte tirée par la base a son titre dans le jeu, et les malus sont bien affichés en rouge
+import re, os
+src = open(os.path.join(os.path.dirname(__file__), "..", "public", "app", "core.js"), encoding="utf-8").read()
+front = set(re.findall(r'(\w+): \["', src[src.index("const CHANCE = {"):src.index("const CHANCE_TXT")]))
+front_bad = set(re.findall(r'"(\w+)"', src[src.index("const BAD = new Set("):src.index("]);", src.index("const BAD = new Set("))]))
+fd = db.sql("select pg_get_functiondef('_chance(uuid)'::regprocedure)")[0][0]
+keys = set(re.findall(r"'(\w+)'", fd[fd.index("keys text[]"):fd.index("ws float8")]))
+check("cartes Chance : chaque carte a son titre dans le jeu", len(keys) == 40 and keys <= front, sorted(keys - front) or len(keys))
+check("cartes Chance : les malus du jeu = ceux de la base", front_bad == bad, sorted(front_bad ^ bad))
+# les nouvelles cartes fun font bien ce qu'elles disent
+def draw(key):
+    db.sql("create or replace function _pick_weighted(opts text[], ws float8[]) returns text language sql volatile as $f$ select %s::text $f$", key)
+    try: return db.sql("select _chance(%s)", str(Cc))[0][0]
+    finally: db.sql(PICK)
+PICK = db.sql("select pg_get_functiondef('_pick_weighted(text[],float8[])'::regprocedure)")[0][0]
+c0 = db.sql("select cash from profiles where id=%s", str(Cc))[0][0]; r = draw("ticket"); c1 = db.sql("select cash from profiles where id=%s", str(Cc))[0][0]
+check("carte Chance « ticket de métro » : +2 €", r["amount"] == 2 and c1 - c0 == 2, (r, c1 - c0))
+r = draw("fashion"); n_all = db.sql("select count(*) from fx where owner=%s and kind='all' and abs(m - 1.2) < 1e-4 and until > now()", str(Cc))[0][0]
+check("carte Chance « Fashion Week » : tous les loyers ×1,2 pendant 24 h", n_all >= 1, r)
+r = draw("punaises"); check("carte Chance « punaises de lit » : un logement bloqué", r.get("card") is not None and db.sql("select count(*) from fx where owner=%s and kind='lot' and card=%s and m=0", str(Cc), r["card"])[0][0] >= 1, r)
+r = draw("syndic"); check("carte Chance « syndic » : −1 % de la valeur d'un immeuble", r["amount"] < 0 and r.get("card") is not None, r)
 print(f"\n{sum(R)}/{len(R)} OK")
