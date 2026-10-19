@@ -135,7 +135,7 @@ async def main():
         await pg.wait_for_timeout(300); await pg.screenshot(path=T + "11_paris.png")
         check("fil d'actu", await E("document.querySelectorAll('#p-paris .fi').length") > 0)
         await pg.click("[data-pt=rank]"); await pg.wait_for_timeout(400); check("classement", await E("document.querySelectorAll('#p-paris .rk').length") >= 2); await pg.screenshot(path=T + "11b_rank.png")
-        await pg.click("[data-pt=arr]"); await pg.wait_for_timeout(400); await pg.click("#p-paris .atile"); await W("document.querySelector('#p-detail .ahead')")
+        await pg.click("[data-pt=arr]"); await pg.wait_for_timeout(400); await pg.click("#p-paris .atile"); await W("document.querySelector('#p-detail .ar-h')")
         await pg.wait_for_timeout(300); await pg.screenshot(path=T + "12_arr.png"); check("page arrondissement", True)
         await pg.click("[data-back]"); await E("push('results'); 1"); await W("document.querySelector('#p-detail .parties')"); await pg.screenshot(path=T + "13_results.png")
         await pg.click("[data-back]")

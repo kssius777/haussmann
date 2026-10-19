@@ -1850,3 +1850,35 @@ body.legon #score{display:none}
 }
 .nw,.lbx .pay small em,.lbx .pay small span{white-space:nowrap}
 .lotph:last-child{margin-bottom:0}
+/* ---------- page d'arrondissement : épurée (un seul panneau, pas d'aplat de couleur ni d'émoji) ---------- */
+.arp{max-width:640px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px 22px 20px}
+.ar-h .h1{margin:0;font-size:30px;letter-spacing:-.02em}
+.ar-mayor{display:flex;align-items:center;gap:8px;margin:8px 0 0;font-size:15px;color:var(--ink2)}
+.ar-mayor svg{flex:none}
+.ar-nodot{display:inline-block;flex:none;width:16px;height:16px;border-radius:50%;border:1.5px dashed #9CA3AF;box-sizing:border-box}
+.ar-t{margin:26px 0 10px;font-size:14px;font-weight:800;color:var(--ink)}
+.ar-line{margin:0;font-size:14.5px;line-height:1.45;color:var(--ink2)}
+.ar-bars{display:grid;gap:8px}
+.ar-line+.ar-bars{margin-top:12px}
+.ar-vs{display:grid;grid-template-columns:minmax(0,96px) minmax(0,1fr) auto;gap:12px;align-items:center;font-size:14px}
+.ar-vs span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;color:var(--ink2)}
+.ar-vs.me span{color:var(--ink)}
+.ar-vs>i{display:block;height:8px;border-radius:4px;background:var(--soft2);overflow:hidden}
+.ar-vs>i>i{display:block;height:100%;border-radius:4px}
+.ar-vs b{font-size:14px;font-weight:800}
+.ar-note{margin:10px 0 0;font-size:13.5px;line-height:1.45;color:var(--muted)}
+.ar-note b{color:var(--ink)}
+.ar-ev{display:flex;align-items:center;gap:10px;margin:18px 0 0;padding:11px 14px;border-radius:12px;background:var(--soft);font-size:14px;color:var(--ink2)}
+.ar-ev i{flex:none;width:8px;height:8px;border-radius:50%;background:#F59E0B}
+.ar-ev i.up{background:#16A34A}
+.ar-list{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.ar-list li{display:grid;grid-template-columns:18px 18px minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);font-size:15px}
+.ar-list li .n{font-size:13px;font-weight:800;color:var(--muted)}
+.ar-list li .who{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700}
+.ar-list li .who small{margin-left:8px;font-size:12px;font-weight:700;color:var(--muted)}
+.ar-list li.me .who{color:var(--act)}
+.ar-list li svg{display:block}
+.arp .ar-map{margin-top:22px}
+@media (max-width:699px){.arp{padding:18px 16px 16px;border-radius:16px}.ar-h .h1{font-size:26px}}
+/* la légende « Qui gouverne Paris » de la carte ne passe plus par-dessus les pages */
+body:has(#p-detail:not([hidden])) #partyleg{display:none!important}

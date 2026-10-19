@@ -635,21 +635,28 @@ async function arrPage(i) {
   const a = IDX.arr[i];
   let info = null; try { info = await rpc("arr_info", { p_arr: a.n }); } catch (e) { }
   const s = info?.state, pc = s?.party ? PARTIES[s.party] : null, ev = ST.state?.event, top = info?.top || [], mine = +info?.mine || 0;
-  const iAmMayor = s?.mayor === ME, lead = top[0], gap = lead ? Math.max(0, lead.v - mine + 1) : 0, maxV = lead?.v || 1;
+  const iAmMayor = s?.mayor === ME, lead = top[0], gap = lead ? Math.max(0, lead.v - mine + 1) : 0;
+  const col = k => PARTIES[k]?.c || "#9CA3AF", myCol = PARTIES[ST.state?.profile?.party]?.c || "var(--act)";
+  const emb = k => PARTIES[k] ? emblemSVG(k, 18) : `<i class="ar-nodot"></i>`;
+  // vous face au maire (ou face au deuxième si le maire, c'est vous)
+  const rival = iAmMayor ? top[1] : lead, mx = Math.max(1, mine, rival?.v || 0);
+  const vs = (name, v, c, me) => `<div class="ar-vs${me ? " me" : ""}"><span>${name}</span><i><i style="width:${Math.max(1.5, v / mx * 100)}%;background:${c}"></i></i><b class="num">${fmtE(v)}</b></div>`;
   let goal;
-  if (iAmMayor) goal = `<div class="goal ok"><b>👑 Vous êtes le maire !</b><span>Vous touchez ${MAYOR_TAX} % des loyers des autres propriétaires d'ici. Gardez la première place.</span></div>`;
-  else if (!lead) goal = `<div class="goal"><b>Siège libre</b><span>Achetez un bien ici : vous deviendrez maire.</span></div>`;
-  else goal = `<div class="goal"><b>Pour devenir maire</b><span>Possédez plus que ${esc(lead.pseudo)} ici : il vous manque <b class="num">${fmtE(gap)}</b> de biens.</span></div>`;
-  return dhead("") + `<div class="wrap">
-    <div class="ahead" style="--pc:${pc ? pc.c : "#94A3B8"}"><span class="an">${ord(a.n)}</span><div><small>arrondissement</small><b>${s?.pseudo ? "Maire : " + esc(s.pseudo) : "Pas encore de maire"}</b>${pc ? `<span class="ap">${emblemSVG(s.party, 18)}${esc(pc.n)} · ${esc(pc.side.toLowerCase())}</span>` : ""}</div></div>
-    ${goal}
-    ${ev?.arr === a.n ? (() => { const t = evText(ev); return `<div class="box evbox" style="margin-top:10px"><span class="ei">${t.ic}</span><span><small>Aujourd'hui</small><b>${esc(t.t)}</b><span>${t.d}</span></span></div>`; })() : ""}
-    <h2 class="h3">Plus gros propriétaires</h2>
-    ${top.length ? `<div class="ranks">${top.map((t, k) => `<div class="rk${t.owner === ME ? " me" : ""}"><span class="md">${k === 0 ? "👑" : `<span class="n">${k + 1}</span>`}</span><span class="av" style="background:${PARTIES[t.party]?.c || "#94A3B8"}">${esc((t.pseudo || "?")[0].toUpperCase())}</span><span class="who"><b>${esc(t.pseudo)}${t.owner === ME ? " (vous)" : ""}</b><i class="bar"><i style="width:${Math.max(4, 100 * t.v / maxV)}%;background:${PARTIES[t.party]?.c || "#94A3B8"}"></i></i></span><b class="num">${fmtE(t.v)}</b></div>`).join("")}</div>` : `<div class="empty">Personne ne possède encore de bien ici.</div>`}
-    ${mine && !top.some(t => t.owner === ME) ? `<p class="sub" style="margin-top:8px">Vos biens ici : <b class="num">${fmtE(mine)}</b></p>` : ""}
-    ${pc ? `<p class="sub" style="margin-top:12px;font-size:12.5px">Les membres de ${esc(pc.n)} touchent +${MEMBER_BONUS} % de loyers dans cet arrondissement.</p>` : ""}
-    <div style="margin-top:14px"><button class="btn block light" data-arrmap="${i}">Voir sur la carte</button></div>
-  </div>`;
+  if (iAmMayor) goal = `<p class="ar-line">Vous êtes le maire. Vous touchez ${MAYOR_TAX} % des loyers des autres propriétaires d'ici.</p>${rival ? `<div class="ar-bars">${vs("Vous", mine, myCol, true)}${vs(esc(rival.pseudo), rival.v, col(rival.party))}</div><p class="ar-note">Votre avance : <b class="num">${fmtE(Math.max(0, mine - rival.v))}</b>. Gardez la première place.</p>` : ""}`;
+  else if (!lead) goal = `<p class="ar-line">Personne n'est maire ici. Achetez un bien dans le ${ord(a.n)} pour le devenir.</p>`;
+  else goal = `<div class="ar-bars">${vs("Vous", mine, myCol, true)}${vs(esc(lead.pseudo), lead.v, col(lead.party))}</div><p class="ar-note">Il vous manque <b class="num">${fmtE(gap)}</b> de biens ici pour passer devant ${esc(lead.pseudo)}.</p>`;
+  const evl = ev?.arr === a.n ? (() => { const pct = Math.round(Math.abs(ev.m - 1) * 100); return `<p class="ar-ev"><i class="${ev.m >= 1 ? "up" : ""}"></i><span><b>Aujourd'hui</b> · ${esc((EVENTS[ev.ev] || ["Événement"])[0])} : loyers ${ev.m >= 1 ? "+" : "−"}${pct} % ici.</span></p>`; })() : "";
+  return dhead("") + `<div class="wrap"><div class="arp">
+    <div class="ar-h"><h1 class="h1">${ord(a.n)} arrondissement</h1>
+      <p class="ar-mayor">${s?.pseudo ? `${emb(s.party)}<span>Maire : <b>${esc(s.pseudo)}</b>${pc ? ` · ${esc(pc.n)}` : ""}</span>` : `<i class="ar-nodot"></i><span>Pas encore de maire</span>`}</p></div>
+    ${evl}
+    <h2 class="ar-t">${iAmMayor ? "Votre mairie" : "Pour devenir maire"}</h2>${goal}
+    <h2 class="ar-t">Plus gros propriétaires</h2>
+    ${top.length ? `<ol class="ar-list">${top.map((t, k) => `<li class="${t.owner === ME ? "me" : ""}"><span class="n">${k + 1}</span>${emb(t.party)}<span class="who">${esc(t.pseudo)}${t.owner === ME ? " (vous)" : ""}${k === 0 ? `<small>maire</small>` : ""}</span><b class="num">${fmtE(t.v)}</b></li>`).join("")}</ol>` : `<p class="ar-note">Personne ne possède encore de bien ici.</p>`}
+    ${mine && !top.some(t => t.owner === ME) ? `<p class="ar-note">Vos biens ici : <b class="num">${fmtE(mine)}</b></p>` : ""}
+    ${pc ? `<p class="ar-note">Les membres de ${esc(pc.n)} touchent +${MEMBER_BONUS} % de loyers dans cet arrondissement.</p>` : ""}
+    <button class="btn block light ar-map" data-arrmap="${i}">Voir sur la carte</button>
+  </div></div>`;
 }
 document.addEventListener("click", e => { const b = e.target.closest("[data-arrmap]"); if (!b) return; const a = IDX.arr[+b.dataset.arrmap]; go("map"); setTimeout(() => map?.flyTo({ center: a.center, zoom: 14.4, pitch: 50, duration: 1200 }), 60); });
 
