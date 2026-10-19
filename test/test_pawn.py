@@ -86,4 +86,9 @@ check("après le déplacement, plus de destination en attente", db.sql("select p
 db.sql("update profiles set rent_at=now()-interval '2 days 4 hours' where id=%s", str(A)); db.rpc(A, "state")
 lab = db.sql("select label from ledger where owner=%s and kind='rent_away' order by at desc limit 1", str(A))
 check("loyers d'absence : une ligne à part avec la durée", bool(lab) and "2 j 4 h" in lab[0][0], lab)
+# les ponts (migration_ponts.sql) : depuis l'île de la Cité, le dé propose aussi la rive droite
+db.sql(open("supabase/migration_ponts.sql").read())
+opts = db.sql("select _options(%s, 301003, 6)", str(D))[0][0]
+north = [o["card"] for o in opts if db.sql("select cy from cards where id=%s", o["card"])[0][0] > 4885750]
+check("îles : depuis la Cité, le dé propose aussi l'autre rive (ponts)", len(north) >= 1, [o["card"] for o in opts])
 print(f"\n{sum(R)}/{len(R)} OK")

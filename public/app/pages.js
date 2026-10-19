@@ -71,8 +71,9 @@ function renderWallet() {
   }
   const pr = PARTIES[s.profile.party]; const av = $("#avatar");
   av.textContent = (s.profile.pseudo || "?")[0].toUpperCase(); av.style.background = pr ? pr.c : "#94A3B8";
-  const n = packsReady(); const b = $("#packbadge"); b.hidden = !n; b.textContent = n;
-  const pn = $("#packn"); if (pn) { const m = Math.ceil(freeIn() / 60); pn.textContent = n ? n : m >= 60 ? `${Math.floor(m / 60)} h` : `${m} min`; const bp = $("#b-pack"); bp.classList.toggle("zero", !n); bp.setAttribute("aria-label", n ? `Ouvrir mes boosters (${n})` : "Boosters"); }   // sur le sachet : combien il en reste, sinon dans combien de temps le prochain gratuit
+  // la pastille du booster : combien il en reste, sinon (ordinateur) dans combien de temps le prochain gratuit
+  const n = packsReady(), b = $("#packbadge"), m = Math.ceil(freeIn() / 60); b.hidden = false; b.textContent = n || (m >= 60 ? `${Math.floor(m / 60)} h` : `${m} min`);
+  const bp = $("#b-pack"); bp.classList.toggle("zero", !n); bp.setAttribute("aria-label", n ? `Ouvrir mes boosters (${n})` : "Boosters");
 }
 
 // ---------------- PATRIMOINE ----------------

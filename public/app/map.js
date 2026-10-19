@@ -150,7 +150,7 @@ function buildMap(base) {
       el.addEventListener("click", ev => { ev.stopPropagation(); push("arr", i); });
       a.marker = new maplibregl.Marker({ element: el }).setLngLat(a.center).addTo(map);
     });
-    buildMonMarkers(); buildParkLabels();
+    buildMonMarkers(); buildParkLabels(); map.on("move", queueDeclutter); map.on("resize", queueDeclutter);
     map.on("zoom", renderMarks); map.on("zoomend", () => typeof declutterDest === "function" && declutterDest()); map.on("rotateend", () => typeof declutterDest === "function" && declutterDest()); map.on("moveend", renderTags);
     // la boussole n'apparaît que si la carte a été tournée ; elle remet le nord en haut
     map.on("rotate", () => { const b = map.getBearing(); $("#t-north").hidden = Math.abs(b) < 2; $("#needle").style.transform = `rotate(${-b}deg)`; });
@@ -216,7 +216,26 @@ function renderMarks() {
     const show = z >= (m.r === "M" ? (innerWidth < 700 ? 13.8 : 13.4) : 14.4); m.el.classList.toggle("far", z < (m.r === "M" ? (innerWidth < 700 ? 14.8 : 14.4) : 15.5)); if (show && !m.on) { m.mk.addTo(map); m.on = true; } else if (!show && m.on) { m.mk.remove(); m.on = false; }
     if (show && !m.ph) { const c = card(m.g); if (c) { m.ph = true; if (c.ph) m.el.querySelector("i").setAttribute("style", phStyle(c)); } }
   }
+  queueDeclutter();
 }
+// téléphone : pas de noms de lieux collés sous les barres du haut (19/10/2026, demande du propriétaire : « ne pas surcharger la partie haute »)
+let topLim = 0, dtRaf = 0;
+function declutterTop() {
+  if (!mapReady) return;
+  topLim = 0;
+  if (innerWidth < 900 && document.body.classList.contains("mapfull")) {
+    const rs = [...document.querySelectorAll("#bar .wallet,#credbar,#filter")].map(e => e.getBoundingClientRect()).filter(r => r.height > 0 && r.bottom < innerHeight / 2);
+    if (rs.length) topLim = Math.max(...rs.map(r => r.bottom)) + 6;
+  }
+  const c = map.getContainer().getBoundingClientRect().top;
+  const chk = (mk, el, h, bottom) => { if (!el) return; let hide = false;
+    if (topLim) { const p = map.project(mk.getLngLat()), y = c + p.y + mk.getOffset().y; hide = (bottom ? y - h : y - h / 2) < topLim; }
+    if (el.classList.contains("undertop") !== hide) el.classList.toggle("undertop", hide); };
+  for (const m of monMarks) if (m.on) chk(m.mk, m.el, 34, true);
+  for (const p of parkMarks) if (p.on) chk(p.mk, p.mk.getElement(), 18, false);
+  for (const a of IDX.arr) if (a.marker) chk(a.marker, a.marker.getElement(), 30, false);
+}
+function queueDeclutter() { if (!dtRaf) dtRaf = requestAnimationFrame(() => { dtRaf = 0; declutterTop(); }); }
 let tagMarks = [];
 function renderTags() {
   tagMarks.forEach(t => t.remove()); tagMarks = [];

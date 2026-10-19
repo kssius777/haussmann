@@ -1991,31 +1991,26 @@ body.mapfull #bar,body.mapfull #credbar,body.mapfull #tabs{backdrop-filter:none!
 .lever:active{transform:scale(.99)}
 @media (min-width:760px){.lever b{font-size:21px}.lever{padding:12px 14px}}
 @media (max-width:699px){#p-assets .levers{gap:6px;margin-top:6px}#p-assets .lever{padding:8px 10px}#p-assets .lever b{font-size:16px}}
-/* dé + booster côte à côte, centrés ensemble (19/10/2026, demande du propriétaire : « pas équilibré ») ;
-   le booster = le sachet en plus grand, sans tuile blanche, avec le nombre restant (ou dans combien de temps le prochain gratuit) */
-.dicebar{align-items:flex-end!important;justify-content:center}
-.dside.dspace{display:none!important}
-#b-pack.dside{width:auto!important;height:auto!important;padding:0 0 6px!important;margin:0!important;background:none!important;box-shadow:none!important;border:0!important;border-radius:0!important;display:grid;grid-template-rows:auto;justify-items:center;overflow:visible;position:relative}
-#b-pack .ic{display:block;width:auto!important;height:auto!important;margin:0!important}
-#b-pack .sachet.mini{--pw:54px;position:relative;left:auto;top:auto;border-radius:4px;transform:rotate(-6deg);box-shadow:0 10px 18px rgba(15,23,42,.32)}
-#b-pack .sachet.mini svg.frame,#b-pack .sachet.mini svg.fac{display:block}
-#b-pack .sachet.mini .seal{width:40cqw;height:40cqw;bottom:16cqw}
-#b-pack .sachet.mini .seal b{font-size:17cqw}
-#b-pack:not(.zero) .sachet.mini{animation:packNudge 3.6s ease-in-out infinite}
-#b-pack:active .sachet.mini{animation:none;transform:rotate(-6deg) scale(.94)}
-@keyframes packNudge{0%,80%,100%{transform:rotate(-6deg)}86%{transform:rotate(-11deg) translateY(-3px)}92%{transform:rotate(-2deg)}96%{transform:rotate(-7deg)}}
-#b-pack>small{position:absolute;top:-10px;right:-14px;min-width:28px;height:28px;padding:0 8px;border-radius:14px;display:grid;place-items:center;white-space:nowrap;border:2px solid #fff;background:var(--gold)!important;color:#3B2A00!important;font:800 15px/1 var(--f)!important;box-shadow:0 4px 10px rgba(15,23,42,.22)}
-#b-pack.zero>small{background:#fff!important;color:#4B5563!important;font-size:12px!important;font-weight:700!important;box-shadow:0 0 0 1px var(--line),0 4px 10px rgba(15,23,42,.16)}
-#b-pack .badge{display:none!important}
-@media (max-width:699px){#b-pack .sachet.mini{--pw:50px}}
-@media (max-width:899px){
-  /* téléphone : le dé et le booster tiennent ensemble au milieu du dock */
-  body.mapfull #tabs{grid-template-columns:1fr 1fr 150px 1fr 1fr}
-  body.mapfull #tabs::before,body.mapfull #tabs::after{width:calc(50% - 75px)}
-  body.mapfull #b-pack{position:relative;right:auto;bottom:auto}
-  body.mapfull .dicebar{gap:8px!important}
-  body.mapfull .mapside{bottom:calc(env(safe-area-inset-bottom,0px) + 98px)}
+/* ordinateur : le dé et le booster côte à côte, centrés ensemble (19/10/2026, « pas équilibré ») ; le booster = le sachet en grand, sans tuile,
+   avec une pastille : le nombre de boosters, sinon dans combien de temps le prochain gratuit.
+   Téléphone : on garde le dock d'avant (le dé au milieu, la tuile « Boosters » au-dessus à droite), choix du propriétaire du 19/10/2026 */
+@media (min-width:900px){
+  .dicebar{align-items:flex-end!important;justify-content:center}
+  .dside.dspace{display:none!important}
+  #b-pack.dside{width:auto!important;height:auto!important;padding:0 0 6px!important;margin:0!important;background:none!important;box-shadow:none!important;border:0!important;border-radius:0!important;display:grid;grid-template-rows:auto;justify-items:center;overflow:visible;position:relative}
+  #b-pack .ic{display:block;width:auto!important;height:auto!important;margin:0!important}
+  #b-pack .sachet.mini{--pw:54px;position:relative;left:auto;top:auto;border-radius:4px;transform:rotate(-6deg);box-shadow:0 10px 18px rgba(15,23,42,.32)}
+  #b-pack .sachet.mini svg.frame,#b-pack .sachet.mini svg.fac{display:block}
+  #b-pack .sachet.mini .seal{width:40cqw;height:40cqw;bottom:16cqw}
+  #b-pack .sachet.mini .seal b{font-size:17cqw}
+  #b-pack:not(.zero) .sachet.mini{animation:packNudge 3.6s ease-in-out infinite}
+  #b-pack:active .sachet.mini{animation:none;transform:rotate(-6deg) scale(.94)}
+  #b-pack>small{display:none!important}
+  #b-pack .badge{top:-10px;right:-14px;min-width:28px;height:28px;padding:0 8px;border-radius:14px;display:grid;place-items:center;white-space:nowrap;border:2px solid #fff;font:800 15px/1 var(--f)}
+  #b-pack.zero .badge{background:#fff;color:#4B5563;font-size:12px;font-weight:700;box-shadow:0 0 0 1px var(--line),0 4px 10px rgba(15,23,42,.16)}
 }
+@keyframes packNudge{0%,80%,100%{transform:rotate(-6deg)}86%{transform:rotate(-11deg) translateY(-3px)}92%{transform:rotate(-2deg)}96%{transform:rotate(-7deg)}}
+@media (max-width:899px){#b-pack.zero .badge{display:none!important}}   /* téléphone : comme avant, pas de pastille quand il n'y a rien à ouvrir */
 /* lancer du dé : plus de zone floutée (19/10/2026, demande du propriétaire) ; le dé seul, avec une lueur douce juste derrière lui */
 #dice3d{background:radial-gradient(circle at 50% 50%,rgba(255,255,255,.85) 0,rgba(255,255,255,.5) 70px,rgba(255,255,255,0) 150px)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
 /* inscription : le choix du parti, juste après le pseudo (19/10/2026, demande du propriétaire : « le concept central ») */
@@ -2025,3 +2020,23 @@ body.mapfull #bar,body.mapfull #credbar,body.mapfull #tabs{backdrop-filter:none!
 .opdet span{display:block;font-size:13.5px;font-weight:600;color:var(--ink2);margin-top:2px}
 .opdet.empty{justify-content:center;color:var(--muted);font-weight:600;font-size:14px;border-style:dashed}
 .onb #plater{align-self:center}
+/* téléphone, carte : 1re ligne = le filtre (à la place du logo) + l'argent + l'avatar ; « Crédit dispo » juste dessous ; la loupe en bas à droite
+   (19/10/2026, choix du propriétaire sur la maquette « B », en gardant le crédit) */
+@media (max-width:899px){
+  body.mapfull{--bar-h:62px}
+  body.mapfull.hascred{--bar-h:94px}
+  body.mapfull #bar{top:calc(env(safe-area-inset-top,0px) + 10px)!important;height:44px!important;padding:0!important;background:transparent!important;box-shadow:none!important;border:0!important;border-radius:0!important;pointer-events:none;justify-content:flex-end!important}
+  body.mapfull #bar>*{pointer-events:auto}
+  body.mapfull #bar .brand,body.mapfull #bar .rate,body.mapfull #bar .plus{display:none!important}
+  body.mapfull #bar .money{background:#fff!important;border-color:transparent!important;box-shadow:0 6px 20px rgba(15,23,42,.16),0 0 0 1px rgba(15,23,42,.05)!important;padding:0 12px!important;min-width:0!important}
+  body.mapfull #bar .avatar{box-shadow:0 6px 16px rgba(15,23,42,.22)!important}
+  html body.mapfull #filter{position:fixed!important;top:calc(env(safe-area-inset-top,0px) + 12px)!important;left:8px!important;z-index:31!important;transform:none!important;padding:3px!important;box-shadow:0 6px 20px rgba(15,23,42,.16),0 0 0 1px rgba(15,23,42,.05)!important}
+  html body.mapfull #filter button{height:34px!important;padding:0 9px!important;font-size:12.5px!important}
+  html body.mapfull #filter button span{display:none!important}
+  body.mapfull #credbar{top:calc(env(safe-area-inset-top,0px) + 62px)!important}
+  body.mapfull .maptop{top:auto!important;bottom:calc(env(safe-area-inset-bottom,0px) + 220px);left:auto!important;right:10px!important}
+  body.mapfull #partyleg{top:10px}
+}
+@media (max-width:370px){html body.mapfull #filter button{padding:0 7px!important;font-size:12px!important}html body.mapfull #filter .dot{display:none}}
+/* téléphone : les noms de lieux trop près de la barre du haut sont cachés (19/10/2026, « ne pas surcharger la partie haute ») */
+.undertop{opacity:0!important;pointer-events:none!important}
