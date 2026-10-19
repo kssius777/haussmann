@@ -70,10 +70,12 @@ function setMovebar(html, kind) {
 function fitLand() {
   const m = $("#movebar"), lc = m.querySelector(".land .lc");
   if (!lc) return;
-  lc.style.removeProperty("--cw");
+  // on part de la plus grande carte possible (pas de trou au milieu sur les grands écrans), puis on réduit jusqu'à ce que tout tienne
+  const maxW = Math.max(120, Math.min(m.clientWidth - 28, innerWidth < 700 ? innerWidth * .8 : 300, 340));
+  lc.style.setProperty("--cw", maxW + "px");
   requestAnimationFrame(() => {
-    let w = lc.getBoundingClientRect().width, i = 0;
-    while (m.scrollHeight > m.clientHeight + 1 && w > 96 && i++ < 40) { w -= 8; lc.style.setProperty("--cw", w + "px"); }
+    let w = maxW, i = 0;
+    while (m.scrollHeight > m.clientHeight + 1 && w > 96 && i++ < 60) { w -= 8; lc.style.setProperty("--cw", w + "px"); }
   });
 }
 addEventListener("resize", () => { if (panelKind === "land") fitLand(); });

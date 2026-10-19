@@ -7,8 +7,16 @@ const hideSet = new Set(), lastState = new Map(); let painted = new Set();
 // Palette « Paris » : pierre de taille et toits en zinc
 // (les toits sont un gris chaud clair : un Paris beige, pas bleu ; les immeubles des autres joueurs sont en terre cuite)
 // thème « Blanc pur » : Paris en maquette blanche, seules les infos de jeu sont en couleur
+// Couleurs des immeubles et du sol : « Pierre & zinc » le jour ; decor.js les fait varier avec l'heure réelle à Paris (coucher de soleil, nuit)
 const MC = { mine: "#2563EB", mineB: "#BFD2FB", theirs: "#F4B4A5", theirsB: "#FCEDE9", sale: "#F5A524", saleB: "#FCE1AE",
-  sel: "#0B0C10", selB: "#9DB4F7", mute: "#F7F7F8", muteR: "#EDEEF0", stone: "#FFFFFF", zinc: "#F2F3F5" };
+  sel: "#0B0C10", selB: "#9DB4F7", mute: "#F4EEE3", muteR: "#E3DDD2", stone: "#F5E6CB", zinc: "#A9B4C4",
+  rarM: "#B98AE8", rarMB: "#EBDDF9", rarL: "#E2B23A", rarLB: "#F8E7B8", lit: "#A9B4C4", litB: "#F5E6CB", lit2B: "#F5E6CB" };
+const GROUND = { bg: "#EEE8DC", parks: "#A8D38C", water: "#6DB3E2", major: "#FFFDF8", majorCase: "#DDD3C1", road: "#FFFDF8", arrline: "#FFFFFF",
+  names: "#5B6270", namesHalo: "#FFFFFF", shadow: "#5A4A30", shadowOp: .14, glow: 0,
+  light: { anchor: "viewport", color: "#FFF4E0", intensity: .42, position: [1.15, 220, 55] },
+  sky: { "sky-color": "#A9CBEF", "horizon-color": "#FFF3E2", "fog-color": "#F2ECE2", "sky-horizon-blend": .55, "horizon-fog-blend": .6, "fog-ground-blend": .8, "atmosphere-blend": 0 } };
+// ombre portée des immeubles sur le sol (un simple décalage de leur emprise)
+const SHADOW_T = ["interpolate", ["linear"], ["zoom"], 13.5, ["literal", [1.5, 1]], 15, ["literal", [5, 3.5]], 16, ["literal", [10, 7]], 18, ["literal", [38, 27]]];
 
 function geoArr(i) {
   const A = ARR[i], feats = []; const ih = FIELDS.indexOf("h"), ir = FIELDS.indexOf("r");
@@ -24,11 +32,12 @@ const polysGeo = list => ({ type: "FeatureCollection", features: list.map(rs => 
 
 function colorExprs(m) {
   const st = ["coalesce", ["feature-state", "s"], 0], se = ["boolean", ["feature-state", "sel"], false], tg = ["coalesce", ["feature-state", "tgt"], 0], nr = ["coalesce", ["feature-state", "near"], 0];
-  const rarR = d => ["match", ["get", "r"], "M", "#B98AE8", "L", "#E2B23A", d], rarB = d => ["match", ["get", "r"], "M", "#EBDDF9", "L", "#F8E7B8", d];
+  const rarR = d => ["match", ["get", "r"], "M", MC.rarM, "L", MC.rarL, d], rarB = d => ["match", ["get", "r"], "M", MC.rarMB, "L", MC.rarLB, d];
+  const lit = (d, a, b) => ["case", ["==", ["%", ["id"], 5], 0], a, ["==", ["%", ["id"], 7], 1], b, d];   // la nuit, des fenêtres allumées
   if (m === "mine") return { roof: ["case", se, MC.sel, [">=", st, 3], MC.mine, MC.muteR], body: ["case", se, MC.selB, [">=", st, 3], MC.mineB, MC.mute] };
   if (m === "sale") return { roof: ["case", se, MC.sel, ["==", st, 4], MC.sale, MC.muteR], body: ["case", se, MC.selB, ["==", st, 4], MC.saleB, MC.mute] };
-  return { roof: ["case", ["==", tg, 2], "#A855F7", ["==", tg, 1], "#FACC15", se, MC.sel, [">=", st, 3], MC.mine, ["==", st, 4], MC.sale, ["==", nr, 1], "#4FCB7E", ["==", st, 2], MC.theirs, rarR(MC.zinc)],
-           body: ["case", ["==", tg, 2], "#D8B4FE", ["==", tg, 1], "#FDE68A", se, MC.selB, [">=", st, 3], MC.mineB, ["==", st, 4], MC.saleB, ["==", nr, 1], "#E3F4E8", ["==", st, 2], MC.theirsB, rarB(MC.stone)] };
+  return { roof: ["case", ["==", tg, 2], "#A855F7", ["==", tg, 1], "#FACC15", se, MC.sel, [">=", st, 3], MC.mine, ["==", st, 4], MC.sale, ["==", nr, 1], "#4FCB7E", ["==", st, 2], MC.theirs, rarR(lit(MC.zinc, MC.lit, MC.lit))],
+           body: ["case", ["==", tg, 2], "#D8B4FE", ["==", tg, 1], "#FDE68A", se, MC.selB, [">=", st, 3], MC.mineB, ["==", st, 4], MC.saleB, ["==", nr, 1], "#E3F4E8", ["==", st, 2], MC.theirsB, rarB(lit(MC.stone, MC.litB, MC.lit2B))] };
 }
 function partyFill() {
   return ["match", ["coalesce", ["feature-state", "p"], ""], ...PARTY_ORDER.flatMap(k => [k, PARTIES[k].c]), "#FFFFFF"];
@@ -42,7 +51,8 @@ function addArrToMap(i) {
     map.addSource("b" + i, { type: "geojson", data: geoArr(i), maxzoom: 15, buffer: 32, tolerance: .5 });
     map.addSource("r" + i, { type: "geojson", data: linesGeo(ARR[i].roads), maxzoom: 15, buffer: 32 });
     const e = colorExprs(mode);
-    map.addLayer({ id: "rd" + i, type: "line", source: "r" + i, minzoom: 14, paint: { "line-color": "#FFFFFF", "line-opacity": .95, "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 14, ["match", ["get", "k"], 1, 1.2, .5], 18, ["match", ["get", "k"], 1, 10, 3]] } }, "anchor-b");
+    map.addLayer({ id: "sh" + i, type: "fill", source: "b" + i, minzoom: 13.5, paint: { "fill-color": GROUND.shadow, "fill-opacity": GROUND.shadowOp, "fill-translate": SHADOW_T, "fill-translate-anchor": "map" } }, "anchor-g");
+    map.addLayer({ id: "rd" + i, type: "line", source: "r" + i, minzoom: 14, paint: { "line-color": GROUND.road, "line-opacity": .95, "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 14, ["match", ["get", "k"], 1, 1.2, .5], 18, ["match", ["get", "k"], 1, 10, 3]] } }, "sh" + i);
     map.addLayer({ id: "bd" + i, type: "fill-extrusion", source: "b" + i, minzoom: 12.6, paint: { "fill-extrusion-color": e.body, "fill-extrusion-height": ["-", ["get", "h"], 1], "fill-extrusion-opacity": 1, "fill-extrusion-vertical-gradient": true } }, "anchor-top");
     map.addLayer({ id: "rf" + i, type: "fill-extrusion", source: "b" + i, minzoom: 15.2, paint: { "fill-extrusion-color": e.roof, "fill-extrusion-height": ["get", "h"], "fill-extrusion-base": ["-", ["get", "h"], 1], "fill-extrusion-opacity": 1 } }, "anchor-top");
     for (const L of ["bd" + i, "rf" + i]) {
@@ -105,20 +115,20 @@ function buildMap(base) {
     container: "map", attributionControl: false, center: [2.3440, 48.8566], zoom: 14.2, pitch: 55, bearing: 0, maxPitch: 75, minZoom: 10.8,
     maxBounds: [[2.16, 48.77], [2.54, 48.95]], fadeDuration: 0, dragRotate: true, touchPitch: true, pitchWithRotate: true,
     style: { version: 8, glyphs: "/fonts/{fontstack}/{range}.pbf",
-      light: { anchor: "viewport", color: "#FFFFFF", intensity: .55, position: [1.15, 210, 40] },
-      sky: { "sky-color": "#E9F0F8", "horizon-color": "#FFFFFF", "fog-color": "#EFF0F2", "sky-horizon-blend": .6, "horizon-fog-blend": .7, "fog-ground-blend": .85, "atmosphere-blend": 0 },
+      light: GROUND.light, sky: GROUND.sky,
       sources: { water: { type: "geojson", data: polysGeo(base.water) }, parks: { type: "geojson", data: polysGeo(base.parks) }, major: { type: "geojson", data: linesGeo(base.major) }, arr: { type: "geojson", data: outline }, mfill: { type: "geojson", data: mfill } },
       layers: [
-        { id: "bg", type: "background", paint: { "background-color": "#ECEDEF" } },
+        { id: "bg", type: "background", paint: { "background-color": GROUND.bg } },
         { id: "arrfill", type: "fill", source: "arr", paint: { "fill-color": partyFill(), "fill-opacity": ["interpolate", ["linear"], ["zoom"], 11, .62, 12.6, .5, 13.6, .18, 14.4, .04, 15, 0] } },
-        { id: "parks", type: "fill", source: "parks", paint: { "fill-color": "#CFE5C2", "fill-opacity": 1 } },
-        { id: "water", type: "fill", source: "water", paint: { "fill-color": "#A9CCE8" } },
-        { id: "major-case", type: "line", source: "major", paint: { "line-color": "#DFE1E5", "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "k"], 3, 1.6, .6], 18, ["match", ["get", "k"], 3, 34, 20]] } },
-        { id: "major", type: "line", source: "major", paint: { "line-color": "#FFFFFF", "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "k"], 3, 1.2, .4], 18, ["match", ["get", "k"], 3, 30, 17]] } },
+        { id: "parks", type: "fill", source: "parks", paint: { "fill-color": GROUND.parks, "fill-opacity": 1 } },
+        { id: "water", type: "fill", source: "water", paint: { "fill-color": GROUND.water } },
+        { id: "major-case", type: "line", source: "major", paint: { "line-color": GROUND.majorCase, "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "k"], 3, 1.6, .6], 18, ["match", ["get", "k"], 3, 34, 20]] } },
+        { id: "major", type: "line", source: "major", paint: { "line-color": GROUND.major, "line-blur": GROUND.glow * 1.6, "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "k"], 3, 1.2, .4], 18, ["match", ["get", "k"], 3, 30, 17]] } },
         { id: "mfill", type: "fill", source: "mfill", paint: { "fill-color": "#F5D98A", "fill-opacity": ["interpolate", ["linear"], ["zoom"], 12, .35, 16, .25] } },
         { id: "mfill-line", type: "line", source: "mfill", paint: { "line-color": "#B8860B", "line-width": 1.5, "line-dasharray": [2, 1.5] } },
-        { id: "anchor-b", type: "background", layout: { visibility: "none" }, paint: {} },
-        { id: "arrline", type: "line", source: "arr", paint: { "line-color": "#FFFFFF", "line-width": ["interpolate", ["linear"], ["zoom"], 11, 1.6, 16, 3] } },
+        { id: "anchor-g", type: "background", layout: { visibility: "none" }, paint: {} },   // sous ce repère : rues et ombres des arrondissements
+        { id: "anchor-b", type: "background", layout: { visibility: "none" }, paint: {} },   // entre les deux : passants, voitures, trafic, sillages (life.js)
+        { id: "arrline", type: "line", source: "arr", paint: { "line-color": GROUND.arrline, "line-width": ["interpolate", ["linear"], ["zoom"], 11, 1.6, 16, 3] } },
         { id: "evline", type: "line", source: "arr", filter: ["==", ["id"], ev ? ev.arr - 1 : -1], paint: { "line-color": "#F59E0B", "line-width": ["interpolate", ["linear"], ["zoom"], 11, 3, 16, 6], "line-dasharray": [2, 1.2] } },
         { id: "anchor-top", type: "background", layout: { visibility: "none" }, paint: {} }
       ] }
@@ -149,7 +159,7 @@ function buildMap(base) {
     fetch("/data/streets.json").then(r => r.json()).then(list => {
       map.addSource("snames", { type: "geojson", data: { type: "FeatureCollection", features: list.map(([n, c]) => ({ type: "Feature", properties: { n }, geometry: { type: "LineString", coordinates: c } })) } });
       map.addLayer({ id: "snames", type: "symbol", source: "snames", minzoom: 15.3, layout: { "symbol-placement": "line", "text-field": ["get", "n"], "text-font": ["Noto Sans Medium"], "text-size": ["interpolate", ["linear"], ["zoom"], 15.3, 10.5, 18, 14], "text-max-angle": 30, "symbol-spacing": 320, "text-padding": 4 },
-        paint: { "text-color": "#5B6270", "text-halo-color": "#FFFFFF", "text-halo-width": 1.6 } });
+        paint: { "text-color": GROUND.names, "text-halo-color": GROUND.namesHalo, "text-halo-width": 1.6 } });
     }).catch(() => { });   // arrondissements chargés avant la carte (ex. celui du pion)
     updateArrFill(); applyMode(); paintAll(); initPawnLayers();
     loadAllProgressive();

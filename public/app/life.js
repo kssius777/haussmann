@@ -201,7 +201,7 @@ function flowStep(dt, feats) {
   FLOW.dots = FLOW.dots.filter(d => { d.d += d.v * d.dir * dt; if (d.d < 0 || d.d > d.l.len) return false; const q = lifeAt(d.l, d.d, 2.5 * d.dir); d.x = q.x; d.y = q.y; return inV(d.x, d.y); });
   if (FLOW.dots.length < want) {
     if (!FLOW.vis || performance.now() - FLOW.visAt > 3000) { FLOW.vis = flowLines().filter(l => l.p.some(([x, y]) => inV(x, y))); FLOW.visAt = performance.now(); }
-    for (let n = 0; n < 12 && FLOW.dots.length < want && FLOW.vis.length; n++) { const l = pick(FLOW.vis); FLOW.dots.push({ l, d: rnd(0, l.len), dir: pick([-1, 1]), v: rnd(9, 15), c: pick(["#334155", "#334155", "#475569", "#64748B", "#EF4444", "#2563EB", "#FACC15"]) }); }
+    for (let n = 0; n < 12 && FLOW.dots.length < want && FLOW.vis.length; n++) { const l = pick(FLOW.vis); FLOW.dots.push({ l, d: rnd(0, l.len), dir: pick([-1, 1]), v: rnd(9, 15), c: pick(typeof DECOR !== "undefined" && DECOR.flow || ["#334155", "#334155", "#475569", "#64748B", "#EF4444", "#2563EB", "#FACC15"]) }); }
   }
   for (const d of FLOW.dots) if (d.x != null) feats.push({ type: "Feature", properties: { c: d.c }, geometry: { type: "Point", coordinates: [d.x, d.y] } });
 }

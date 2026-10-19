@@ -670,6 +670,7 @@ async function profilePage() {
     <div style="margin-top:10px"><button class="btn block ${pr ? "light" : ""}" data-push="party" ${pr && wait > 0 ? "disabled" : ""}>${!pr ? "Choisir mon parti" : wait > 0 ? `Changer de parti possible dans ${hm(wait)}` : "Changer de parti"}</button></div>
     ${ST.admin ? `<h2 class="h2">Admin</h2><button class="btn block" data-push="admin">📊 Tableau de bord</button><button class="btn block light" data-push="gifts" style="margin-top:8px">🎁 Liens cadeaux (giveaway)</button>` : ""}
     <h2 class="h2">Réglages</h2>
+    <button class="btn block light" id="cielb">${(() => { try { return localStorage.getItem("hm_ciel") === "jour" ? "☀️ Toujours le jour · suivre l'heure de Paris" : "🌙 Jour et nuit selon l'heure de Paris · toujours le jour"; } catch (e) { return "🌙 Ciel"; } })()}</button>
     <button class="btn block light" id="lifeb">${(() => { try { return localStorage.getItem("hm_life") === "0" ? "🚶 Passants et voitures masqués · afficher" : "🚶 Passants et voitures · masquer"; } catch (e) { return "🚶 Passants"; } })()}</button>
     <button class="btn block light" id="mute">${(() => { try { return localStorage.getItem("hm_sound") === "1" ? "🔊 Sons activés · couper" : "🔇 Sons coupés · activer"; } catch (e) { return "🔇 Sons"; } })()}</button>
     <button class="btn block light" id="nooffers" style="margin-top:8px">${p.no_offers ? "🚫 Offres de rachat refusées · les accepter" : "🤝 J'accepte de recevoir des offres de rachat · désactiver"}</button>
@@ -705,6 +706,7 @@ async function partyClick(e) {
   if (e.target.closest("#party-save")) { if (await act("set_party", { p_party: pickParty }, `Bienvenue chez ${PARTIES[pickParty].n} !`)) { renderWallet(); back(); } return; }
   if (e.target.closest("#logout")) return signOut();
   if (e.target.closest("#nooffers")) { await act("set_no_offers", { p_on: !ST.state.profile.no_offers }, ST.state.profile.no_offers ? "Vous recevez à nouveau les offres" : "Vous ne recevrez plus d'offres"); return renderDetail(false); }
+  if (e.target.closest("#cielb")) { try { localStorage.getItem("hm_ciel") === "jour" ? localStorage.removeItem("hm_ciel") : localStorage.setItem("hm_ciel", "jour"); } catch (x) { } applyDecor(true); return renderDetail(false); }
   if (e.target.closest("#lifeb")) { try { localStorage.setItem("hm_life", localStorage.getItem("hm_life") === "0" ? "1" : "0"); } catch (x) { } return renderDetail(false); }
   if (e.target.closest("#mute")) { try { localStorage.setItem("hm_sound", localStorage.getItem("hm_sound") === "1" ? "0" : "1"); } catch (x) { } return renderDetail(false); }
 }
