@@ -2052,3 +2052,74 @@ body.mapfull #bar,body.mapfull #credbar,body.mapfull #tabs{backdrop-filter:none!
 @media (max-width:370px){html body.mapfull #filter button{padding:0 7px!important;font-size:12px!important}html body.mapfull #filter .dot{display:none}}
 /* téléphone : les noms de lieux trop près de la barre du haut sont cachés (19/10/2026, « ne pas surcharger la partie haute ») */
 .undertop{opacity:0!important;pointer-events:none!important}
+/* =====================================================================
+   Le chat du Champ-de-Mars (place.js, 20/10/2026) : le jeu s'efface, la carte reste
+   ===================================================================== */
+body.inplace #bar,body.inplace #credbar,body.inplace #tabs,body.inplace .dicebar,body.inplace #filter,body.inplace .maptop,
+body.inplace .mapside,body.inplace #partyleg,body.inplace #score,body.inplace #stripsum,body.inplace #pawnoff,body.inplace #movebar,
+body.inplace #preview,body.inplace #destcard,body.inplace #search,body.inplace .amark,body.inplace .mmark,body.inplace .plabel,
+body.inplace .pricetag,body.inplace .lbub,body.inplace .pawn,body.inplace #coach{display:none!important}
+#place{position:fixed;inset:0;z-index:60;pointer-events:none;--kb:0px}
+#plL{position:absolute;inset:0;overflow:hidden}
+.av{position:absolute;left:0;top:0;width:0;height:0;padding:0;border:0;background:none;pointer-events:none}
+.av .avi{position:absolute;left:0;top:0;display:grid;justify-items:center;transform:translate(-50%,-100%) scale(var(--k,1));transform-origin:50% 100%;pointer-events:auto;cursor:pointer}
+.av .nm{display:flex;align-items:center;gap:3px;padding:1.5px 6px 1.5px 3px;border-radius:999px;background:rgba(255,255,255,.96);box-shadow:0 2px 6px rgba(15,23,42,.18);font:700 8.5px/1.25 var(--f);color:#1F2430;white-space:nowrap;margin-bottom:2px}
+.av .nm i{width:8px;height:8px;border-radius:50%}
+.av.me .nm{background:var(--act);color:#fff}
+.av .bd{display:block;line-height:0}
+.av .pp{display:block;transform:scaleX(var(--f,1))}
+.av.walk .pp{animation:plWalk .36s ease-in-out infinite}
+@keyframes plWalk{0%,100%{translate:0 0}50%{translate:0 -2px}}
+.av .ring{position:absolute;bottom:-2px;left:50%;width:30px;height:9px;margin-left:-15px;border-radius:50%;border:2px solid var(--act);background:rgba(37,99,235,.12)}
+.av .bub{--dx:0px;position:relative;max-width:140px;width:max-content;padding:5px 8px;border-radius:11px;background:#fff;box-shadow:0 3px 10px rgba(15,23,42,.22);font:600 10.5px/1.3 var(--f);color:#0B0C10;margin-bottom:5px;text-align:center;transform:translateX(var(--dx));white-space:normal;overflow-wrap:anywhere}
+.av .bub[hidden]{display:none}
+.av .bub::after{content:"";position:absolute;left:calc(50% - var(--dx));bottom:-5px;margin-left:-5px;border:5px solid transparent;border-top-color:#fff;border-bottom:0}
+.av .bub.pop{animation:plPop .25s cubic-bezier(.2,1.5,.4,1)}
+.av .bub.out{opacity:0;transition:opacity .35s}
+@keyframes plPop{from{opacity:0;transform:translateX(var(--dx)) scale(.6)}to{opacity:1;transform:translateX(var(--dx)) scale(1)}}
+.plh{position:absolute;left:10px;top:calc(env(safe-area-inset-top,0px) + 10px);display:flex;align-items:center;gap:10px;padding:6px;border-radius:999px;background:#fff;box-shadow:0 6px 20px rgba(15,23,42,.16);pointer-events:auto}
+.plh .plx,.plh .plme{width:38px;height:38px;border-radius:50%;background:#F1F3F7;display:grid;place-items:center;color:#0B0C10;overflow:hidden;flex:none}
+.plh .plx svg{width:20px;height:20px}
+.plh .plme svg{margin-top:12px}
+.plh>div{min-width:0;padding-right:4px}
+.plh b{display:block;font:800 15px/1.1 var(--f);color:#0B0C10;white-space:nowrap}
+.plh small{display:flex;align-items:center;gap:6px;font:600 12px/1.2 var(--f);color:#16A34A;margin-top:2px;white-space:nowrap}
+.plh small i{width:7px;height:7px;border-radius:50%;background:#22C55E;box-shadow:0 0 0 3px rgba(34,197,94,.2)}
+.plhint{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 74px + var(--kb));transform:translateX(-50%);padding:6px 13px;border-radius:999px;background:rgba(11,12,16,.74);color:#fff;font:600 12.5px/1.2 var(--f);white-space:nowrap}
+.plin{position:absolute;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px + var(--kb));display:flex;gap:8px;pointer-events:auto}
+.plin input{flex:1;min-width:0;height:48px;border-radius:999px;border:0;background:#fff;box-shadow:0 6px 20px rgba(15,23,42,.18);padding:0 18px;font:500 16px/1 var(--f);color:#0B0C10}
+.plin input:focus{outline:2px solid var(--act)}
+.plin button{flex:none;width:48px;height:48px;border-radius:50%;background:var(--act);display:grid;place-items:center;box-shadow:0 6px 16px rgba(37,99,235,.4)}
+@media (min-width:900px){.plin{left:50%;right:auto;width:560px;margin-left:-280px;bottom:22px}.plhint{bottom:84px}.plh{left:16px;top:16px}}
+#plsheet{position:fixed;inset:0;z-index:70;background:rgba(11,12,16,.35);display:flex;align-items:flex-end;justify-content:center}
+#plsheet .plsb{position:relative;width:min(100%,460px);max-height:85vh;overflow:auto;background:#fff;border-radius:22px 22px 0 0;padding:18px 16px calc(env(safe-area-inset-bottom,0px) + 18px);box-shadow:0 -10px 40px rgba(15,23,42,.25)}
+@media (min-width:900px){#plsheet{align-items:center}#plsheet .plsb{border-radius:22px}}
+#plsheet .plsx{position:absolute;right:10px;top:10px;width:34px;height:34px;border-radius:50%;background:#F1F5F9;font-size:20px;line-height:1}
+.plst{display:block;font:800 17px/1.2 var(--f);margin:2px 0 12px}
+.plwho{display:flex;align-items:center;gap:12px;margin:4px 40px 4px 0}
+.plwho b{display:block;font:800 17px/1.2 var(--f)} .plwho span{font:600 13px/1.3 var(--f);color:var(--muted)}
+.plban{display:grid;gap:8px;margin-top:14px}
+.btn.danger{background:#DC2626!important;color:#fff!important;border-color:#DC2626!important}
+/* l'éditeur du personnage (profil et chat) */
+.lked{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center}
+.lkprev{width:84px;display:grid;place-items:center}
+.lkrows{display:grid;gap:8px}
+.lkrow{display:grid;grid-template-columns:62px 1fr;align-items:center;gap:6px}
+.lkrow>span{font:700 12.5px/1 var(--f);color:var(--ink2)}
+.lkrow>div{display:flex;flex-wrap:wrap;gap:6px}
+.lksw{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#fff;box-shadow:0 0 0 1px var(--line);padding:0}
+.lksw i{width:22px;height:22px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(15,23,42,.15)}
+.lksw svg{display:block}
+.lksw.on{box-shadow:0 0 0 2.5px var(--act)}
+@media (max-width:420px){.lked{grid-template-columns:1fr;justify-items:center}.lkrows{justify-self:stretch}}
+/* l'entrée : 5e onglet sur ordinateur, tuile en bas à gauche sur téléphone (miroir des boosters) */
+#tabs .t-chat{position:relative}
+#tabs .t-chat .chatn{position:absolute;top:1px;left:30px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#22C55E;color:#fff;font:800 11px/18px var(--f);text-align:center;box-shadow:0 0 0 2px #fff}
+#tabs .chatn[hidden]{display:none}
+#b-chat{display:none}
+#b-chat .ic svg{width:28px;height:28px}
+#b-chat .badge{background:#22C55E!important;color:#fff!important}
+@media (max-width:899px){
+  #tabs .t-chat{display:none!important}
+  body.mapfull #b-chat{display:grid;position:absolute;left:0;bottom:84px;margin:0}
+}

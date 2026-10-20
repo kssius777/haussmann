@@ -11,6 +11,7 @@ const TABS = ["map", "booster", "assets", "market", "paris"];
 const cur = () => stack.length ? "detail" : tab;
 
 function go(t) {
+  if (t === "chat") return openPlace();   // le chat du Champ-de-Mars : pas une page, une vue de la carte (place.js)
   stack.length = 0; $("#p-detail").hidden = true;
   tab = t; if (t === "assets") assetMort = false; if (t === "market") marketSell = false;
   for (const x of TABS) { const el = $("#p-" + x); const on = x === t; if (on && el.hidden) { el.hidden = false; el.classList.remove("enter"); void el.offsetWidth; el.classList.add("enter"); } else el.hidden = !on; }
@@ -42,7 +43,7 @@ function back() {
 async function renderDetail(anim) {
   const top = stack[stack.length - 1]; if (!top) return; const el = $("#p-detail");
   el.hidden = false; setMapFull(); if (anim) { el.classList.remove("enter"); void el.offsetWidth; el.classList.add("enter"); el.scrollTop = 0; }
-  const K = { b: buildingPage, arr: arrPage, shop: shopPage, money: moneyPage, profile: profilePage, results: resultsPage, party: partyPage, gifts: giftsPage, admin: adminPage }[top.kind];
+  const K = { b: buildingPage, arr: arrPage, shop: shopPage, money: moneyPage, profile: profilePage, results: resultsPage, party: partyPage, gifts: giftsPage, admin: adminPage, chatbans: chatBansPage }[top.kind];
   if (!K) return;
   const html = await K(top.arg);
   if (stack[stack.length - 1] !== top) return;
@@ -733,7 +734,9 @@ async function profilePage() {
     ${!pr ? `<div class="box"><b>Vous n'avez pas encore de parti</b><p class="sub" style="margin:4px 0 0">Rejoignez un camp pour toucher +${MEMBER_BONUS} % de loyers dans les arrondissements qu'il tient, et jouer pour l'Hôtel de Ville.</p></div>` : ""}
     ${pr ? `<div class="box" style="border-left:6px solid ${pr.c};display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center">${emblemSVG(p.party, 56)}<div><b style="color:${pr.c};font-size:17px">${esc(pr.n)}</b><div class="motto">« ${esc(pr.motto)} »</div><div class="sub" style="margin:4px 0 0;font-size:13px"><b>Pouvoir :</b> ${esc(pr.power)}</div><p class="sub" style="margin:6px 0 0">Vous protège de : ${esc(shieldText(p.party))}. Dans les arrondissements tenus par votre parti, vos loyers sont à +${MEMBER_BONUS} %.</p></div></div>` : ""}
     <div style="margin-top:10px"><button class="btn block ${pr ? "light" : ""}" data-push="party" ${pr && wait > 0 ? "disabled" : ""}>${!pr ? "Choisir mon parti" : wait > 0 ? `Changer de parti possible dans ${hm(wait)}` : "Changer de parti"}</button></div>
-    ${ST.admin ? `<h2 class="h2">Admin</h2><button class="btn block" data-push="admin">📊 Tableau de bord</button><button class="btn block light" data-push="gifts" style="margin-top:8px">🎁 Liens cadeaux (giveaway)</button>` : ""}
+    <h2 class="h2">Mon personnage</h2>
+    <div class="box lkwrap">${lookEditorHTML(lookOf(ME, p.look), p.party)}</div>
+    ${ST.admin ? `<h2 class="h2">Admin</h2><button class="btn block" data-push="admin">📊 Tableau de bord</button><button class="btn block light" data-push="gifts" style="margin-top:8px">🎁 Liens cadeaux (giveaway)</button><button class="btn block light" data-push="chatbans" style="margin-top:8px">🚫 Bannis du chat</button>` : ""}
     <h2 class="h2">Réglages</h2>
     <button class="btn block light" id="lifeb">${(() => { try { return localStorage.getItem("hm_life") === "0" ? "🚶 Passants et voitures masqués · afficher" : "🚶 Passants et voitures · masquer"; } catch (e) { return "🚶 Passants"; } })()}</button>
     <button class="btn block light" id="mute">${(() => { try { return localStorage.getItem("hm_sound") === "1" ? "🔊 Sons activés · couper" : "🔇 Sons coupés · activer"; } catch (e) { return "🔇 Sons"; } })()}</button>
@@ -743,6 +746,18 @@ async function profilePage() {
     <p class="sub" style="margin-top:16px;text-align:center"><a href="/terms" target="_blank">Conditions d'utilisation</a> · <a href="/privacy" target="_blank">Confidentialité</a></p>
   </div>`;
 }
+// admin : les bannis du chat du Champ-de-Mars, avec « Débannir »
+async function chatBansPage() {
+  let L = [];
+  try { L = await rpc("chat_bans"); } catch (e) { return dhead("Bannis du chat") + `<div class="wrap"><div class="empty">${esc(e.message)}</div></div>`; }
+  const when = b => b.until ? "jusqu'au " + new Date(b.until).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "à vie";
+  return dhead("Bannis du chat") + `<div class="wrap"><div class="rows">${L.map(b => `<div class="lrow" style="grid-template-columns:1fr auto"><div class="t"><b>${esc(b.pseudo || "?")}</b><span>${when(b)}</span></div>
+    <div class="v"><button class="btn sm ghost" data-unban="${esc(b.id)}">Débannir</button></div></div>`).join("") || `<div class="empty">Personne n'est banni.</div>`}</div></div>`;
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-unban]"); if (!b) return; b.disabled = true;
+  try { await rpc("chat_unban", { p_user: b.dataset.unban }); toast("Débanni", "good"); renderDetail(); } catch (er) { b.disabled = false; toast(er.message, "bad"); }
+});
 // le seul endroit pour choisir son parti : en haut de l'onglet Paris (le profil y renvoie aussi)
 function partyCard() {
   const p = ST.state?.profile; if (!p) return "";

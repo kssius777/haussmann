@@ -22,3 +22,4 @@ migration_sans_teleport.sql
 migration_partis_noms.sql
 migration_ponts.sql
 migration_chance_fun.sql
+migration_chat.sql

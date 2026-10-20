@@ -19,9 +19,10 @@ const GROUND = { bg: "#EEE8DC", parks: "#A8D38C", water: "#6DB3E2", major: "#FFF
 const SHADOW_T = ["interpolate", ["linear"], ["zoom"], 13.5, ["literal", [1.5, 1]], 15, ["literal", [5, 3.5]], 16, ["literal", [10, 7]], 18, ["literal", [38, 27]]];
 
 function geoArr(i) {
-  const A = ARR[i], feats = []; const ih = FIELDS.indexOf("h"), ir = FIELDS.indexOf("r");
+  const A = ARR[i], feats = []; const ih = FIELDS.indexOf("h"), ir = FIELDS.indexOf("r"), iu = FIELDS.indexOf("u");
   A.geo.forEach((enc, k) => {
-    const g = i * 1e5 + k; if (hideSet.has(g)) return; const row = A.cards[k]; const h = Math.max(4, row[ih] || 0);
+    const g = i * 1e5 + k; if (hideSet.has(g)) return; const row = A.cards[k]; if (row[iu] === "met" || row[iu] === "jar" || row[iu] === "pla") return;   // un lieu : son repère suffit
+    const h = Math.max(4, row[ih] || 0);
     const polys = enc.map(f => { const d = decodeRing(f); return [d.concat([d[0]])]; });
     feats.push({ type: "Feature", id: g, properties: { h, r: row[ir] }, geometry: polys.length === 1 ? { type: "Polygon", coordinates: polys[0] } : { type: "MultiPolygon", coordinates: polys } });
   });
@@ -141,7 +142,7 @@ function buildMap(base) {
     mapReady = true; pumpGeo();
     if (window.THREE && window.addMonuments) addMonuments(map, IDX.models);
     map.on("click", "mfill", e => { const f = e.features[0]; if (f) onBuildingTap(f.id); });
-    map.on("click", e => { if (e.defaultPrevented) return;
+    map.on("click", e => { if (e.defaultPrevented || document.body.classList.contains("inplace")) return;   // au chat, le toucher sert à marcher (place.js)
       // un toucher sur la carte ferme la case ouverte, sans déplacer la carte (on regarde là où on a touché)
       if (panelKind === "land" && !moving) { justBought = null; setMovebar(""); closeSearch(); return; }
       if (!map.queryRenderedFeatures(e.point).some(f => /^(bd|rf)\d|^mfill$/.test(f.layer.id))) hidePreview(); closeSearch(); });
@@ -150,7 +151,7 @@ function buildMap(base) {
       el.addEventListener("click", ev => { ev.stopPropagation(); push("arr", i); });
       a.marker = new maplibregl.Marker({ element: el }).setLngLat(a.center).addTo(map);
     });
-    buildMonMarkers(); buildParkLabels(); map.on("move", queueDeclutter); map.on("resize", queueDeclutter);
+    buildMonMarkers(); buildSpotMarkers(); buildParkLabels(); map.on("move", queueDeclutter); map.on("resize", queueDeclutter);
     map.on("zoom", renderMarks); map.on("zoomend", () => typeof declutterDest === "function" && declutterDest()); map.on("rotateend", () => typeof declutterDest === "function" && declutterDest()); map.on("moveend", renderTags);
     // la boussole n'apparaît que si la carte a été tournée ; elle remet le nord en haut
     map.on("rotate", () => { const b = map.getBearing(); $("#t-north").hidden = Math.abs(b) < 2; $("#needle").style.transform = `rotate(${-b}deg)`; });
@@ -187,6 +188,35 @@ function buildMonMarkers() {
     return { g, r, mk, el, on: false };
   });
 }
+// les lieux en cartes à parts (stations de métro, jardins, places) : un repère qu'on touche pour ouvrir la carte
+// (pictogrammes neutres, pas de logo), un anneau bleu si on y a des parts, rose s'il est à d'autres, orange s'il y a une annonce
+const SPOT_ICO = {
+  m: '<svg viewBox="0 0 24 24"><rect x="6" y="3.5" width="12" height="14" rx="3.5" fill="#fff"/><rect x="8" y="6" width="8" height="5" rx="1.2" fill="currentColor"/><circle cx="9.3" cy="14.2" r="1.2" fill="currentColor"/><circle cx="14.7" cy="14.2" r="1.2" fill="currentColor"/><path d="M8.5 17.5l-2 3M15.5 17.5l2 3" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  j: '<svg viewBox="0 0 24 24"><circle cx="12" cy="9.5" r="6" fill="#fff"/><rect x="11" y="13" width="2" height="7" rx="1" fill="#fff"/></svg>',
+  b: '<svg viewBox="0 0 24 24"><circle cx="8.5" cy="10" r="4.6" fill="#fff"/><circle cx="15.5" cy="9" r="5.2" fill="#fff"/><rect x="7.6" y="13" width="1.8" height="7" rx=".9" fill="#fff"/><rect x="14.6" y="13" width="1.8" height="7" rx=".9" fill="#fff"/></svg>',
+  p: '<svg viewBox="0 0 24 24"><path d="M12 3l1.6 3.2V15h-3.2V6.2z" fill="#fff"/><rect x="6" y="15" width="12" height="2.4" rx="1" fill="#fff"/><rect x="4" y="18.4" width="16" height="2.2" rx="1" fill="#fff"/></svg>',
+  c: '<svg viewBox="0 0 24 24"><path d="M3 15c3-2 6 2 9 0s6-2 9 0" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M5 12a7 7 0 0 1 14 0" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>'
+};
+let spotMarks = [];
+function buildSpotMarkers() {
+  spotMarks = (IDX.spots || []).map(([g, kind, lines, lon, lat]) => {
+    const el = document.createElement("button"); el.className = "smark k-" + kind;
+    el.innerHTML = `<i class="si">${SPOT_ICO[kind] || SPOT_ICO.p}</i><span class="sn"></span>`;
+    el.addEventListener("click", ev => { ev.stopPropagation(); onBuildingTap(g); });
+    return { g, kind, mk: new maplibregl.Marker({ element: el, anchor: "center" }).setLngLat([lon, lat]), el, on: false, named: false, st: -1 };
+  });
+}
+function renderSpots(z) {
+  const phone = innerWidth < 700;
+  for (const s of spotMarks) {
+    const m = s.kind === "m", show = mode === "all" && !document.body.classList.contains("picking") && z >= (m ? (phone ? 14.8 : 14.4) : (phone ? 13.8 : 13.4)) && z < 19;
+    if (show && !s.on) { s.mk.addTo(map); s.on = true; } else if (!show && s.on) { s.mk.remove(); s.on = false; }
+    if (!show) continue;
+    s.el.classList.toggle("far", z < (m ? 15.8 : 14.6));
+    if (!s.named) { const c = card(s.g); if (c) { s.named = true; s.el.querySelector(".sn").textContent = shortName((c.name || "").replace(/^Métro /, "")); s.el.setAttribute("aria-label", c.name || ""); } else ensureCards([s.g]).then(() => renderSpots(map.getZoom())).catch(() => { }); }
+    const st = stateFor(s.g); if (st !== s.st) { s.st = st; s.el.classList.toggle("me", st === 3 || st === 5); s.el.classList.toggle("them", st === 2); s.el.classList.toggle("sale", st === 4); }
+  }
+}
 // vue dézoomée : quel parti tient chaque mairie (légende en haut de la carte)
 function renderPartyLegend(z) {
   let el = $("#partyleg"); if (!el) { el = document.createElement("div"); el.id = "partyleg"; el.onclick = () => { go("paris"); setTimeout(() => push("results"), 30); }; $("#p-map").appendChild(el); }
@@ -212,6 +242,7 @@ function renderMarks() {
   renderPartyLegend(z);
   // noms des quartiers et des parcs : un peu plus tard qu'avant (carte moins chargée)
   for (const p of parkMarks) { const show = z >= p.minz + (p.minz < 12.6 ? 0 : .6) && z < 17.5; if (show && !p.on) { p.mk.addTo(map); p.on = true; } else if (!show && p.on) { p.mk.remove(); p.on = false; } }
+  renderSpots(z);
   for (const m of monMarks) {
     const show = z >= (m.r === "M" ? (innerWidth < 700 ? 13.8 : 13.4) : 14.4); m.el.classList.toggle("far", z < (m.r === "M" ? (innerWidth < 700 ? 14.8 : 14.4) : 15.5)); if (show && !m.on) { m.mk.addTo(map); m.on = true; } else if (!show && m.on) { m.mk.remove(); m.on = false; }
     if (show && !m.ph) { const c = card(m.g); if (c) { m.ph = true; if (c.ph) m.el.querySelector("i").setAttribute("style", phStyle(c)); } }
@@ -223,8 +254,8 @@ let topLim = 0, dtRaf = 0;
 function declutterTop() {
   if (!mapReady) return;
   topLim = 0;
-  if (innerWidth < 900 && document.body.classList.contains("mapfull")) {
-    const rs = [...document.querySelectorAll("#bar .wallet,#credbar,#filter")].map(e => e.getBoundingClientRect()).filter(r => r.height > 0 && r.bottom < innerHeight / 2);
+  if (document.body.classList.contains("mapfull")) {   // téléphone : la première ligne ; ordinateur : les capsules du haut (onglets, argent…)
+    const rs = [...document.querySelectorAll(innerWidth < 900 ? "#bar .wallet,#credbar,#filter" : "#tabs,#bar .wallet,#bar .brand,#credbar,#filter,#score")].map(e => e.getBoundingClientRect()).filter(r => r.height > 0 && r.bottom < innerHeight / 2);
     if (rs.length) topLim = Math.max(...rs.map(r => r.bottom)) + 6;
   }
   const c = map.getContainer().getBoundingClientRect().top;
@@ -232,6 +263,7 @@ function declutterTop() {
     if (topLim) { const p = map.project(mk.getLngLat()), y = c + p.y + mk.getOffset().y; hide = (bottom ? y - h : y - h / 2) < topLim; }
     if (el.classList.contains("undertop") !== hide) el.classList.toggle("undertop", hide); };
   for (const m of monMarks) if (m.on) chk(m.mk, m.el, 34, true);
+  for (const s of spotMarks) if (s.on) chk(s.mk, s.el, 14, false);
   for (const p of parkMarks) if (p.on) chk(p.mk, p.mk.getElement(), 18, false);
   for (const a of IDX.arr) if (a.marker) chk(a.marker, a.marker.getElement(), 30, false);
 }

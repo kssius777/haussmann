@@ -21,7 +21,19 @@ const RAR = {
   M: { n: "Mythique",    l: "M", c: "#8B3FD9", frame: "linear-gradient(140deg,#F2B3FF,#7FD4FF 35%,#B9F5C9 55%,#FFC7A1 75%,#C59BFF)", roof: "#D9B8F5", body: "#F4EAFD", w: 0.6 }
 };
 const ORDER = "MLRUC";
-const USE = { res: "Résidentiel", ind: "Immeuble", com: "Commerces & services", ann: "Annexe", rel: "Lieu de culte", spo: "Sport", indus: "Industriel", agr: "Agricole" };
+const USE = { res: "Résidentiel", ind: "Immeuble", com: "Commerces & services", ann: "Annexe", rel: "Lieu de culte", spo: "Sport", indus: "Industriel", agr: "Agricole", met: "Station de métro", jar: "Jardin", pla: "Place" };
+// les lieux en cartes à parts (20/10/2026, scripts/add_spots.py) : stations de métro, jardins, bois, places, le canal
+// IDX.spots = [[carte, sorte, lignes, lon, lat]] ; sorte : m station · j jardin · b bois · p place · c canal
+const SPOTK = { m: "Station de métro", j: "Jardin", b: "Bois", p: "Place", c: "Canal" };
+const LINE_C = { "1": "#FFCD00", "2": "#003CA6", "3": "#837902", "3bis": "#6EC4E8", "4": "#CF009E", "5": "#FF7E2E", "6": "#6ECA97", "7": "#FA9ABA", "7bis": "#6ECA97",
+  "8": "#E19BDF", "9": "#B6BD00", "10": "#C9910D", "11": "#704B1C", "12": "#007852", "13": "#6EC4E8", "14": "#62259D" };
+const LINE_DARK = new Set(["1", "3bis", "5", "6", "7", "7bis", "8", "9", "13"]);   // numéro en noir sur les couleurs claires
+let SPOTM = null;
+const spotOf = g => { if (!SPOTM && typeof IDX !== "undefined" && IDX?.spots) SPOTM = new Map(IDX.spots.map(s => [s[0], s])); return SPOTM?.get(g) || null; };
+const isStation = g => spotOf(g)?.[1] === "m";
+const stationLines = g => (spotOf(g)?.[2] || "").split(",").filter(Boolean);
+const myStations = () => Math.min(15, [...ST.mineParts.keys()].filter(isStation).length);   // bonus réseau : +1 % par station, jusqu'à +15 %
+const lineBadges = (g, size = 20) => stationLines(g).map(n => `<i class="lnb${LINE_DARK.has(n) ? " dk" : ""}" style="--lc:${LINE_C[n] || "#64748B"};--ls:${size}px">${n.replace("bis", "b")}</i>`).join("");
 
 // Partis, présentés de gauche à droite (noms fictifs). Mêmes règles pour tous :
 // le maire touche 8 % des loyers de son arrondissement, les membres du parti du maire y gagnent +10 %,
@@ -143,7 +155,7 @@ const floorOfLot = (c, k) => c.lk !== "l" ? 0 : Math.min(c.et2, 1 + Math.floor(k
 function lotsOfFloor(c, f) { const o = []; for (let k = 0; k < c.lots; k++) if (floorOfLot(c, k) === f) o.push(k); return o; }
 const lotName = (c, k) => c.lk === "l" ? `Appartement n°${k + 1}` : c.lk === "c" ? `Local commercial n°${k + 1}` : "Part";
 const lotWord = (c, n) => c.lk === "l" ? (n > 1 ? "logements" : "logement") : c.lk === "p" ? (n > 1 ? "parts" : "part") : (n > 1 ? "locaux" : "local");
-const kindLabel = c => c.lk === "p" ? "Monument" : c.lk === "c" ? "Commerces & bureaux" : (USE[c.u] || "Immeuble");
+const kindLabel = c => SPOTK[spotOf(c.g)?.[1]] || (c.lk === "p" ? "Monument" : c.lk === "c" ? "Commerces & bureaux" : (USE[c.u] || "Immeuble"));
 
 // lien vers la vraie rue (Google Street View, dans un nouvel onglet)
 function streetURL(g) { try { const [x, y] = centerOf(g); return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${y.toFixed(6)},${x.toFixed(6)}`; } catch (e) { return ""; } }

@@ -28,7 +28,7 @@ def rpc(uid, fn, **args):
             import uuid as _u; _u.UUID(str(uid))
             cur.execute("select set_config('request.jwt.claim.sub', %s, true)", (str(uid),))
         names = ", ".join(f"{k} => %s" for k in args)
-        cur.execute(f"select {fn}({names})", list(args.values()))
+        cur.execute(f"select {fn}({names})", [psycopg2.extras.Json(v) if isinstance(v, dict) else v for v in args.values()])   # un objet JSON (jsonb), comme supabase-js
         r = cur.fetchone()[0]; c.commit(); return r
     except Exception as e:
         c.rollback(); raise

@@ -50,7 +50,7 @@ function paintTargets() {
   if (g != null && map.getSource("b" + ai(g))) { map.setFeatureState({ source: "b" + ai(g), id: g }, { tgt: 1 }); landPainted = g; }
 }
 function onBuildingTap(g) {
-  if (moving) return;
+  if (moving || document.body.classList.contains("inplace")) return;
   if (panelKind === "land" && !landView) { justBought = null; setMovebar(""); return; }   // 1er toucher : on ferme la case où l'on est tombé
   previewBuilding(g);
 }

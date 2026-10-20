@@ -9,7 +9,41 @@ function phStyle(c) { const [a, n] = c.ph; return `background-image:url(${DATA}p
 const goodPhoto = c => c.ph && !/anoramax/.test(c.cr || "");
 function photo(c) {
   if (goodPhoto(c)) return `<div class="img" style="${phStyle(c)}" role="img" aria-label="Photo de ${esc(title(c))}"></div>`;
+  const sp = spotOf(c.g); if (sp) return spotArt(c, sp);
   try { return maquetteSVG(c); } catch (e) { return facadeSVG(c); }   // la vraie forme de l'immeuble ; à défaut, sa façade dessinée
+}
+// les lieux (stations, jardins, places) : un dessin à eux en attendant leurs photos
+function spotArt(c, sp) {
+  const kind = sp[1], R = rng("sp" + c.g), T = 'font-family="Inter Tight,system-ui,sans-serif"';
+  if (kind === "m") {   // le quai : carreaux blancs biseautés, plaque bleue émaillée avec le nom, pastilles des lignes
+    let tiles = ""; for (let y = 0; y < 8; y++) for (let x = -1; x < 11; x++) tiles += `<rect x="${x * 40 + (y % 2) * 20 + 2}" y="${y * 22 + 2}" width="36" height="18" rx="5" fill="url(#tl)" stroke="#DDDDD3" stroke-width="1.2"/>`;
+    const name = (c.name || "").replace(/^Métro /, ""), fs = Math.max(16, Math.min(30, 560 / Math.max(8, name.length)));
+    const L = stationLines(c.g), r = 17, gap = 8, w0 = L.length * (2 * r) + (L.length - 1) * gap;
+    const badges = L.map((n, i) => { const cx = 200 - w0 / 2 + r + i * (2 * r + gap); return `<circle cx="${cx}" cy="226" r="${r}" fill="${LINE_C[n] || "#64748B"}" stroke="#fff" stroke-width="3"/><text x="${cx}" y="232" text-anchor="middle" font-size="${n.length > 2 ? 12 : 17}" font-weight="900" fill="${LINE_DARK.has(n) ? "#111" : "#fff"}" ${T}>${n.replace("bis", "b")}</text>`; }).join("");
+    return `<svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" aria-label="Station ${esc(name)}"><defs><linearGradient id="tl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#EDEDE6"/></linearGradient></defs>
+      <rect width="400" height="300" fill="#F4F4EE"/>${tiles}
+      <rect x="0" y="178" width="400" height="22" fill="#E9E5DA"/>
+      <rect x="34" y="104" width="332" height="62" rx="7" fill="#17337E"/><rect x="40" y="110" width="320" height="50" rx="4" fill="none" stroke="#fff" stroke-width="2.5"/>
+      <text x="200" y="${135 + fs * .36}" text-anchor="middle" font-size="${fs}" font-weight="800" fill="#fff" ${T}>${esc(name)}</text>
+      <rect x="0" y="252" width="400" height="48" fill="#4B4F57"/><rect x="0" y="252" width="400" height="7" fill="#F2C230"/>${badges}</svg>`;
+  }
+  if (kind === "p") {   // une place : pavés, une fontaine au milieu, des façades autour
+    let fac = "", pav = "";
+    for (let x = -10; x < 410; x += 58) { const h = 70 + Math.floor(R() * 30); fac += `<rect x="${x}" y="${150 - h}" width="56" height="${h}" fill="#F1E5CC"/><path d="M${x - 2} ${150 - h}l6-14h44l6 14z" fill="#A9B4C4"/>` + [0, 1, 2].map(i => [0, 1, 2].map(j => `<rect x="${x + 8 + i * 16}" y="${150 - h + 12 + j * 20}" width="8" height="12" rx="1" fill="#B9CBE0"/>`).join("")).join(""); }
+    for (let y = 160; y < 300; y += 14) for (let x = -(y % 28); x < 400; x += 28) pav += `<rect x="${x}" y="${y}" width="26" height="12" rx="3" fill="#D9D2C3"/>`;
+    return `<svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" aria-label="${esc(c.name || "")}"><defs><linearGradient id="sk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#BFE0FF"/><stop offset="1" stop-color="#EEF6FF"/></linearGradient></defs>
+      <rect width="400" height="300" fill="url(#sk)"/>${fac}<rect x="0" y="150" width="400" height="150" fill="#CFC6B4"/>${pav}
+      <ellipse cx="200" cy="246" rx="96" ry="26" fill="#8DB6CF" stroke="#E9E2D3" stroke-width="7"/><ellipse cx="200" cy="243" rx="72" ry="16" fill="#A9CCE0"/>
+      <rect x="192" y="168" width="16" height="72" rx="4" fill="#C9C2B3"/><path d="M200 150l10 22h-20z" fill="#C9C2B3"/><path d="M180 196c10 6 30 6 40 0" stroke="#BFE3F5" stroke-width="5" fill="none" stroke-linecap="round"/>
+      ${[70, 330].map(x => `<rect x="${x - 2}" y="180" width="4" height="70" fill="#2F3B38"/><circle cx="${x}" cy="178" r="7" fill="#F8E7A8" stroke="#2F3B38" stroke-width="2"/>`).join("")}</svg>`;
+  }
+  // jardins, bois et le canal : pelouse, allée, arbres (et l'eau du canal sous une passerelle)
+  let trees = ""; const n = kind === "b" ? 14 : 8;
+  for (let i = 0; i < n; i++) { const x = 20 + R() * 360, y = 150 + R() * (kind === "c" ? 40 : 110), s = 18 + R() * 22 + (y - 150) * .12; trees += `<rect x="${x - 2.5}" y="${y}" width="5" height="${s * .9}" fill="#7A5233"/><circle cx="${x}" cy="${y - s * .2}" r="${s}" fill="${["#3E9B57", "#4FAE63", "#2F8A4A", "#5CB86D"][i % 4]}"/>`; }
+  const water = kind === "c" ? `<rect x="0" y="210" width="400" height="90" fill="#6FB6DF"/><path d="M0 232c40-8 80 8 120 0s80-8 120 0 80 8 120 0 40-8 40-8" stroke="#A8D6F0" stroke-width="5" fill="none"/>
+      <path d="M90 214c40-62 180-62 220 0" stroke="#2F5D50" stroke-width="9" fill="none"/><path d="M80 214h240" stroke="#2F5D50" stroke-width="7"/>${[130, 170, 210, 250].map(x => `<path d="M${x} 214v-${x === 130 || x === 250 ? 28 : 40}" stroke="#2F5D50" stroke-width="3"/>`).join("")}` : `<path d="M150 300c20-60 80-90 160-150" stroke="#E9DDC4" stroke-width="34" fill="none" stroke-linecap="round"/>`;
+  return `<svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" aria-label="${esc(c.name || "")}"><defs><linearGradient id="sj" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#BFE0FF"/><stop offset="1" stop-color="#F0F8FF"/></linearGradient></defs>
+    <rect width="400" height="300" fill="url(#sj)"/><path d="M0 140c80-30 160-20 240-6s120 4 160-8v174H0z" fill="#8FD18B"/><rect x="0" y="170" width="400" height="130" fill="#7CC67A"/>${water}${trees}</svg>`;
 }
 // Façade dessinée fidèle à l'immeuble : époque, hauteur, largeur, usage
 function eraOf(c) {
