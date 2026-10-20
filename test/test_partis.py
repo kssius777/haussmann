@@ -16,7 +16,8 @@ L = toll(Pg); check("Extrême gauche : paie 50 % de loyer en moins", abs(L["toll
 db.sql("update lots set owner=%s where card=%s and k=0", str(Rp), t)
 L = toll(Dl); check("Extrême droite : encaisse 50 % de plus", abs(L["toll"] - rent * 1.5) <= 1 and L["perk"] == "rempart", (L["toll"], rent))
 L = toll(Pg); check("Extrême gauche chez l'extrême droite : les deux s'appliquent (× 0,75)", abs(L["toll"] - rent * .75) <= 1, (L["toll"], rent))
-# Droite : apport 5 % et +50 % de capacité d'emprunt
+# Droite : apport 5 % et +50 % de capacité d'emprunt (sans les biens qu'une carte Chance a pu leur donner plus haut)
+for u in (N, Dl): db.sql("delete from lots where owner=%s", str(u)); db.sql("delete from parts where owner=%s", str(u))
 cN = db.sql("select _loan_cap(%s)", str(N))[0][0]; cD = db.sql("select _loan_cap(%s)", str(Dl))[0][0]
 check("Droite : +50 % de capacité d'emprunt", abs(cD - cN * 1.5) <= 2, (cN, cD))
 g2, v2 = db.sql("select id, v from cards where lk='l' and lots between 2 and 6 and v between 500000 and 3000000 and id not in (select card from lots) limit 1")[0]

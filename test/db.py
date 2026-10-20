@@ -20,10 +20,22 @@ def seed_graph():
         e = json.load(open('public/data/edges.json'))
         psycopg2.extras.execute_values(cur, "insert into edges(a,b) values %s on conflict do nothing", [(a, b) for a, b in e] + [(b, a) for a, b in e], page_size=20000)
     c.commit()
+SAFE = None
+def safeupdate(cur):
+    """Comme chez Supabase, où chaque requête du site passe par pg-safeupdate : DELETE / UPDATE sans WHERE refusés
+    (test/safeupdate.c, construit par test/up.sh)."""
+    global SAFE
+    if SAFE is False: return False
+    try: cur.execute("load 'hm_safeupdate'"); SAFE = True
+    except Exception:
+        cur.connection.rollback(); SAFE = False
+        import sys; print("(safeupdate absent : relancer test/up.sh ; DELETE / UPDATE sans WHERE non vérifiés)", file=sys.stderr)
+    return SAFE
 def rpc(uid, fn, **args):
     """Calls a public function as user uid, exactly like supabase.rpc() would."""
     c = conn(); cur = c.cursor()
     try:
+        safeupdate(cur)
         if uid:
             import uuid as _u; _u.UUID(str(uid))
             cur.execute("select set_config('request.jwt.claim.sub', %s, true)", (str(uid),))

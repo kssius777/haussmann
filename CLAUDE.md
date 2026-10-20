@@ -31,6 +31,7 @@ Logo (19/10/2026, choix du propriétaire) : icône façade haussmannienne sur fo
    python3 test/test_chat.py     # chat (salles, messages, bans, personnage)
    python3 test/test_monde.py    # Paris à pied (marche, km du jour, salaire, péage, achat à portée, métro, « ? », chat)
    python3 test/test_metro.py    # stations, jardins, places, gares, ponts, bonus réseau
+   python3 test/test_migrations.py  # les migrations passent comme sur la vraie base (refaite depuis le 16/10, safeupdate, 8 s, rejouables)
    python3 test/sim_boosters.py  # (pas obligatoire) 1 500 boosters : les chances par rareté et que tout peut sortir
    python3 test/e2e.py           # parcours complet dans un vrai navigateur, captures dans test/shots/
    ```
@@ -40,7 +41,13 @@ Logo (19/10/2026, choix du propriétaire) : icône façade haussmannienne sur fo
    **Vercel applique tout seul les migrations au déploiement** (`buildCommand` → `scripts/migrate.mjs` → fonction `_run_migration`,
    table `_migrations`). Une migration qui échoue est annulée et bloque le déploiement (le site reste sur l'ancienne version).
    Le propriétaire n'a plus rien à coller (installé le 16/10/2026 avec `bootstrap_auto_migrations.sql`, vérifié de bout en bout avec `migration_ping.sql` : `migrations_ok()` répond true).
-   Pour vérifier qu'une migration est passée en prod : appeler une de ses fonctions avec la clé publique (anon) de api.js.
+   Pour vérifier qu'une migration est passée en prod : `migration_status()` avec la clé publique (anon) de api.js donne la dernière migration
+   passée et la dernière erreur (notée par migrate.mjs, `migration_journal.sql`) ; sinon appeler une de ses fonctions. migrate.mjs réessaie
+   deux fois une erreur passagère (délai, verrou, serveur).
+   **Supabase refuse tout DELETE ou UPDATE sans WHERE** venant de l'API, donc dans les migrations et dans les fonctions appelées par le site
+   (extension pg-safeupdate ; le SQL Editor, lui, l'accepte) : écrire `truncate x` ou `where true`. Le 20/10/2026, « delete from metro_stop; »
+   a fait échouer deux déploiements sans autre message que « Deployment has failed ». En local, `test/safeupdate.c` (construit par up.sh,
+   chargé par `db.rpc`) fait la même chose, et `test_migrations.py` rejoue toutes les migrations comme Vercel (8 s chacune, comme service_role).
    Le site doit continuer à marcher (message « mise à jour en cours ») tant que la migration n'est pas passée.
 3. **Sécurité** : la clé `service_role` ne doit jamais apparaître dans le code ni dans la conversation
    (elle est seulement dans les variables Vercel). Les fonctions internes `_xxx` sont interdites aux joueurs (revoke).

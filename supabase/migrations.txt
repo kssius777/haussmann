@@ -28,4 +28,5 @@ migration_chat_look.sql
 migration_ruban.sql
 migration_lieux.sql
 migration_monde.sql
+migration_journal.sql
 migration_monde_paris.sql

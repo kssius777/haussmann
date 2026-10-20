@@ -58,7 +58,7 @@ create table if not exists metro_stop (
   primary key (line, b, i)
 );
 alter table metro_stop enable row level security;
-delete from metro_stop;
+truncate metro_stop;   -- (pas « delete from » sans where : Supabase le refuse, extension pg-safeupdate)
 insert into metro_stop(line, b, i, card) values
 ('1',0,0,1506832),
 ('1',0,1,1506816),
