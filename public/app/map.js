@@ -176,7 +176,7 @@ function buildParkLabels() {
   parkMarks = [...PARKS, ...PLACES].map(([n, lon, lat, minz, k]) => { const el = document.createElement("div"); el.className = "plabel" + (k ? " " + k : ""); el.textContent = n; return { mk: new maplibregl.Marker({ element: el }).setLngLat([lon, lat]), minz, on: false, dup: spotN.has(n) }; });
 }
 // noms courts pour les étiquettes de la carte
-const SHORT = { "Centre national d'art et de culture Georges-Pompidou": "Centre Pompidou", "cathédrale Notre-Dame de Paris": "Notre-Dame", "basilique du Sacré-Cœur de Montmartre": "Sacré-Cœur", "arc de triomphe de l'Étoile": "Arc de Triomphe", "palais de l'Élysée": "Élysée", "Paris-Nord": "Gare du Nord", "grande mosquée de Paris": "Grande Mosquée", "palais du Luxembourg": "Sénat (Luxembourg)", "Musée du Louvre": "Louvre", "église de la Madeleine": "La Madeleine", "palais Garnier": "Opéra Garnier", "catacombes de Paris": "Catacombes", "Palais Omnisports de Paris-Bercy": "Accor Arena (Bercy)", "Paris-Lyon": "Gare de Lyon", "Muséum national d'histoire naturelle": "Muséum", "hôtel de ville de Paris": "Hôtel de Ville", "conciergerie de Paris": "Conciergerie", "Paris-Est": "Gare de l'Est", "Paris-Montparnasse": "Gare Montparnasse", "Paris-Saint-Lazare": "Gare Saint-Lazare", "Paris-Austerlitz": "Gare d'Austerlitz", "obélisque de Louxor": "Obélisque", "Tombeau de l'Empereur Napoléon aux Invalides": "Les Invalides", "église Saint-Sulpice de Paris": "Saint-Sulpice", "église Saint-Eustache de Paris": "Saint-Eustache", "abbaye Royale de Saint-Germain-des-Prés": "Saint-Germain-des-Prés", "basilique Sainte-Clotilde": "Sainte-Clotilde", "église de la Sainte-Trinité de Paris": "La Trinité", "église Saint-Augustin de Paris": "Saint-Augustin", "église du Val-de-Grâce": "Val-de-Grâce", "église Saint-Étienne-du-Mont": "Saint-Étienne-du-Mont", "église Saint-Vincent-de-Paul": "Saint-Vincent-de-Paul", "église Saint-Ambroise": "Saint-Ambroise", "église Saint-Paul-Saint-Louis de Paris": "Saint-Paul", "arc de triomphe du Carrousel": "Arc du Carrousel", "opéra Bastille": "Opéra Bastille" };
+const SHORT = { "Centre national d'art et de culture Georges-Pompidou": "Centre Pompidou", "cathédrale Notre-Dame de Paris": "Notre-Dame", "basilique du Sacré-Cœur de Montmartre": "Sacré-Cœur", "arc de triomphe de l'Étoile": "Arc de Triomphe", "palais de l'Élysée": "Élysée", "Paris-Nord": "Gare du Nord", "grande mosquée de Paris": "Grande Mosquée", "palais du Luxembourg": "Sénat (Luxembourg)", "Musée du Louvre": "Louvre", "église de la Madeleine": "La Madeleine", "palais Garnier": "Opéra Garnier", "catacombes de Paris": "Catacombes", "Palais Omnisports de Paris-Bercy": "Accor Arena (Bercy)", "Paris-Lyon": "Gare de Lyon", "Muséum national d'histoire naturelle": "Muséum", "hôtel de ville de Paris": "Hôtel de Ville", "conciergerie de Paris": "Conciergerie", "Paris-Est": "Gare de l'Est", "Paris-Montparnasse": "Gare Montparnasse", "Paris-Saint-Lazare": "Gare Saint-Lazare", "Paris-Austerlitz": "Gare d'Austerlitz", "obélisque de Louxor": "Obélisque", "Tombeau de l'Empereur Napoléon aux Invalides": "Les Invalides", "église Saint-Sulpice de Paris": "Saint-Sulpice", "église Saint-Eustache de Paris": "Saint-Eustache", "abbaye Royale de Saint-Germain-des-Prés": "Saint-Germain-des-Prés", "basilique Sainte-Clotilde": "Sainte-Clotilde", "église de la Sainte-Trinité de Paris": "La Trinité", "église Saint-Augustin de Paris": "Saint-Augustin", "église du Val-de-Grâce": "Val-de-Grâce", "église Saint-Étienne-du-Mont": "Saint-Étienne-du-Mont", "église Saint-Vincent-de-Paul": "Saint-Vincent-de-Paul", "église Saint-Ambroise": "Saint-Ambroise", "église Saint-Paul-Saint-Louis de Paris": "Saint-Paul", "arc de triomphe du Carrousel": "Arc du Carrousel", "opéra Bastille": "Opéra Bastille", "Fondation d'entreprise Louis-Vuitton": "Fondation Louis Vuitton" };
 const noAcc = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 const shortName = n => SHORT[n] || cap(n).replace(/^(Église|Musée|Théâtre|Hôtel|Palais|Basilique|Gare) /, "$1 ").replace(/ de Paris$/, "");
 let monMarks = [];
@@ -197,7 +197,12 @@ const SPOT_ICO = {
   j: '<svg viewBox="0 0 24 24"><circle cx="12" cy="9.5" r="6" fill="#fff"/><rect x="11" y="13" width="2" height="7" rx="1" fill="#fff"/></svg>',
   b: '<svg viewBox="0 0 24 24"><circle cx="8.5" cy="10" r="4.6" fill="#fff"/><circle cx="15.5" cy="9" r="5.2" fill="#fff"/><rect x="7.6" y="13" width="1.8" height="7" rx=".9" fill="#fff"/><rect x="14.6" y="13" width="1.8" height="7" rx=".9" fill="#fff"/></svg>',
   p: '<svg viewBox="0 0 24 24"><path d="M12 3l1.6 3.2V15h-3.2V6.2z" fill="#fff"/><rect x="6" y="15" width="12" height="2.4" rx="1" fill="#fff"/><rect x="4" y="18.4" width="16" height="2.2" rx="1" fill="#fff"/></svg>',
-  c: '<svg viewBox="0 0 24 24"><path d="M3 15c3-2 6 2 9 0s6-2 9 0" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M5 12a7 7 0 0 1 14 0" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>'
+  c: '<svg viewBox="0 0 24 24"><path d="M3 15c3-2 6 2 9 0s6-2 9 0" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M5 12a7 7 0 0 1 14 0" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
+  g: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.6" fill="#fff"/><path d="M12 7.4V12l3.2 2.1" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>',
+  n: '<svg viewBox="0 0 24 24"><path d="M3 15.5h18" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M5 15.5c2-6.4 12-6.4 14 0" fill="none" stroke="#fff" stroke-width="2"/><path d="M8.4 15.5v-3M12 15.5v-4.6M15.6 15.5v-3" stroke="#fff" stroke-width="1.5"/></svg>',
+  k: '<svg viewBox="0 0 24 24"><path d="M8 19.5V10a4 4 0 0 1 8 0v9.5z" fill="#fff"/><rect x="6" y="18.6" width="12" height="2.2" rx="1" fill="#fff"/></svg>',
+  o: '<svg viewBox="0 0 24 24"><path d="M12 3.6l8 4.2H4z" fill="#fff"/><path d="M5.4 9.2h2v8h-2zM9.4 9.2h2v8h-2zM12.6 9.2h2v8h-2zM16.6 9.2h2v8h-2z" fill="#fff"/><rect x="4" y="17.6" width="16" height="2.6" rx="1" fill="#fff"/></svg>',
+  a: '<svg viewBox="0 0 24 24"><path d="M9 21l2.2-16h1.6L15 21z" fill="#fff"/><path d="M12 8.2v2M12 13v2.2M12 18v2" stroke="currentColor" stroke-width="1.3"/><circle cx="5.5" cy="12" r="2.6" fill="#fff"/><circle cx="18.5" cy="12" r="2.6" fill="#fff"/></svg>'
 };
 let spotMarks = [];
 function buildSpotMarkers() {
@@ -205,7 +210,8 @@ function buildSpotMarkers() {
     const el = document.createElement("button"); el.className = "smark k-" + kind;
     el.innerHTML = `<i class="si">${SPOT_ICO[kind] || SPOT_ICO.p}</i><span class="sn">${esc(shortName((name || "").replace(/^Métro /, "")))}</span>`;
     el.addEventListener("click", ev => { ev.stopPropagation(); onBuildingTap(g); });
-    return { g, kind, lon, lat, name: name || "", mk: new maplibregl.Marker({ element: el, anchor: "center" }).setLngLat([lon, lat]), el, on: false, far: null, st: -1 };
+    const model = IDX.models.find(x => x.g === g);   // une statue, une colonne : le repère se pose au-dessus, pas sur elle
+    return { g, kind, lon, lat, name: name || "", mh: model ? model.h : 0, off: 0, mk: new maplibregl.Marker({ element: el, anchor: model ? "bottom" : "center" }).setLngLat(model ? [model.lon, model.lat] : [lon, lat]), el, on: false, far: null, st: -1 };
   });
 }
 function renderSpots(z) {
@@ -218,6 +224,7 @@ function renderSpots(z) {
     if (show && !s.on) { s.mk.addTo(map); s.el.setAttribute("aria-label", s.name); s.on = true; } else if (!show && s.on) { s.mk.remove(); s.on = false; }   // addTo met « Map marker »
     if (!show) continue;
     const far = z < (m ? 15.8 : 14.6); if (far !== s.far) { s.far = far; s.el.classList.toggle("far", far); }
+    if (s.mh) { const off = -Math.round(Math.min(220, s.mh * 512 * Math.pow(2, z) / (40075016.7 * Math.cos(s.lat * Math.PI / 180)) * .8)); if (Math.abs(off - s.off) > 3) { s.off = off; s.mk.setOffset([0, off]); } }
     const st = stateFor(s.g); if (st !== s.st) { s.st = st; s.el.classList.toggle("me", st === 3 || st === 5); s.el.classList.toggle("them", st === 2); s.el.classList.toggle("sale", st === 4); }
   }
 }
@@ -363,7 +370,7 @@ function initMapUI() {
   $("#q").addEventListener("input", () => {
     const v = $("#q").value.trim().toLowerCase(); const out = $("#results"); if (v.length < 2) { out.innerHTML = ""; return; }
     const hits = [], nv = noAcc(v);   // « chatelet » trouve Châtelet
-    for (const [g, n, r] of IDX.mons) { if (noAcc(n).includes(nv)) hits.push([0, ORDER.indexOf(r), g, cap(n), r]); if (hits.length > 40) break; }
+    for (const [g, n, r] of IDX.mons) { if (noAcc(n).includes(nv) || (SHORT[n] && noAcc(SHORT[n]).includes(nv))) hits.push([0, ORDER.indexOf(r), g, knownName(n), r]); if (hits.length > 40) break; }
     for (const s of IDX.spots || []) if (hits.length < 50 && noAcc(s[5] || "").includes(nv)) hits.push([0, ORDER.indexOf(s[6]), s[0], s[5], s[6]]);
     const ia = FIELDS.indexOf("adr"), ir = FIELDS.indexOf("r");
     for (let i = 0; i < 20 && hits.length < 60; i++) { const A = ARR[i]; if (!A?.cards) continue; A.cards.forEach((row, k) => { const a = row[ia]; if (a && a.toLowerCase().includes(v) && hits.length < 60) hits.push([1, ORDER.indexOf(row[ir]), i * 1e5 + k, a, row[ir]]); }); }

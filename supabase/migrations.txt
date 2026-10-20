@@ -24,3 +24,6 @@ migration_ponts.sql
 migration_chance_fun.sql
 migration_chat.sql
 migration_metro.sql
+migration_chat_look.sql
+migration_ruban.sql
+migration_lieux.sql

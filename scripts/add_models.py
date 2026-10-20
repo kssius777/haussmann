@@ -26,9 +26,11 @@ NEW = [
     (401377, "museum", [], dict(h=30)),
     (600185, "ecolemilitaire", [], dict(h=36, fx=-1)),
     (491, "horloge", [], dict(h=47)),   # tour de l'Horloge (Conciergerie)
-    (None, "vendome", [], dict(lon=2.32941, lat=48.86752, L=7, W=7, h=44, ang=0.0)),
-    (None, "juillet", [], dict(lon=2.36914, lat=48.85321, L=14, W=14, h=51, ang=0.0)),
-    (None, "saintjacques", [], dict(lon=2.34886, lat=48.85802, L=11, W=11, h=52, snap=True)),
+    ("Place Vendôme", "vendome", [], dict(lon=2.32941, lat=48.86752, L=7, W=7, h=44, ang=0.0)),
+    ("Place de la Bastille", "juillet", [], dict(lon=2.36914, lat=48.85321, L=14, W=14, h=51, ang=0.0)),
+    ("Tour Saint-Jacques", "saintjacques", [], dict(lon=2.34886, lat=48.85802, L=11, W=11, h=52, ang=0.0)),
+    ("Place de la République", "republique", [], dict(lon=2.363556, lat=48.867528, L=15, W=15, h=26, ang=0.0)),
+    ("Place du Châtelet", "palmier", [], dict(lon=2.347222, lat=48.8575, L=12, W=12, h=23, ang=0.0)),
     (401791, "valdegrace", [], dict(h=46, L=26, W=26)),
     (502573, "sulpice", [502575, 502576], dict(h=73, fx=-1)),
     (1150, "eustache", [], dict(h=58, fx=-1)),
@@ -43,6 +45,8 @@ NEW = [
 ]
 
 ix = json.load(open(D + "index.json")); F = ix["fields"]
+def spot(name):   # la carte d'un lieu (scripts/add_spots.py) : une colonne, une statue, une tour reliées à leur place
+    return next(s[0] for s in ix["spots"] if s[5] == name)
 def dec(flat):
     x = flat[0] + 235000; y = flat[1] + 4886000; out = [(x / 1e5, y / 1e5)]
     for k in range(2, len(flat), 2):
@@ -89,6 +93,7 @@ def nearest(lon, lat, R=12):
 keys = {m for _, m, _, _ in NEW}
 models = [m for m in ix["models"] if m["m"] not in keys]
 added = []
+NEW = [(spot(g) if isinstance(g, str) else g, key, extra, o) for g, key, extra, o in NEW]
 for g, key, extra, o in NEW:
     o = dict(o)
     if g is not None:

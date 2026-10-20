@@ -8,7 +8,7 @@ function phStyle(c) { const [a, n] = c.ph; return `background-image:url(${DATA}p
 // les photos de rue automatiques (Panoramax) sont souvent ratées : on garde le dessin pour elles
 const goodPhoto = c => c.ph && !/anoramax/.test(c.cr || "");
 function photo(c) {
-  if (goodPhoto(c)) return `<div class="img" style="${phStyle(c)}" role="img" aria-label="Photo de ${esc(title(c))}"></div>`;
+  if (goodPhoto(c)) return `<div class="img" style="${phStyle(c)}" role="img" aria-label="Photo de ${esc(title(c))}"></div>${isStation(c.g) ? `<span class="phl">${lineBadges(c.g, 18)}</span>` : ""}`;   // une station : ses lignes sur la photo
   const sp = spotOf(c.g); if (sp) return spotArt(c, sp);
   try { return maquetteSVG(c); } catch (e) { return facadeSVG(c); }   // la vraie forme de l'immeuble ; à défaut, sa façade dessinée
 }
@@ -28,7 +28,7 @@ function spotArt(c, sp) {
       <text x="200" y="${125 + fs * .36}" text-anchor="middle" font-size="${fs}" font-weight="800" fill="#fff" ${T}${fit}>${esc(name)}</text>${badges}`, "Station " + name);
   }
   const sky = `<rect width="400" height="300" fill="#D6EBFF"/><rect y="70" width="400" height="80" fill="#E6F3FF"/>`;
-  if (kind === "p") {   // une place : façades autour, pavés, une fontaine au milieu, deux réverbères
+  if (kind === "p" || kind === "g" || kind === "o" || kind === "a") {   // une place (et, en attendant leur photo, gares, monuments, avenue) : façades, pavés, fontaine, réverbères
     let fac = "", pav = "";
     for (let x = -10; x < 410; x += 58) {
       const h = 72 + Math.floor(R() * 30), top = 150 - h;
@@ -43,14 +43,16 @@ function spotArt(c, sp) {
       <path d="M186 204c6-10 22-10 28 0" stroke="#D4ECF8" stroke-width="5" fill="none" stroke-linecap="round"/>${lamp(68)}${lamp(332)}`, c.name || "");
   }
   // jardins, bois et le canal : pelouse, arbres ; au jardin une allée et les chaises vertes, au bois un lac, au canal l'eau et sa passerelle
-  let trees = ""; const n = kind === "b" ? 16 : kind === "c" ? 7 : 9, pts = [], greens = kind === "b" ? ["#2F7D45", "#3E9254", "#256B3B", "#4A9F5E"] : ["#3E9B57", "#4FAE63", "#2F8A4A", "#5CB86D"];
-  for (let i = 0; i < n; i++) pts.push([20 + R() * 360, 150 + R() * (kind === "c" ? 26 : kind === "b" ? 70 : 112)]);
+  const water = kind === "c" || kind === "n";
+  let trees = ""; const n = kind === "b" || kind === "k" ? 16 : water ? 7 : 9, pts = [], greens = kind === "b" ? ["#2F7D45", "#3E9254", "#256B3B", "#4A9F5E"] : ["#3E9B57", "#4FAE63", "#2F8A4A", "#5CB86D"];
+  for (let i = 0; i < n; i++) pts.push([20 + R() * 360, 150 + R() * (water ? 26 : kind === "b" ? 70 : kind === "k" ? 40 : 112)]);
   pts.sort((a, b) => a[1] - b[1]).forEach(([x, y], i) => { const s = 16 + R() * 18 + (y - 150) * .16; trees += `<rect x="${x - 2.5}" y="${y}" width="5" height="${s * .9}" fill="#7A5233"/><circle cx="${x}" cy="${y - s * .15}" r="${s}" fill="${greens[i % 4]}"/><circle cx="${x - s * .3}" cy="${y - s * .45}" r="${s * .35}" fill="#fff" opacity=".12"/>`; });
   const chair = (x, y, f) => `<path d="M${x} ${y}h${22 * f}M${x + 2 * f} ${y}l${-2 * f} 17M${x + 20 * f} ${y}l${2 * f} 17M${x + 20 * f} ${y}l${6 * f} -22" stroke="#2F7A55" stroke-width="3.6" stroke-linecap="round" fill="none"/><path d="M${x + 22.5 * f} ${y - 8}l${3 * f} -10" stroke="#2F7A55" stroke-width="7" stroke-linecap="round"/>`;
   const lawn = `<path d="M0 140c80-30 160-20 240-6s120 4 160-8v174H0z" fill="${kind === "b" ? "#86C27F" : "#93D08C"}"/><rect x="0" y="168" width="400" height="132" fill="${kind === "b" ? "#74B66F" : "#7FC57A"}"/>`;
   let inner;
-  if (kind === "c") inner = `${lawn}${trees}<rect x="0" y="200" width="400" height="8" fill="#B8AE98"/><rect x="0" y="206" width="400" height="94" fill="#6FB2DA"/><path d="M0 232c40-8 80 8 120 0s80-8 120 0 80 8 120 0 40-6 40-6" stroke="#A8D6F0" stroke-width="5" fill="none"/>
+  if (water) inner = `${lawn}${trees}<rect x="0" y="200" width="400" height="8" fill="#B8AE98"/><rect x="0" y="206" width="400" height="94" fill="#6FB2DA"/><path d="M0 232c40-8 80 8 120 0s80-8 120 0 80 8 120 0 40-6 40-6" stroke="#A8D6F0" stroke-width="5" fill="none"/>
       <path d="M86 206c40-64 188-64 228 0" stroke="#2E5B4F" stroke-width="9" fill="none"/><path d="M76 206h248" stroke="#2E5B4F" stroke-width="7"/>${[128, 166, 200, 234, 272].map(x => `<path d="M${x} 206v-${Math.round(46 - Math.abs(x - 200) * .32)}" stroke="#2E5B4F" stroke-width="3"/>`).join("")}`;
+  else if (kind === "k") inner = `${lawn}${trees}${[60, 120, 180, 240, 300, 350, 90, 210, 330].map((x, i) => { const y = 225 + (i % 3) * 22 + (i > 5 ? 8 : 0); return `<path d="M${x - 9} ${y + 22}v-16a9 9 0 0 1 18 0v16z" fill="#C9CDD3" stroke="#9AA1AB" stroke-width="1.5"/>`; }).join("")}`;
   else if (kind === "b") inner = `${lawn}<ellipse cx="110" cy="262" rx="120" ry="30" fill="#7DB9DC"/><path d="M40 262c30-6 60 6 90 0" stroke="#B4DCF0" stroke-width="4" fill="none" stroke-linecap="round"/>${trees}`;
   else inner = `${lawn}<path d="M150 300c20-60 80-90 170-150" stroke="#EADFC6" stroke-width="34" fill="none" stroke-linecap="round"/>${trees}${chair(96, 262, 1)}${chair(300, 270, -1)}`;
   return svg(`${sky}${inner}`, c.name || "");
@@ -239,17 +241,19 @@ const itemUnits = it => it.n || (it.ks ? it.ks.length : 1);
 function rarSq(r, size) { return `<span class="sq" style="background:${RAR[r].c};${size ? `width:${size}px;height:${size}px` : ""}">${RAR[r].l}</span>`; }
 
 // --- la carte « plaque de rue » ---------------------------------------------
-function plaqueTitle(c) { return c.name ? cap(c.name) : (c.adr || "Immeuble"); }
+function plaqueTitle(c) { return c.name ? knownName(c.name) : (c.adr || "Immeuble"); }
 const STARS = { C: 1, U: 2, R: 3, L: 4, M: 5 };
 const ERA_N = { ancien: "Ancien Paris", hauss: "Haussmannien", brique: "Années folles", beton: "Trente Glorieuses", contemp: "Contemporain" };
-function cardHTML(c, { w, item, tier, count } = {}) {
+function cardHTML(c, { w, item, tier, count, party } = {}) {
   const r = tier || c.r, n = item ? Math.max(1, itemUnits(item)) : 1;
+  // le ruban : le parti qui possède le plus de logements (ou de parts) de cette carte (choix du propriétaire, 20/10/2026)
+  const pt = party !== undefined ? party : (typeof ST !== "undefined" && ST.own?.get(c.g)?.party) || null, rib = pt && RIB[pt];
   const t = plaqueTitle(c), long = t.length > 22;
   // carte d'un immeuble entier (pas d'un bien possédé) : les chiffres sont ceux d'UN logement
   const per = !item && c.lots > 1 ? (c.lk === "p" ? "/ PART" : c.lk === "l" ? "/ LOGT" : "/ LOCAL") : "";
-  return `<div class="hc t${r}" style="${w ? `--w:${w}` : ""}"><div class="fr"><div class="in">
+  return `<div class="hc t${r}${rib ? " pr" : ""}" style="${w ? `--w:${w};` : ""}${rib ? `--pc1:${rib[0]};--pc2:${rib[1]}` : ""}"><div class="fr"><div class="in">
     <div class="plq"><small>${c.arr === 1 ? "1<sup>er</sup>" : c.arr + "<sup>e</sup>"} Arr<sup>t</sup></small><b class="${long ? "long" : ""}">${esc(t)}</b></div>
-    <div class="ph">${photo(c)}<i class="foil"></i>${c.lk !== "p" && c.u !== "rel" && !goodPhoto(c) ? `<span class="era e-${eraOf(c)}">${ERA_N[eraOf(c)]}${c.y ? ` · ${esc(c.y)}` : ""}</span>` : ""}<span class="rb">${RAR[r].l}</span>${count ? `<span class="cnt">${esc(count)}</span>` : ""}</div>
+    <div class="ph">${photo(c)}${rib ? `<span class="rib">${emblemSVG(pt, 30)}${esc(PARTIES[pt].n)}</span>` : ""}<i class="foil"></i>${c.lk !== "p" && c.u !== "rel" && !goodPhoto(c) ? `<span class="era e-${eraOf(c)}">${ERA_N[eraOf(c)]}${c.y ? ` · ${esc(c.y)}` : ""}</span>` : ""}<span class="rb">${RAR[r].l}</span>${count ? `<span class="cnt">${esc(count)}</span>` : ""}</div>
     <div class="bd"><div class="kd">${esc(itemLabel(c, item) || kindLabel(c))}</div>
       <div class="nums num"><div><span>${per ? "LOYER " + per : "LOYER / JOUR"}</span><b class="g">${fmtE(c.rent * n)}</b></div><div class="r"><span>${per ? "PRIX " + per : "VALEUR"}</span><b>${fmtE(c.v * n)}</b></div></div>
       <div class="rn"><span><i class="stars">${"★".repeat(STARS[r])}</i>${RAR[r].n.toUpperCase()}</span><em>N° ${String(c.arr).padStart(2, "0")}-${String(li(c.g)).padStart(5, "0")}</em></div></div>
@@ -308,7 +312,7 @@ function packHTML(cls = "", col = "blue") {
 
 // phrase claire pour « ce que je possède » dans un immeuble
 function ownSentence(c, ks, n) {
-  if (n) return `${fmtN(n)} part${n > 1 ? "s" : ""} ${{ m: "de la station", j: "du jardin", b: "du bois", p: "de la place", c: "du canal" }[spotOf(c.g)?.[1]] || "du monument"} sur ${fmtN(c.lots)}`;
+  if (n) return `${fmtN(n)} part${n > 1 ? "s" : ""} ${SPOTDE[spotOf(c.g)?.[1]] || "du monument"} sur ${fmtN(c.lots)}`;
   const w = x => c.lk === "l" ? (x > 1 ? "logements" : "logement") : (x > 1 ? "locaux commerciaux" : "local commercial");
   if (ks.length === c.lots && c.lots > 1) return `Tout l'immeuble : ses ${c.lots} ${w(c.lots)}`;
   return `${ks.length} ${w(ks.length)} sur les ${c.lots} de l'immeuble`;

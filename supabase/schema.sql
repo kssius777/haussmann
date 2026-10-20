@@ -2691,3 +2691,456 @@ insert into spots(card, kind, lines) values
 (1706105,'p',null),
 (902927,'c',null)
 on conflict (card) do update set kind = excluded.kind, lines = excluded.lines;
+
+-- ===== migration_chat_look.sql =====
+-- =====================================================================
+--  Mon personnage, un peu plus de choix (20/10/2026, demande du propriétaire : homme ou femme, blond, « un peu plus de custo,
+--  mais minimaliste ») : genre (g), 8 couleurs de cheveux (h), 6 coupes (c), couleur du bas (b), un accessoire (a).
+--  Les personnages déjà enregistrés restent valables (g, b, a absents = 0).
+--  Salles de 80 au lieu de 40 : on peut maintenant marcher sur tout le Champ-de-Mars. Rejouable sans risque.
+-- =====================================================================
+create or replace function set_look(p_look jsonb) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare u uuid := _need_me(); l jsonb; r int; k text; v int; lo int; hi int; opt boolean;
+begin
+  l := '{}'::jsonb;
+  foreach k in array array['g', 's', 'h', 'c', 't', 'b', 'a'] loop
+    lo := case k when 't' then -1 else 0 end;
+    hi := case k when 'g' then 1 when 's' then 5 when 'h' then 7 when 'c' then 5 when 't' then 6 else 4 end;
+    opt := k in ('g', 'b', 'a');
+    v := case when jsonb_typeof(p_look -> k) = 'number' then (p_look ->> k)::numeric::int else null end;
+    if v is null and opt then v := 0; end if;
+    if v is null or v < lo or v > hi then raise exception 'Choix de personnage inconnu'; end if;
+    l := l || jsonb_build_object(k, v);
+  end loop;
+  update profiles set look = l where id = u;
+  select room into r from place_people where user_id = u;
+  if r is not null then perform _chat_emit(r, u, 'look', jsonb_build_object('look', l)); end if;
+  return l;
+end $$;
+revoke all on function set_look(jsonb) from public, anon;
+grant execute on function set_look(jsonb) to authenticated;
+
+-- entrer sur le Champ-de-Mars (ou y revenir) : on garde sa salle, sinon la première qui a de la place
+create or replace function chat_join(p_lon float8, p_lat float8) returns json
+language plpgsql security definer set search_path = public as $$
+declare u uuid := _need_me(); b timestamptz; r int; lo float8; la float8;
+begin
+  b := _chat_ban_until(u);
+  if b = 'infinity'::timestamptz then raise exception 'Vous êtes banni du chat.'; end if;
+  if b is not null then raise exception 'Vous êtes banni du chat jusqu''au %', to_char(b at time zone 'Europe/Paris', 'DD/MM à HH24"h"MI'); end if;
+  lo := least(2.3050, greatest(2.2920, coalesce(p_lon, 2.2985)));
+  la := least(48.8600, greatest(48.8500, coalesce(p_lat, 48.8556)));
+  delete from place_people where seen < now() - interval '90 seconds';
+  select room into r from place_people where user_id = u;
+  if r is null then
+    select min(g) into r from generate_series(1, (select coalesce(max(room), 0) + 1 from place_people)) g
+      where (select count(*) from place_people x where x.room = g) < 80;   -- 80 par salle (20/10/2026 : tout le Champ-de-Mars est ouvert)
+  end if;
+  insert into place_people(user_id, room, lon, lat, seen) values (u, r, lo, la, now())
+    on conflict (user_id) do update set room = excluded.room, lon = excluded.lon, lat = excluded.lat, seen = now();
+  perform _chat_emit(r, u, 'join', _chat_person(u));
+  return json_build_object('room', r, 'me', u, 'people', chat_people(), 'last', coalesce((select max(id) from chat_msg where room = r), 0), 'admin', is_admin());
+end $$;
+
+-- ===== migration_ruban.sql =====
+-- =====================================================================
+--  Les cartes aux couleurs du parti qui en possède le plus (20/10/2026, choix du propriétaire : le « ruban »).
+--  map_state() renvoie en plus, pour chaque carte, le parti qui y a le plus de logements (ou de parts) ;
+--  personne si aucun propriétaire n'a de parti, ou s'il y a égalité en tête. Rejouable sans risque.
+-- =====================================================================
+create or replace function map_state() returns json language sql stable security definer set search_path = public as $$
+  with lp as (select l.card, p.party, count(*)::numeric n from lots l join profiles p on p.id = l.owner where p.party is not null group by l.card, p.party),
+       pp as (select x.card, p.party, sum(x.n)::numeric n from parts x join profiles p on p.id = x.owner where p.party is not null group by x.card, p.party),
+       u as (select card, party, n, max(n) over (partition by card) mx from (select * from lp union all select * from pp) a),
+       dom as (select card, case when count(*) filter (where n = mx) = 1 then min(party) filter (where n = mx) end party from u group by card)
+  select json_build_object(
+    'lots',  coalesce((select json_agg(json_build_array(x.card, x.owners, x.n, d.party)) from
+               (select card, array_agg(distinct owner) owners, count(*) n from lots group by card) x left join dom d on d.card = x.card), '[]'),
+    'parts', coalesce((select json_agg(json_build_array(y.card, y.owners, y.n, d.party)) from
+               (select card, array_agg(owner) owners, sum(n) n from parts group by card) y left join dom d on d.card = y.card), '[]'),
+    'sale',  coalesce((select json_agg(distinct card) from listings), '[]'),
+    'arr',   coalesce((select json_agg(json_build_array(s.arr, s.mayor, s.party, p.pseudo)) from arr_state s left join profiles p on p.id=s.mayor), '[]'))
+$$;
+grant execute on function map_state() to anon, authenticated;
+
+-- ===== migration_lieux.sql =====
+--  Les lieux, deuxième vague (gares, ponts, cimetières, monuments, immeubles célèbres nommés) : ici la liste des lieux et les noms ;
+--  les cartes et les liens du dé viennent de cards.json et edges.json (/api/seed).
+-- la liste des lieux (pour une base neuve : les cartes et les liens viennent de cards.json et edges.json)
+insert into spots(card, kind, lines) values
+(1578,'m',array['1','4','7','11','14']),
+(1579,'m',array['4']),
+(1580,'m',array['4']),
+(1581,'m',array['1']),
+(1582,'m',array['1','7']),
+(1583,'m',array['7']),
+(1584,'m',array['7','14']),
+(1585,'m',array['1']),
+(101896,'m',array['3']),
+(101897,'m',array['3']),
+(101898,'m',array['3','4']),
+(101899,'m',array['3']),
+(101900,'m',array['4','8','9']),
+(202033,'m',array['3','11']),
+(202034,'m',array['8']),
+(202035,'m',array['8']),
+(202036,'m',array['11']),
+(202037,'m',array['3','5','8','9','11']),
+(202038,'m',array['8']),
+(202039,'m',array['3']),
+(301901,'m',array['4']),
+(301902,'m',array['1','11']),
+(301903,'m',array['7']),
+(301904,'m',array['1']),
+(301905,'m',array['7']),
+(402728,'m',array['10']),
+(402729,'m',array['7']),
+(402730,'m',array['10']),
+(402731,'m',array['7','10']),
+(402732,'m',array['10']),
+(402733,'m',array['7']),
+(502588,'m',array['10']),
+(502589,'m',array['12']),
+(502590,'m',array['4','10']),
+(502591,'m',array['12']),
+(502592,'m',array['4']),
+(502593,'m',array['4']),
+(502594,'m',array['4']),
+(502595,'m',array['4']),
+(602929,'m',array['12']),
+(602930,'m',array['10','13']),
+(602931,'m',array['8']),
+(602932,'m',array['8','13']),
+(602933,'m',array['8']),
+(602934,'m',array['12']),
+(602935,'m',array['13']),
+(602936,'m',array['10','12']),
+(602937,'m',array['12']),
+(602938,'m',array['10']),
+(602939,'m',array['13']),
+(703297,'m',array['9']),
+(703298,'m',array['1','13']),
+(703299,'m',array['1','2','6']),
+(703300,'m',array['1','8','12']),
+(703301,'m',array['2']),
+(703302,'m',array['3']),
+(703303,'m',array['1','9']),
+(703304,'m',array['1']),
+(703305,'m',array['13']),
+(703306,'m',array['8','12','14']),
+(703307,'m',array['9','13']),
+(703308,'m',array['2']),
+(703309,'m',array['9']),
+(703310,'m',array['3','12','13','14']),
+(703311,'m',array['9']),
+(703312,'m',array['2']),
+(803146,'m',array['2']),
+(803147,'m',array['7']),
+(803148,'m',array['7','9']),
+(803149,'m',array['8','9']),
+(803150,'m',array['3','9']),
+(803151,'m',array['7']),
+(803152,'m',array['12']),
+(803153,'m',array['3','7','8']),
+(803154,'m',array['2','12']),
+(803155,'m',array['7']),
+(803156,'m',array['8','9']),
+(803157,'m',array['12']),
+(803158,'m',array['12']),
+(902918,'m',array['2','4']),
+(902919,'m',array['8','9']),
+(902920,'m',array['4']),
+(902921,'m',array['7']),
+(902922,'m',array['2']),
+(902923,'m',array['4','5','7']),
+(902924,'m',array['4','5']),
+(902925,'m',array['5']),
+(902926,'m',array['7','7bis']),
+(1004561,'m',array['2']),
+(1004562,'m',array['2']),
+(1004563,'m',array['5']),
+(1004564,'m',array['9']),
+(1004565,'m',array['2']),
+(1004566,'m',array['8']),
+(1004567,'m',array['11']),
+(1004568,'m',array['8']),
+(1004569,'m',array['2']),
+(1004570,'m',array['5','9']),
+(1004571,'m',array['3']),
+(1004572,'m',array['5']),
+(1004573,'m',array['9']),
+(1004574,'m',array['3']),
+(1004575,'m',array['9']),
+(1004576,'m',array['9']),
+(1103959,'m',array['1','5','8']),
+(1103960,'m',array['6']),
+(1103961,'m',array['6','14']),
+(1103962,'m',array['14']),
+(1103963,'m',array['6','8']),
+(1103964,'m',array['6']),
+(1103965,'m',array['1','14']),
+(1103966,'m',array['8']),
+(1103967,'m',array['8']),
+(1103968,'m',array['1','2','6','9']),
+(1103969,'m',array['6']),
+(1103970,'m',array['8']),
+(1103971,'m',array['8']),
+(1103972,'m',array['5']),
+(1103973,'m',array['1','8']),
+(1204454,'m',array['14']),
+(1204455,'m',array['5']),
+(1204456,'m',array['6']),
+(1204457,'m',array['6']),
+(1204458,'m',array['5','10']),
+(1204459,'m',array['6']),
+(1204460,'m',array['7']),
+(1204461,'m',array['7','14']),
+(1204462,'m',array['6']),
+(1204463,'m',array['14']),
+(1204464,'m',array['5','6','7']),
+(1204465,'m',array['7']),
+(1204466,'m',array['7']),
+(1204467,'m',array['7']),
+(1204468,'m',array['6']),
+(1204469,'m',array['5']),
+(1204470,'m',array['7']),
+(1304770,'m',array['4']),
+(1304771,'m',array['4','6']),
+(1304772,'m',array['6']),
+(1304773,'m',array['13']),
+(1304774,'m',array['4']),
+(1304775,'m',array['13']),
+(1304776,'m',array['13']),
+(1304777,'m',array['4']),
+(1304778,'m',array['13']),
+(1304779,'m',array['4','6']),
+(1304780,'m',array['6']),
+(1304781,'m',array['4']),
+(1406557,'m',array['10']),
+(1406558,'m',array['8']),
+(1406559,'m',array['6']),
+(1406560,'m',array['8']),
+(1406561,'m',array['6']),
+(1406562,'m',array['10']),
+(1406563,'m',array['8']),
+(1406564,'m',array['12']),
+(1406565,'m',array['6']),
+(1406566,'m',array['12']),
+(1406567,'m',array['8']),
+(1406568,'m',array['10']),
+(1406569,'m',array['6','8','10']),
+(1406570,'m',array['8']),
+(1406571,'m',array['4','6','12','13']),
+(1406572,'m',array['6','12']),
+(1406573,'m',array['12']),
+(1406574,'m',array['10']),
+(1406575,'m',array['6']),
+(1406576,'m',array['12']),
+(1406577,'m',array['12']),
+(1506816,'m',array['1']),
+(1506817,'m',array['6']),
+(1506818,'m',array['10']),
+(1506819,'m',array['10']),
+(1506820,'m',array['9']),
+(1506821,'m',array['9']),
+(1506822,'m',array['9']),
+(1506823,'m',array['6']),
+(1506824,'m',array['9']),
+(1506825,'m',array['9','10']),
+(1506826,'m',array['9','10']),
+(1506827,'m',array['10']),
+(1506828,'m',array['6']),
+(1506829,'m',array['10']),
+(1506830,'m',array['2']),
+(1506831,'m',array['9']),
+(1506832,'m',array['1']),
+(1506833,'m',array['9']),
+(1506834,'m',array['9']),
+(1506835,'m',array['6','9']),
+(1506836,'m',array['2']),
+(1606046,'m',array['13']),
+(1606047,'m',array['13']),
+(1606048,'m',array['3']),
+(1606049,'m',array['3']),
+(1606050,'m',array['14']),
+(1606051,'m',array['3']),
+(1606052,'m',array['13','14']),
+(1606053,'m',array['13']),
+(1606054,'m',array['2']),
+(1606055,'m',array['2','3']),
+(1606056,'m',array['3']),
+(1706091,'m',array['12']),
+(1706092,'m',array['2']),
+(1706093,'m',array['4']),
+(1706094,'m',array['13']),
+(1706095,'m',array['12']),
+(1706096,'m',array['2']),
+(1706097,'m',array['12']),
+(1706098,'m',array['4','12']),
+(1706099,'m',array['12']),
+(1706100,'m',array['2','13']),
+(1706101,'m',array['4']),
+(1706102,'m',array['12']),
+(1706103,'m',array['4']),
+(1804259,'m',array['7bis']),
+(1804260,'m',array['7bis']),
+(1804261,'m',array['7bis']),
+(1804262,'m',array['7']),
+(1804263,'m',array['7']),
+(1804264,'m',array['7bis']),
+(1804265,'m',array['2','5','7bis']),
+(1804266,'m',array['5']),
+(1804267,'m',array['5']),
+(1804268,'m',array['7bis','11']),
+(1804269,'m',array['7']),
+(1804270,'m',array['5']),
+(1804271,'m',array['7bis']),
+(1804272,'m',array['7']),
+(1804273,'m',array['2','5','7']),
+(1905308,'m',array['2','11']),
+(1905309,'m',array['9']),
+(1905310,'m',array['3','3bis']),
+(1905311,'m',array['11']),
+(1905312,'m',array['9']),
+(1905313,'m',array['3bis']),
+(1905314,'m',array['2','3']),
+(1905315,'m',array['2']),
+(1905316,'m',array['3']),
+(1905317,'m',array['9']),
+(1905318,'m',array['1']),
+(1905319,'m',array['3bis','11']),
+(1905320,'m',array['11']),
+(1905321,'m',array['3bis']),
+(1905322,'m',array['11']),
+(1586,'j',null),
+(502596,'j',null),
+(602940,'j',null),
+(1804274,'j',null),
+(703313,'j',null),
+(402734,'j',null),
+(1304782,'j',null),
+(1804275,'j',null),
+(1406578,'j',null),
+(1103974,'j',null),
+(1587,'j',null),
+(1588,'j',null),
+(1905323,'j',null),
+(1103975,'j',null),
+(1406579,'j',null),
+(602941,'j',null),
+(1506837,'j',null),
+(1506838,'b',null),
+(1103976,'b',null),
+(703314,'p',null),
+(1506839,'p',null),
+(301906,'p',null),
+(1103977,'p',null),
+(202040,'p',null),
+(1606057,'p',null),
+(1589,'p',null),
+(1706104,'p',null),
+(1103978,'p',null),
+(1204471,'p',null),
+(101901,'p',null),
+(101902,'p',null),
+(1590,'p',null),
+(502597,'p',null),
+(1591,'p',null),
+(703315,'p',null),
+(301907,'p',null),
+(803159,'p',null),
+(402735,'p',null),
+(402736,'p',null),
+(502598,'p',null),
+(301908,'p',null),
+(1304783,'p',null),
+(1606058,'p',null),
+(1706105,'p',null),
+(902927,'c',null),
+(703316,'a',null),
+(1905324,'k',null),
+(1304784,'k',null),
+(1706106,'k',null),
+(1506840,'k',null),
+(1103979,'k',null),
+(1606059,'k',null),
+(1406580,'g',null),
+(902928,'g',null),
+(1103980,'g',null),
+(1804276,'o',null),
+(1103981,'o',null),
+(402737,'o',null),
+(301909,'o',null),
+(1204472,'o',null),
+(1506841,'o',null),
+(1592,'o',null),
+(1103982,'o',null),
+(602942,'o',null),
+(1506842,'j',null),
+(1103983,'j',null),
+(1506843,'j',null),
+(1506844,'j',null),
+(1506845,'j',null),
+(1103984,'j',null),
+(1804277,'c',null),
+(1593,'n',null),
+(602943,'n',null),
+(1594,'n',null),
+(602944,'n',null),
+(1406581,'n',null),
+(1406582,'n',null),
+(602945,'n',null),
+(602946,'n',null),
+(301910,'n',null),
+(301911,'n',null),
+(301912,'n',null),
+(1103985,'n',null),
+(402738,'n',null),
+(301913,'n',null),
+(703317,'n',null),
+(602947,'n',null),
+(301914,'n',null),
+(301915,'n',null),
+(301916,'n',null),
+(1595,'n',null),
+(301917,'n',null),
+(1204473,'n',null),
+(402739,'n',null),
+(1103986,'n',null),
+(301918,'n',null),
+(1596,'n',null),
+(301919,'n',null),
+(1506846,'n',null),
+(1204474,'n',null),
+(1406583,'n',null),
+(1103987,'n',null),
+(1204475,'n',null),
+(1506847,'n',null)
+on conflict (card) do update set kind = excluded.kind, lines = excluded.lines;
+update cards set title = 'Bibliothèque nationale de France' where id = 1202667;
+update cards set title = 'Parc des Princes' where id = 1506606;
+update cards set title = 'Stade Roland-Garros' where id = 1506797;
+update cards set title = 'Musée des Arts et Métiers' where id = 200003;
+update cards set title = 'Palais de Tokyo' where id = 1502073;
+update cards set title = 'Hôtel de Matignon' where id = 601996;
+update cards set title = 'Musée Grévin' where id = 800984;
+update cards set title = 'Palais de Chaillot' where id = 1506634;
+update cards set title = 'Institut de France' where id = 500022;
+update cards set title = 'Bibliothèque Sainte-Geneviève' where id = 402237;
+update cards set title = 'Maxim''s' where id = 700013;
+update cards set title = 'Stade Jean-Bouin' where id = 1506743;
+update cards set title = 'Le Dôme' where id = 1304328;
+update cards set title = 'Maison de Balzac' where id = 1504365;
+update cards set title = 'Hôpital Lariboisière' where id = 901729;
+update cards set title = 'La Tour d''Argent' where id = 400590;
+update cards set title = 'Piscine Molitor' where id = 1506742;
+update cards set title = 'Palais de la Découverte' where id = 701535;
+update cards set title = 'Palais de la Légion d''honneur' where id = 602760;
+update cards set title = 'Café de la Paix' where id = 800620;
+update cards set title = 'Institut du monde arabe' where id = 400382;
+update cards set title = 'Collège de France' where id = 402726;
+update cards set title = 'École normale supérieure' where id = 401664;
+update cards set title = 'Conservatoire national des arts et métiers' where id = 200920;
+update cards set title = 'Institut Pasteur' where id = 1405018;
+update cards set title = 'Les Deux Magots' where id = 501212;

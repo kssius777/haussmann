@@ -62,6 +62,10 @@ function inPark(x, y) {
   }
   return false;
 }
+// ---- zones piétonnes : pas de voitures, comme dans un parc (le Champ-de-Mars, piétonnisé ; 20/10/2026) ----
+const NOCAR = [[[2.29193, 48.85769], [2.29199, 48.85778], [2.29554, 48.85983], [2.2969, 48.85904], [2.3035, 48.85413], [2.30247, 48.85023], [2.30138, 48.85096]]];
+const inPoly = (x, y, r) => { let ins = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) if ((r[i][1] > y) !== (r[j][1] > y) && x < (r[j][0] - r[i][0]) * (y - r[i][1]) / (r[j][1] - r[i][1]) + r[i][0]) ins = !ins; return ins; };
+const pedZone = p => NOCAR.some(r => [p[0], p[Math.floor(p.length / 2)], p[p.length - 1]].every(q => inPoly(q[0], q[1], r)));
 // ---- les rues visibles, en mètres ----
 function lifeLines() {
   if (LIFE.lines && performance.now() - LIFE.linesAt < 4000 && LIFE.linesKey) return LIFE.lines;
@@ -72,7 +76,7 @@ function lifeLines() {
       const p = decodeRing(f); let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; const cum = [0];
       for (let j = 0; j < p.length; j++) { const [x, y] = p[j]; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); if (j) cum.push(cum[j - 1] + Math.hypot((x - p[j - 1][0]) * M_LON, (y - p[j - 1][1]) * M_LAT)); }
       const m = p[Math.floor(p.length / 2)], m2 = p[0];
-      return { k, p, cum, len: cum[cum.length - 1], bb: [x0, y0, x1, y1], park: inPark((m[0] + m2[0]) / 2, (m[1] + m2[1]) / 2) && inPark(m[0], m[1]) };
+      return { k, p, cum, len: cum[cum.length - 1], bb: [x0, y0, x1, y1], park: (inPark((m[0] + m2[0]) / 2, (m[1] + m2[1]) / 2) && inPark(m[0], m[1])) || pedZone(p) };
     }).filter(l => l.len > 25);
     for (const l of A.lifeL) if (l.bb[2] > W && l.bb[0] < E && l.bb[3] > S && l.bb[1] < N) { out.walk.push(l); if (l.park) out.bike.push(l); else if (l.k === 1 && l.len > 60) out.car.push(l); }
   }
@@ -192,7 +196,7 @@ function boatStep(dt, out, wakes) {
 const FLOW = { lines: null, dots: [] };
 function flowLines() {
   if (FLOW.lines) return FLOW.lines;
-  FLOW.lines = (BASE?.major || []).map(([k, f]) => { const p = decodeRing(f), cum = [0]; for (let j = 1; j < p.length; j++) cum.push(cum[j - 1] + Math.hypot((p[j][0] - p[j - 1][0]) * M_LON, (p[j][1] - p[j - 1][1]) * M_LAT)); return { k, p, cum, len: cum[cum.length - 1] }; }).filter(l => l.len > 120);
+  FLOW.lines = (BASE?.major || []).map(([k, f]) => { const p = decodeRing(f), cum = [0]; for (let j = 1; j < p.length; j++) cum.push(cum[j - 1] + Math.hypot((p[j][0] - p[j - 1][0]) * M_LON, (p[j][1] - p[j - 1][1]) * M_LAT)); return { k, p, cum, len: cum[cum.length - 1] }; }).filter(l => l.len > 120 && !pedZone(l.p));   // pas de trafic sur les zones piétonnes
   return FLOW.lines;
 }
 function flowStep(dt, feats) {

@@ -2,3 +2,4 @@ __pycache__/
 test/shots/
 node_modules/
 .vercel
+scripts/data/.cache_photos/

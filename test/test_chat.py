@@ -14,7 +14,7 @@ cur.execute("""create schema if not exists realtime;
   create or replace function realtime.send(payload jsonb, event text, topic text, private boolean default true) returns void language sql as
   $$ insert into realtime.sent(payload, event, topic, private) values (payload, event, topic, private) $$;
   truncate realtime.sent;""")
-for f in ["migration_admin.sql", "migration_chat.sql", "migration_chat.sql"]: cur.execute(open("supabase/" + f).read())   # 2 fois : rejouable
+for f in ["migration_admin.sql", "migration_chat.sql", "migration_chat.sql", "migration_chat_look.sql", "migration_chat_look.sql"]: cur.execute(open("supabase/" + f).read())   # 2 fois : rejouable
 c0.commit()
 db.sql("truncate place_people, chat_msg, chat_bans")
 ADM, A, B = player("Adm", "milieu"), player("Ana", "tendue"), player("Ben", "rempart")
@@ -44,9 +44,12 @@ check("sans temps réel, chat_feed rend les évènements depuis le dernier vu", 
 check("pastille : nombre de joueurs sur le Champ-de-Mars", db.rpc(A, "chat_count") == 2)
 # le personnage
 lk = db.rpc(A, "set_look", p_look=json.dumps({"s": 3, "h": 1, "c": 2, "t": -1}))
-check("personnage : enregistré et visible dans le profil", lk == {"s": 3, "h": 1, "c": 2, "t": -1} and db.rpc(A, "state")["profile"]["look"] == lk)
+check("personnage : enregistré et visible dans le profil (genre, bas, accessoire à 0 par défaut)", lk == {"g": 0, "s": 3, "h": 1, "c": 2, "t": -1, "b": 0, "a": 0} and db.rpc(A, "state")["profile"]["look"] == lk, lk)
 check("personnage : changement envoyé aux autres", db.sql("select payload->>'k' from realtime.sent order by at desc limit 1")[0][0] == "look")
-check("personnage : un choix inconnu est refusé", "inconnu" in (err(lambda: db.rpc(A, "set_look", p_look=json.dumps({"s": 9, "h": 1, "c": 0, "t": 0}))) or ""))
+check("personnage : un choix inconnu est refusé", all("inconnu" in (err(lambda x=x: db.rpc(A, "set_look", p_look=json.dumps(x))) or "") for x in
+      ({"s": 9, "h": 1, "c": 0, "t": 0}, {"g": 2, "s": 1, "h": 1, "c": 0, "t": 0}, {"s": 1, "h": 1, "c": 0, "t": 0, "a": 9}, {"s": 1, "h": 8, "c": 0, "t": 0})))
+full = {"g": 1, "s": 2, "h": 4, "c": 5, "t": 5, "b": 3, "a": 3}
+check("personnage : une femme blonde, rasée, jupe beige et béret", db.rpc(A, "set_look", p_look=json.dumps(full)) == full)
 # bannir
 check("un joueur ne peut pas bannir", "administrateur" in (err(lambda: db.rpc(A, "chat_ban", p_user=str(B), p_hours=24)) or ""))
 ADM2 = player("Adm2"); db.sql("insert into admins(id) values (%s) on conflict do nothing", str(ADM2))
@@ -65,11 +68,13 @@ db.rpc(ADM, "chat_ban", p_user=str(B), p_hours=None)
 e = err(lambda: db.rpc(B, "chat_join", p_lon=2.298, p_lat=48.855)) or ""
 check("banni à vie", e == "Vous êtes banni du chat.", e)
 check("la liste des bannis est réservée à l'admin", "administrateur" in (err(lambda: db.rpc(A, "chat_bans")) or "") and db.rpc(ADM, "chat_bans")[0]["until"] is None)
-# salles de 40, et ceux qui sont partis sans dire au revoir
+# salles de 80, et ceux qui sont partis sans dire au revoir
 db.sql("truncate place_people")
-fake = [player("P%02d" % i) for i in range(40)]
-for i, u in enumerate(fake): db.sql("insert into place_people(user_id, room, lon, lat) values (%s, 1, 2.298, 48.855)", str(u))
-check("salle pleine (40) : on ouvre le Champ-de-Mars 2", db.rpc(A, "chat_join", p_lon=2.298, p_lat=48.855)["room"] == 2)
+fake = [player("P%02d" % i) for i in range(80)]
+for i, u in enumerate(fake[:79]): db.sql("insert into place_people(user_id, room, lon, lat) values (%s, 1, 2.298, 48.855)", str(u))
+check("salle de 79 : on y entre encore", db.rpc(A, "chat_join", p_lon=2.298, p_lat=48.855)["room"] == 1); db.rpc(A, "chat_leave")
+db.sql("insert into place_people(user_id, room, lon, lat) values (%s, 1, 2.298, 48.855)", str(fake[79]))
+check("salle pleine (80) : on ouvre le Champ-de-Mars 2", db.rpc(A, "chat_join", p_lon=2.298, p_lat=48.855)["room"] == 2)
 db.sql("update place_people set seen = now() - interval '2 minutes' where room = 1")
 db.rpc(A, "chat_leave"); r = db.rpc(A, "chat_join", p_lon=2.298, p_lat=48.855)
 check("partis depuis plus de 90 s : retirés, on retrouve la salle 1", r["room"] == 1 and db.sql("select count(*) from place_people")[0][0] == 1, r["room"])

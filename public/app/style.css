@@ -2132,6 +2132,11 @@ body.inplace .pricetag,body.inplace .lbub,body.inplace .pawn,body.inplace #coach
 .smark.k-j,.smark.k-b{--sk:#2F8F4E}
 .smark.k-p{--sk:#57534E}
 .smark.k-c{--sk:#0284C7}
+.smark.k-g{--sk:#7C3AED}
+.smark.k-n{--sk:#334155}
+.smark.k-k{--sk:#6B7280}
+.smark.k-o{--sk:#B45309}
+.smark.k-a{--sk:#9F1239}
 .smark.far{padding:2px;gap:0}
 .smark.far .sn,.smark.clash .sn{display:none}
 .smark.clash{padding:2px;gap:0}
@@ -2146,7 +2151,94 @@ body.inplace .smark,body.picking .smark{display:none}
 .netl{display:flex;align-items:center;gap:10px;margin:8px 0;padding:8px 10px;border-radius:12px;background:#EEF2FF;font-size:13px;line-height:1.25}
 .netl .lnbs{display:flex;gap:3px;flex-wrap:wrap;max-width:104px}
 .netl b{display:block;color:#1F3A93;font-size:12px}
+/* À crédit / Comptant : le choix fait se voit tout de suite, en plein (bleu = crédit, vert = comptant, comme le bouton à glisser) — 20/10/2026, « on voit pas assez la démarcation » */
+.pay button[aria-selected="true"]{background:var(--act)!important;box-shadow:0 3px 10px rgba(37,99,235,.32)!important}
+.pay button[data-paymode="0"][aria-selected="true"],.pay button[data-act="paymode"][data-k="0"][aria-selected="true"]{background:#16A34A!important;box-shadow:0 3px 10px rgba(22,163,74,.32)!important}
+.pay button[aria-selected="true"],.pay button[aria-selected="true"] b,.pay button[aria-selected="true"] small,.pay button[aria-selected="true"] small *{color:#fff!important}
+.pay button[aria-selected="false"]:not(:disabled) b{color:var(--ink)!important}
+/* éditeur du personnage : « Un homme / Une femme » et « — » en petites pastilles de texte */
+.lksw:has(em){width:auto;min-width:30px;height:30px;border-radius:999px;padding:0 11px}
+.lksw em{font:700 12.5px/1 var(--f);font-style:normal;color:var(--ink2)}
+.lksw.on em{color:var(--act)}
+.lkrow>div{row-gap:6px}
 /* écran de chargement : ce que le jeu est, et les liens légaux (aussi pour les robots de Google, qui lisent la page avant le JavaScript) */
 #loading .loadabout{position:absolute;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 44px);text-align:center;font-size:12.5px;font-weight:500;line-height:1.4}
 #loading .loadlinks{position:absolute;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);text-align:center;font-size:12px;color:var(--muted)}
 #loading .loadlinks a{color:var(--muted)}
+/* les lignes d'une station, sur sa photo */
+.hc .phl{position:absolute;left:3cqw;bottom:3cqw;z-index:2;display:flex;gap:1.2cqw}
+.hc .phl .lnb{--ls:8.6cqw!important;box-shadow:0 0 0 .7cqw #fff,0 .6cqw 1.6cqw rgba(0,0,0,.3)}
+/* le ruban du parti qui possède le plus de la carte (20/10/2026, choix du propriétaire : « plus visuel pour savoir qui domine quoi ») */
+.hc.pr .ph{overflow:hidden}
+.hc .rib{position:absolute;z-index:3;left:-14cqw;top:10cqw;width:66cqw;transform:rotate(-35deg);background:linear-gradient(180deg,var(--pc1),var(--pc2));color:#fff;
+  font:900 3.7cqw/1 var(--f);letter-spacing:.08em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:1.4cqw;padding:1.5cqw 0;
+  box-shadow:0 1cqw 3cqw rgba(0,0,0,.35);border-top:.5cqw solid rgba(255,255,255,.55);border-bottom:.5cqw solid rgba(255,255,255,.55);pointer-events:none;white-space:nowrap}
+.hc .rib svg{width:5.4cqw;height:5.8cqw;flex:none}
+/* ===== page d'accueil v3 (20/10/2026 : maquette B choisie par le propriétaire, avec le titre de la A) ===== */
+#onb .landing.v3,.landing.v3{max-width:none;padding:0;min-height:100%;color:#0B0C10;background:linear-gradient(180deg,#FFFDF8 0,#F6F1E7 100%);font-family:var(--f)}
+.landing.v3 .lhead{position:relative;max-width:1180px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:16px 18px;background:none!important;box-shadow:none!important;border:0!important}
+.landing.v3 .sgn{min-height:40px;padding:0 16px;border-radius:999px;font:700 14px/1 var(--f);border:1.5px solid #D9DEE6!important;color:#0B0C10!important;background:#fff!important}
+.landing.v3 .ltop{max-width:1180px;margin:0 auto}
+.landing.v3 .lhero{padding:6px 20px 0}
+.landing.v3 h1{margin:14px 0 12px;font:900 42px/1.02 var(--f);letter-spacing:-.035em;text-wrap:balance;color:#0B0C10}
+.landing.v3 .lead{margin:0 0 20px;font:500 17px/1.45 var(--f);color:#3F4654;max-width:36ch}
+.landing.v3 .lcta{display:grid;gap:10px;max-width:420px}
+.landing.v3 .lcta .btn{min-height:54px;font-size:16px}
+.landing.v3 .lcta .gbtn{box-shadow:0 0 0 1.5px #D9DEE6!important}
+.landing.v3 .btn.dark{background:#0B0C10!important;color:#fff!important;border:0!important}
+.landing.v3 .tiny{margin:12px 0 0;font:500 13px/1.4 var(--f);color:#6B7280}
+.landing.v3 .giftb{background:#FFF4D6;color:#4A3500;box-shadow:0 0 0 1.5px #F2D58A}
+.landing.v3 .giftb.gone{background:#F1F1EE;color:#374151;box-shadow:none}
+.landing.v3 .side{display:none}
+.landing.v3 .pchips{display:flex;flex-wrap:wrap;gap:8px}
+.landing.v3 .pchips .pc{display:inline-flex;align-items:center;gap:6px;padding:5px 12px 5px 6px;border-radius:999px;background:#fff;box-shadow:0 2px 8px rgba(15,23,42,.12);font:700 13px/1 var(--f);color:#1F2430}
+.landing.v3 .lvis{position:relative;margin:24px 14px 0;height:430px;--cw:128px}
+.landing.v3 .shot{position:absolute;inset:0 0 120px;border-radius:28px;background:#EEE9DF url(/img/accueil-paris.webp) center/cover;box-shadow:0 22px 50px rgba(15,23,42,.28)}
+.landing.v3 .shot b{position:absolute;left:14px;top:14px;padding:7px 12px;border-radius:999px;background:rgba(255,255,255,.95);font:800 13px/1 var(--f);box-shadow:0 2px 8px rgba(15,23,42,.15)}
+.landing.v3 .fan{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:center;pointer-events:none;padding:0;overflow:visible}
+.landing.v3 .fan-c{flex:none;margin:0 -16px;pointer-events:auto}
+.landing.v3 .fan-c .hc{box-shadow:0 16px 34px rgba(15,23,42,.35)}
+.landing.v3 .fan-c:nth-child(1){transform:rotate(-10deg) translateY(14px)}
+.landing.v3 .fan-c:nth-child(2){transform:rotate(-4deg)}
+.landing.v3 .fan-c:nth-child(3){transform:rotate(3deg) translateY(-6px);z-index:2}
+.landing.v3 .fan-c:nth-child(4){transform:rotate(10deg) translateY(12px)}
+.landing.v3 .lsec{max-width:1180px;margin:0 auto;padding:40px 20px 0}
+.landing.v3 .lsec h2{margin:0 0 14px;font:900 28px/1.1 var(--f);letter-spacing:-.02em;color:#0B0C10}
+.landing.v3 .lparties{display:grid;grid-template-columns:1fr;gap:10px;margin:0}
+.landing.v3 .lparties>div{display:grid;grid-template-columns:auto 1fr;column-gap:12px;row-gap:2px;align-items:center;justify-items:start;text-align:left;padding:12px 14px;border-radius:16px;background:#fff;box-shadow:0 0 0 1px #ECE6DA}
+.landing.v3 .lparties svg{grid-row:span 2}
+.landing.v3 .lparties b{font:800 16px/1.15 var(--f);color:#0B0C10}
+.landing.v3 .lparties span{font:500 13.5px/1.3 var(--f);color:#4B5563}
+.landing.v3 .lsteps2{display:grid;gap:10px}
+.landing.v3 .lsteps2>div{background:#fff;border:0;box-shadow:0 0 0 1px #ECE6DA;border-radius:16px;padding:14px 16px}
+.landing.v3 .lsteps2 b{display:block;font-size:16px;margin:0 0 4px}
+.landing.v3 .lsteps2 p{margin:0;color:#4B5563;font-size:14px;line-height:1.4}
+.landing.v3 .lfinal{margin:48px 0 0;padding:44px 20px;text-align:center;background:#0B0C10;color:#fff;display:grid;justify-items:center;gap:18px}
+.landing.v3 .lfinal h2{font:900 28px/1.1 var(--f);margin:0;color:#fff}
+.landing.v3 .lfinal .lcta{width:min(100%,380px)}
+.landing.v3 .lfinal .btn.dark{background:#fff!important;color:#0B0C10!important}
+.landing.v3 .lfoot{max-width:1180px;margin:0 auto;padding:18px 20px calc(env(safe-area-inset-bottom,0px) + 30px);font-size:12px;color:#6B7280}
+.landing.v3 .lfoot a{color:#4B5563}
+@media (min-width:760px){
+  .landing.v3 .lparties{grid-template-columns:repeat(5,1fr)}
+  .landing.v3 .lparties>div{grid-template-columns:1fr;justify-items:start;row-gap:6px}
+  .landing.v3 .lparties svg{grid-row:auto}
+  .landing.v3 .lsteps2{grid-template-columns:repeat(4,1fr)}
+}
+@media (min-width:960px){
+  .landing.v3 .lhead{padding:22px 40px}
+  .landing.v3 .ltop{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:30px;align-items:center;min-height:calc(100vh - 90px);padding:0 40px}
+  .landing.v3 .lhero{padding:0 0 0 40px}
+  .landing.v3 h1{font-size:64px;margin:0 0 16px;max-width:600px}
+  .landing.v3 .lead{font-size:19px;margin:0 0 24px;max-width:520px}
+  .landing.v3 .lcta{max-width:400px}
+  .landing.v3 .side{display:block;margin-top:26px;max-width:560px}
+  .landing.v3 .lvis{margin:0;height:640px;--cw:176px}
+  .landing.v3 .shot{inset:0 0 150px 50px}
+  .landing.v3 .fan{justify-content:flex-start;left:-30px}
+  .landing.v3 .lsec{padding:56px 40px 0}
+  .landing.v3 .lsec h2{font-size:40px}
+  .landing.v3 .lfinal h2{font-size:40px}
+}
+.landing.v3 .lhero{max-width:none}
+.landing.v3 .fan-c{transition:none}

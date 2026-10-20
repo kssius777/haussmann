@@ -24,14 +24,15 @@ const ORDER = "MLRUC";
 const USE = { res: "Résidentiel", ind: "Immeuble", com: "Commerces & services", ann: "Annexe", rel: "Lieu de culte", spo: "Sport", indus: "Industriel", agr: "Agricole", met: "Station de métro", jar: "Jardin", pla: "Place" };
 // les lieux en cartes à parts (20/10/2026, scripts/add_spots.py) : stations de métro, jardins, bois, places, le canal
 // IDX.spots = [[carte, sorte, lignes, lon, lat]] ; sorte : m station · j jardin · b bois · p place · c canal
-const SPOTK = { m: "Station de métro", j: "Jardin", b: "Bois", p: "Place", c: "Canal" };
+const SPOTK = { m: "Station de métro", j: "Jardin", b: "Bois", p: "Place", c: "Canal", g: "Gare", n: "Pont", k: "Cimetière", o: "Monument", a: "Avenue" };
 const LINE_C = { "1": "#FFCD00", "2": "#003CA6", "3": "#837902", "3bis": "#6EC4E8", "4": "#CF009E", "5": "#FF7E2E", "6": "#6ECA97", "7": "#FA9ABA", "7bis": "#6ECA97",
   "8": "#E19BDF", "9": "#B6BD00", "10": "#C9910D", "11": "#704B1C", "12": "#007852", "13": "#6EC4E8", "14": "#62259D" };
 const LINE_DARK = new Set(["1", "3bis", "5", "6", "7", "7bis", "8", "9", "13"]);   // numéro en noir sur les couleurs claires
 let SPOTM = null;
 const spotOf = g => { if (!SPOTM && typeof IDX !== "undefined" && IDX?.spots) SPOTM = new Map(IDX.spots.map(s => [s[0], s])); return SPOTM?.get(g) || null; };
 const isStation = g => spotOf(g)?.[1] === "m";
-const SPOTN = { m: "Station", j: "Jardin", b: "Bois", p: "Place", c: "Canal" };
+const SPOTN = { m: "Station", j: "Jardin", b: "Bois", p: "Place", c: "Canal", g: "Gare", n: "Pont", k: "Cimetière", o: "Monument", a: "Avenue" };
+const SPOTDE = { m: "de la station", j: "du jardin", b: "du bois", p: "de la place", c: "du canal", g: "de la gare", n: "du pont", k: "du cimetière", o: "du monument", a: "de l'avenue" };
 // la station : ses lignes, et ce que rapporte le réseau (+1 % sur tous ses loyers par station, jusqu'à +15 %)
 const netLine = g => isStation(g) ? `<div class="netl"><span class="lnbs">${lineBadges(g, 18)}</span><span>+1 % sur tous vos loyers par station${myStations() ? `<b>vous : +${myStations()} %</b>` : ""}</span></div>` : "";
 const stationLines = g => (spotOf(g)?.[2] || "").split(",").filter(Boolean);
@@ -50,18 +51,26 @@ const PARTIES = {
 };
 const downRate = () => ST.state?.profile?.party === "valeurs" ? .05 : .1;   // Droite : apport de 5 %
 const PARTY_ORDER = ["poing", "tendue", "milieu", "valeurs", "rempart"];
+// le ruban des cartes : la couleur du parti qui en possède le plus (clair, foncé)
+const RIB = { poing: ["#E5483F", "#B3201B"], tendue: ["#EE7FAE", "#C93C78"], milieu: ["#F7B34E", "#D9851A"], valeurs: ["#4C8BEA", "#1F56C2"], rempart: ["#3A4A94", "#18214F"] };
 const MAYOR_TAX = 8, MEMBER_BONUS = 10;
 // Blasons des partis (écusson + emblème blanc)
+// blasons des partis, version 2 (20/10/2026) : des pictogrammes pleins et gros, lisibles même tout petits
 const EMBLEM = {
-  poing: '<path d="M8.6 10.2V6.6a1.1 1.1 0 012.2 0v3.2V5.4a1.1 1.1 0 012.2 0v4.4V6a1.1 1.1 0 012.2 0v4.2V7.6a1.1 1.1 0 012.2 0v5.2c0 2.6-1.6 4.4-4 4.6v2.8h-4v-3c-1.6-.7-2.6-2.1-2.6-4v-1.6l-1.2-1.2a1.05 1.05 0 011.5-1.5z"/>',
-  tendue: '<circle cx="12" cy="8.6" r="3.4"/><path d="M12 5.2c1.8 1 1.8 3.6 0 4.4-1.8-.8-1.8-3.4 0-4.4z" fill="#000" fill-opacity=".18"/><path d="M8.2 9.2c0 3 1.7 4.4 3.8 4.4s3.8-1.4 3.8-4.4c-.9 1.2-2.2 1.8-3.8 1.8s-2.9-.6-3.8-1.8z"/><path d="M11.4 13.4h1.2V20h-1.2z"/><path d="M12.4 17c1.6-2 3.6-2.2 4.4-1.8-.6 1.8-2.4 2.6-4.4 2.4zM11.6 15.8c-1.4-1.6-3-1.8-3.8-1.4.6 1.5 2 2.2 3.8 2z"/>',
-  milieu: '<path d="M11.3 4.5h1.4v13.3h-1.4z"/><path d="M8 19.2h8v1.4H8z"/><path d="M5 7.4h14v1.3H5z"/><circle cx="12" cy="5" r="1.3"/><path d="M6.6 8.7l-2.6 5.2h5.2zM17.4 8.7l-2.6 5.2h5.2z" fill="none" stroke="#fff" stroke-width="1.1"/><path d="M3.8 13.9h5.6a2.8 1.8 0 01-5.6 0zM14.6 13.9h5.6a2.8 1.8 0 01-5.6 0z"/>',
-  valeurs: '<path d="M12 7.2c.9 0 1.6.7 1.6 1.6 0 .4-.1.7-.3 1l1.9 1.2 5.3-4.3-1.6 4.6 2.4-.6-3.6 3.6-3.3.3-.8 2.2 1.4 3.6-3-1.4-3 1.4 1.4-3.6-.8-2.2-3.3-.3L2.7 10.7l2.4.6-1.6-4.6 5.3 4.3 1.9-1.2c-.2-.3-.3-.6-.3-1 0-.9.7-1.6 1.6-1.6z"/><path d="M12.9 8.4l1.6.4-1.3.6z" fill="#000" fill-opacity=".25"/>',
-  rempart: '<path d="M6.5 20V9.5h-1V5.8h2.1v1.6h1.6V5.8h1.7v1.6h2.2V5.8h1.7v1.6h1.6V5.8h2.1v3.7h-1V20z"/><path d="M10.3 20v-3.3a1.7 1.7 0 013.4 0V20z" fill="#000" fill-opacity=".3"/><path d="M8.6 11.6h1.4v2.4H8.6zM14 11.6h1.4v2.4H14z" fill="#000" fill-opacity=".3"/>'
+  // le poing levé
+  poing: '<path d="M9.4 15.6h5.2v5.6H9.4z"/><rect x="6.8" y="5.6" width="10.4" height="10.6" rx="2.8"/><g fill="none" stroke="#000" stroke-opacity=".28" stroke-width="1" stroke-linecap="round"><path d="M9.4 6v3.6M12 6v3.6M14.6 6v3.6"/><path d="M7.4 11.6h5.4c.8 0 1.3.6 1.3 1.3"/></g>',
+  // la rose
+  tendue: '<circle cx="12" cy="8.6" r="4.7"/><g fill="none" stroke="#000" stroke-opacity=".26" stroke-width="1" stroke-linecap="round"><path d="M12.2 5.8c1.6.4 2.3 1.8 1.7 3.1-.6 1.3-2.2 1.5-3.1.6"/><path d="M8.9 9.4c.6 1.7 2 2.6 3.7 2.4"/></g><rect x="11.3" y="12.8" width="1.4" height="8.6" rx=".7"/><path d="M12.6 17.4c1.5-2.4 3.9-2.9 5-2.3-.7 2.2-2.9 3.1-5 2.8zM11.4 15.8c-1.3-1.8-3.1-2.1-4-1.6.5 1.7 2.1 2.4 4 2.1z"/>',
+  // la balance
+  milieu: '<rect x="11.2" y="5.2" width="1.6" height="13.6"/><rect x="7.6" y="18.4" width="8.8" height="2.4" rx="1.2"/><rect x="3.9" y="6.9" width="16.2" height="1.9" rx=".95"/><circle cx="12" cy="5.2" r="1.7"/><path d="M6 8.6l-2.5 5M6 8.6l2.5 5M18 8.6l-2.5 5M18 8.6l2.5 5" stroke="#fff" stroke-width="1.1" fill="none"/><path d="M2.9 13.4h6.2a3.1 2.3 0 0 1-6.2 0zM14.9 13.4h6.2a3.1 2.3 0 0 1-6.2 0z"/>',
+  // l'aigle
+  valeurs: '<ellipse cx="12" cy="12.6" rx="2.4" ry="4.4"/><circle cx="12" cy="7.1" r="2"/><path d="M13.7 6.9l1.9.7-1.9.6z"/><path d="M10.1 10.4L2.4 5.8l1.3 3.6-1.9.3 2.8 2.8-1.5.7 3.9 1.7 3.3.1zM13.9 10.4l7.7-4.6-1.3 3.6 1.9.3-2.8 2.8 1.5.7-3.9 1.7-3.3.1z"/><path d="M10.5 16.4h3l1.3 4-2.8-1.3-2.8 1.3z"/>',
+  // la tour
+  rempart: '<path d="M7 21.2V9.4H5.8V4.6h2.7v2.2h2.2V4.6h2.6v2.2h2.2V4.6h2.7v4.8H17v11.8z"/><path d="M10.4 21.2v-3.4a1.6 1.6 0 0 1 3.2 0v3.4zM9 11.4h1.6v2.6H9zM13.4 11.4H15v2.6h-1.6z" fill="#000" fill-opacity=".3"/>'
 };
 function emblemSVG(k, size = 44) {
   const p = PARTIES[k]; if (!p) return "";
-  return `<svg class="emblem" width="${size}" height="${size}" viewBox="0 0 24 24" aria-label="Blason ${esc(p.n)}" role="img"><path d="M12 .8l9.6 3.6v6.9c0 6.2-4.2 10.6-9.6 12.3C6.6 21.9 2.4 17.5 2.4 11.3V4.4z" fill="${p.c}" stroke="#fff" stroke-width="1"/><path d="M12 2.2l8.3 3.1v6c0 5.4-3.6 9.2-8.3 10.8-4.7-1.6-8.3-5.4-8.3-10.8v-6z" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width=".5"/><g fill="#fff" transform="translate(12 12.4) scale(.62) translate(-12 -12)">${EMBLEM[k]}</g></svg>`;
+  return `<svg class="emblem" width="${size}" height="${size}" viewBox="0 0 24 24" aria-label="Blason ${esc(p.n)}" role="img"><path d="M12 .6l10 3.7v7.2c0 6.4-4.4 10.9-10 12.6C6.4 22.4 2 17.9 2 11.5V4.3z" fill="${p.c}" stroke="#fff" stroke-width="1.1"/><g fill="#fff" transform="translate(12 12.3) scale(.8) translate(-12 -12.6)">${EMBLEM[k]}</g></svg>`;
 }
 const shieldText = k => PARTIES[k].shield.map(x => CHANCE[x][0].toLowerCase()).join(", ").replace(/, ([^,]*)$/, " et $1");
 
@@ -134,7 +143,7 @@ function toast(msg, kind) {
 // ---------------- données statiques ----------------
 let IDX = null, FIELDS = [], ARR = [], BASE = null, MONS = null;
 const DATA = "/data/";
-const DATA_V = "20261020";   // à changer quand les fichiers de public/data changent (sinon le navigateur garde l'ancienne version un jour)
+const DATA_V = "20261020c";   // à changer quand les fichiers de public/data changent (sinon le navigateur garde l'ancienne version un jour)
 async function getJSON(u) { const r = await fetch(u); if (!r.ok) throw new Error(u + " : HTTP " + r.status); return r.json(); }
 function decodeRing(f) { let x = f[0] + 235000, y = f[1] + 4886000; const o = [[x / 1e5, y / 1e5]]; for (let k = 2; k < f.length; k += 2) { x += f[k]; y += f[k + 1]; o.push([x / 1e5, y / 1e5]); } return o; }
 
@@ -153,7 +162,8 @@ async function loadArr(i) {
   ARR[i] = { p }; return p;
 }
 async function ensureCards(gs) { await Promise.all([...new Set(gs.map(ai))].map(loadArr)); }
-const title = c => c.name ? cap(c.name) : (c.adr || "Immeuble sans adresse");
+const knownName = n => (typeof SHORT !== "undefined" && SHORT[n]) || cap(n);   // « Gare du Nord » plutôt que « Paris-Nord » (SHORT dans map.js)
+const title = c => c.name ? knownName(c.name) : (c.adr || "Immeuble sans adresse");
 const floorOfLot = (c, k) => c.lk !== "l" ? 0 : Math.min(c.et2, 1 + Math.floor(k * c.et2 / c.lots));
 function lotsOfFloor(c, f) { const o = []; for (let k = 0; k < c.lots; k++) if (floorOfLot(c, k) === f) o.push(k); return o; }
 const lotName = (c, k) => c.lk === "l" ? `Appartement n°${k + 1}` : c.lk === "c" ? `Local commercial n°${k + 1}` : "Part";

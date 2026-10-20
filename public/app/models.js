@@ -177,6 +177,20 @@ const B={
     for(let i=0;i<3;i++) cyl(g,2.1,2.1,.6,COL.gold,0,20+i*8,0,16); box(g,3.6,1.6,3.6,0x3f6e62,0,43.4); cyl(g,1.2,1.4,2.2,0x3f6e62,0,45,0,10); cone(g,.9,3.6,COL.gold,0,47.2,0,8); },
   saintjacques(g,L){ const s=Math.min(10,L*.9); box(g,s,44,s,0xf2ece0,0,0); for(const sx of [-1,1]) for(const sz of [-1,1]){ box(g,1.8,48,1.8,COL.stone2,sx*s*.46,0,sz*s*.46); cone(g,1.1,4,COL.stone2,sx*s*.46,48,sz*s*.46,4); }
     box(g,s*1.06,1.2,s*1.06,COL.stone2,0,44); cyl(g,.6,.6,3,COL.stone2,0,45.2,0,8); },
+  // place de la République : la statue de Marianne sur son piédestal, entourée de Liberté, Égalité, Fraternité, et le lion à l'urne (20/10/2026)
+  republique(g){ const BR=0x4c7a6c;
+    cyl(g,7.2,7.6,1.2,COL.stone2,0,0,0,32); cyl(g,5.6,6,1.6,COL.stone,0,1.2,0,32); cyl(g,3.6,4,9,COL.stone,0,2.8,0,24);
+    for(let i=0;i<3;i++){ const a=i/3*Math.PI*2+Math.PI/6, x=Math.cos(a)*4.7, z=Math.sin(a)*4.7; box(g,2,1.2,2,COL.stone2,x,2.8,z); cyl(g,.55,.8,2.6,BR,x,4,z,10); cyl(g,.42,.42,.9,BR,x,6.6,z,10); }
+    box(g,3.2,1.6,1.6,BR,0,2.8,5.1); cyl(g,4.2,4.2,.8,COL.stone2,0,11.8,0,24); cyl(g,2.2,2.6,3.4,COL.stone,0,12.6,0,20);
+    cyl(g,1.1,1.7,5.2,BR,0,16,0,14); cyl(g,.8,1.1,2,BR,0,21.2,0,12); cyl(g,.55,.6,1.2,BR,0,23.2,0,10);
+    const arm=box(g,.5,3.4,.5,BR,0,0,0); arm.position.set(.9,24.6,0); arm.rotation.z=-.35; cone(g,.6,1.2,BR,1.5,25.8,0,8);
+    box(g,1.3,1.6,.25,BR,-1.2,20.6,.6); },
+  // place du Châtelet : la fontaine du Palmier, sa colonne aux anneaux dorés et la Victoire dorée en haut
+  palmier(g){ cyl(g,6,6.2,.9,COL.stone2,0,0,0,32); cyl(g,5.5,5.5,.2,0x7db9dc,0,.75,0,32); cyl(g,2.6,3,2.4,COL.stone,0,.9,0,16);
+    for(let i=0;i<4;i++){ const a=i*Math.PI/2; box(g,1,1.2,2.2,COL.stone2,Math.cos(a)*3.4,.9,Math.sin(a)*3.4).rotation.y=-a; }
+    box(g,2.6,3,2.6,COL.stone,0,3.3,0); cyl(g,.95,1.1,12,COL.stone,0,6.3,0,16); for(let i=0;i<4;i++) cyl(g,1.2,1.2,.5,COL.gold,0,7.5+i*2.6,0,16);
+    cyl(g,1.7,1.1,1.5,COL.gold,0,18.3,0,12); cyl(g,.45,.7,2.2,COL.gold,0,19.8,0,10); cyl(g,.3,.3,.6,COL.gold,0,22,0,8);
+    for(const sx of [-1,1]){ const w=box(g,1.6,.9,.12,COL.gold,sx*.8,20.6,-.2); w.rotation.z=sx*.5; } box(g,.2,1.6,.2,COL.gold,.6,21.6,.2).rotation.z=-.4; },
   valdegrace(g,L,W){ box(g,L,15,W,COL.stone,0,0); box(g,L*1.02,1,W*1.02,COL.stone2,0,14.5); cyl(g,9.2,9.2,11,COL.stone,0,15,0,20); for(let i=0;i<16;i++){ const a=i/16*Math.PI*2; cyl(g,.5,.5,9,COL.cream,Math.cos(a)*9.8,15,Math.sin(a)*9.8,6); }
     dome(g,9,COL.slate,0,26,0,1.35); cyl(g,1.6,1.9,5,COL.gold,0,37.6,0,10); cone(g,1.2,3,COL.gold,0,42.6,0,8); },
   sulpice(g,L,W,h,m){ church(g,L,W,{fx:m.fx,n:33,nw:.44,t:2,tw:13.5,th:52,top:"round",sp:18,por:10,fw:.98,tu:.6}); },

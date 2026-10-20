@@ -131,8 +131,8 @@ async function refreshHold() {
 async function refreshMap() {
   const m = await rpc("map_state");
   ST.own = new Map();
-  for (const [c, owners, n] of m.lots) ST.own.set(c, { owners, n: +n });
-  for (const [c, owners, n] of m.parts) { const o = ST.own.get(c); if (o) { o.owners = [...new Set([...o.owners, ...owners])]; o.parts = +n; } else ST.own.set(c, { owners, n: 0, parts: +n }); }
+  for (const [c, owners, n, party] of m.lots) ST.own.set(c, { owners, n: +n, party });   // party : le parti qui en possède le plus (ruban des cartes)
+  for (const [c, owners, n, party] of m.parts) { const o = ST.own.get(c); if (o) { o.owners = [...new Set([...o.owners, ...owners])]; o.parts = +n; o.party = o.party || party; } else ST.own.set(c, { owners, n: 0, parts: +n, party }); }
   ST.sale = new Set(m.sale || []);
   ST.mayors = Array(20).fill(null);
   for (const [arr, mayor, party, pseudo] of m.arr) if (mayor) ST.mayors[arr - 1] = { mayor, party, pseudo };
