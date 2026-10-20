@@ -51,7 +51,7 @@ async function landingHTML() {
     <section class="lsec"><p class="eyebrow">Cinq partis, une seule mairie</p><h2>Choisissez votre camp.</h2>
       <div class="lparties">${PARTY_ORDER.map(k => `<div>${emblemSVG(k, 46)}<b style="color:${PARTIES[k].c}">${esc(PARTIES[k].n)}</b><span>${esc(PARTIES[k].power)}</span></div>`).join("")}</div></section>
     <section class="lfinal"><h2>Votre premier immeuble vous attend.</h2>${cta}</section>
-    <footer class="lfoot"><p>Proprio est un jeu : posséder une carte ne donne aucun droit sur le bien réel. L'argent du jeu est virtuel. <a href="/terms" target="_blank">Conditions</a> · <a href="/privacy" target="_blank">Confidentialité</a></p></footer>
+    <footer class="lfoot"><p>Proprio est un jeu : posséder une carte ne donne aucun droit sur le bien réel. L'argent du jeu est virtuel. <a href="/cgu" target="_blank">Conditions d'utilisation</a> · <a href="/confidentialite" target="_blank">Confidentialité</a> · <a href="mailto:contact@proprio.games">Contact</a></p></footer>
   </div>`;
 }
 // carte de Paris de l'accueil : quelques arrondissements déjà tenus par un parti (une illustration, pas la vraie partie), les autres à prendre
