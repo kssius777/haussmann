@@ -272,7 +272,7 @@ function showLand(L, gv) {
   }
   if (view) {
     const listed = ST.sale.has(g);
-    btns = `${free > 0 ? `<div class="farbuy">🎲 Pour l'acheter, tombez dessus avec le dé.</div>` : ""}<button class="btn block ${listed ? "buy" : "light"}" data-lopen="${g}"><span>${listed ? "En vente au Marché · voir l'offre" : "Voir la fiche de l'immeuble"}</span></button>`;
+    btns = `${free > 0 ? `<div class="farbuy">🎲 Pour l'acheter, tombez dessus avec le dé.</div>` : ""}<button class="btn block ${listed ? "buy" : "light"}" data-lopen="${g}"><span>${listed ? "En vente au Marché · voir l'offre" : isP ? "Voir la fiche" : "Voir la fiche de l'immeuble"}</span></button>`;
   }
   // racheter à un autre joueur : faire une offre (pas pendant l'écran « Acheté ! »)
   if (!jb && others > 0 && !isP && !ST.sale.has(g)) btns += `<button class="btn block light" data-lofr="${g}">🤝 Proposer de racheter ${owners.length === 1 ? "au propriétaire" : "à un propriétaire"}</button>`;
@@ -288,7 +288,7 @@ function showLand(L, gv) {
     } else btns = `<button class="btn block buy" data-mvclose><span>Continuer</span></button>`;
   }
   setMovebar(`<div class="land${lines.length ? " hasln" : ""}"><div class="grab"></div><div class="lc" data-lopen="${g}">${cardHTML(c)}</div>
-    <div class="lr"><b class="lh ${cls}">${head}</b>${lines.length ? `<div class="lns">${lines.join("")}</div>` : ""}${occ}<div class="lb">${btns}</div></div>
+    <div class="lr"><b class="lh ${cls}">${head}</b>${lines.length ? `<div class="lns">${lines.join("")}</div>` : ""}${netLine(g)}${occ}<div class="lb">${btns}</div></div>
     <button class="x" data-mvclose aria-label="Fermer">×</button></div>`, "land");
   $("#movebar").classList.add("r" + c.r);
   landView = view; sel = view ? g : null; if (view) paintAll();
@@ -317,11 +317,11 @@ function initSlides(root) {
 // le plan de l'immeuble : une case par logement (à vous / à d'autres / libre) — aussi utilisé par la fiche
 function occHTML(c, mine, others, free) {
   const tot = c.lots, isP = c.lk === "p"; if (tot <= 1) return "";
-  const u = n => isP ? fmtN(n) + " part" + (n > 1 ? "s" : "") : n;
+  const u = n => isP ? fmtN(n) : n;   // le titre dit déjà « en 100 parts » : la légende tient sur une ligne
   const leg = [mine ? `<span class="o-me">${u(mine)} à vous</span>` : "", others ? `<span class="o-th">${u(others)} à d'autres</span>` : "", free ? `<span class="o-fr">${u(free)} libre${free > 1 ? "s" : ""}</span>` : ""].filter(Boolean).join("");
   const viz = !isP && tot <= 40 ? `<div class="oc">${"<i class='me'></i>".repeat(mine)}${"<i class='th'></i>".repeat(others)}${"<i></i>".repeat(Math.max(0, free))}</div>`
     : `<div class="obar"><i class="me" style="width:${mine / tot * 100}%"></i><i class="th" style="width:${others / tot * 100}%"></i></div>`;
-  return `<div class="occ"><div class="ot">${isP ? `Monument en ${fmtN(tot)} parts` : `Immeuble de ${tot} ${lotWord(c, tot)}`}</div>${viz}<div class="ol">${leg}</div></div>`;
+  return `<div class="occ"><div class="ot">${isP ? `${SPOTN[spotOf(c.g)?.[1]] || "Monument"} en ${fmtN(tot)} parts` : `Immeuble de ${tot} ${lotWord(c, tot)}`}</div>${viz}<div class="ol">${leg}</div></div>`;
 }
 let landCredit = null, landCreditNow = false, justBought = null;   // null = choix automatique (crédit si l'on n'a pas assez pour payer comptant)
 const CREDIT_DOWN = 0.1;

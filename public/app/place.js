@@ -93,7 +93,7 @@ async function openPlace() {
   if (typeof clearDest === "function" && document.body.classList.contains("picking")) clearDest();
   PL.on = true; PL.people.clear(); PL.seen.clear(); PL.last = 0;
   document.body.classList.add("inplace");
-  PL.saved = { ctl: lockMap(true) };
+  PL.saved = { ctl: lockMap(true), cam: { center: map.getCenter(), zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing() } };
   window.pawn3d?.hide();
   buildPlaceUI();
   map.flyTo(Object.assign(placeCam(), { duration: 1100 }));
@@ -116,7 +116,8 @@ function closePlace(noLeave) {
   document.body.classList.remove("inplace");
   lockMap(false, PL.saved?.ctl);
   PL.people.clear(); PL.seen.clear();
-  if (typeof placePawn === "function") placePawn(true);
+  if (typeof placePawn === "function") placePawn(false);   // la montgolfière revient…
+  if (PL.saved?.cam) map.flyTo(Object.assign({}, PL.saved.cam, { duration: 900 }));   // …et la carte comme avant le chat
   refreshChatCount();
 }
 async function rejoin() {

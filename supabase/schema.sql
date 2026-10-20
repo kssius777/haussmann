@@ -2249,3 +2249,445 @@ begin
     end;
   end if;
 end $$;
+
+-- ===== migration_metro.sql =====
+-- =====================================================================
+--  Les lieux en cartes à parts (20/10/2026, validé par le propriétaire) : les 244 stations de métro
+--  de Paris (100 parts, rareté selon le nombre de lignes, Châtelet Mythique) et 45 jardins, bois,
+--  places et le canal Saint-Martin (parts selon la rareté, comme les monuments).
+--  Bonus réseau : +1 % sur tous ses loyers par station où l'on a au moins une part, jusqu'à +15 %.
+--  Boosters : une case Commune peut aussi donner une part de station (8 %).
+--  Généré par scripts/add_spots.py (données Wikidata, CC0). Rejouable sans risque.
+-- =====================================================================
+--  (ici seulement les règles et la liste des lieux : les cartes et les liens du dé viennent de cards.json et edges.json, chargés par /api/seed)
+create table if not exists spots (
+  card  int primary key,                -- la carte (cards.id)
+  kind  text not null,                  -- m station de métro · j jardin · b bois · p place · c canal
+  lines text[]                          -- lignes de métro (stations)
+);
+alter table spots enable row level security;
+
+-- bonus réseau : +1 % de loyers par station où l'on a au moins une part, jusqu'à +15 %
+create or replace function _network(p uuid) returns int language sql stable as $$
+  select least(15, count(*))::int from parts x join spots s on s.card = x.card where x.owner = p and s.kind = 'm' and x.n > 0 $$;
+revoke all on function _network(uuid) from public, anon, authenticated;
+
+-- les loyers (comme avant), multipliés par le bonus réseau
+create or replace function _rates(p uuid) returns table(arr smallint, rate float8, mayor uuid, tax float8)
+language plpgsql as $$
+#variable_conflict use_column
+declare ev day_event := _event(); myparty text; net float8 := 1 + _network(p) / 100.0;
+begin
+  select party into myparty from profiles where id=p;
+  return query
+  with ml as (
+    select l.card, l.k, c.arr a, c.rent, c.lots, c.et, c.lk, l.mort,
+           floor_of(c.lk, c.lots, c.et, l.k) f
+    from lots l join cards c on c.id=l.card where l.owner=p
+  ),
+  per_card as (select card, count(*) n from ml group by card),
+  per_floor as (select card, f, count(*) n from ml group by card, f),
+  per_arr as (select a, count(*) n from ml group by a),
+  fxa as (select * from fx where owner=p and until > now()),
+  lotrates as (
+    select ml.a,
+      case when ml.mort is not null then 0
+           when exists (select 1 from fxa where fxa.kind='lot' and fxa.card=ml.card and fxa.k=ml.k) then 0
+      else ml.rent
+        * case when pc.n = ml.lots and ml.lots > 1 then (cfg()->>'titleBonus')::float8
+               when ml.lk='l' and floor_hi(ml.lots,ml.et,ml.f)-floor_lo(ml.lots,ml.et,ml.f)+1 >= 2
+                    and pf.n = floor_hi(ml.lots,ml.et,ml.f)-floor_lo(ml.lots,ml.et,ml.f)+1 then (cfg()->>'floorBonus')::float8
+               else 1 end
+        * case when ev.arr = ml.a then ev.m else 1 end
+        * case when s.party is not null and s.party = myparty then 1.10 else 1 end
+        * coalesce((select exp(sum(ln(fxa.m))) from fxa where fxa.kind='all' or (fxa.kind='bld' and fxa.card=ml.card)), 1)
+      end as r
+    from ml join per_card pc on pc.card=ml.card
+            join per_floor pf on pf.card=ml.card and pf.f=ml.f
+            join per_arr pa on pa.a=ml.a
+            left join arr_state s on s.arr=ml.a and s.mayor is not null
+  ),
+  partrates as (
+    select c.arr a,
+      case when pt.mort is not null then 0 else
+        c.rent::float8 * pt.n
+        * case when pt.n*4 >= c.lots and pt.owner = (select owner from parts x where x.card=pt.card order by n desc, owner limit 1) then (cfg()->>'gardien')::float8 else 1 end
+        * case when ev.arr = c.arr then ev.m else 1 end
+        * case when s.party is not null and s.party = myparty then 1.10 else 1 end
+        * coalesce((select exp(sum(ln(fxa.m))) from fxa where fxa.kind='all' or (fxa.kind='bld' and fxa.card=pt.card)), 1)
+      end as r
+    from parts pt join cards c on c.id=pt.card left join arr_state s on s.arr=c.arr and s.mayor is not null
+    where pt.owner=p
+  ),
+  allr as (select a, r from lotrates union all select a, r from partrates)
+  select allr.a::smallint, sum(allr.r)::float8 * net,
+         s.mayor,
+         case when s.mayor is null or s.mayor = p then 0
+              else (cfg()->>'tax')::float8 end
+  from allr left join arr_state s on s.arr = allr.a
+  group by allr.a, s.mayor, s.party;
+end $$;
+
+-- les boosters : une case Commune peut aussi donner une part de station de métro (les stations à une ligne sont Communes)
+create or replace function _draw(p uuid, tier char) returns jsonb language plpgsql as $$
+#variable_conflict use_column
+declare t text; c cards; k int; f int; lo int; hi int; ks int[]; sold int; n int; att int; i int;
+begin
+  for att in 1..40 loop
+    t := case tier
+      when 'C' then _pick_weighted(array['key','floor','part'], array[80,12,8])   -- 'part' : une part de station de métro (20/10/2026)
+      when 'U' then _pick_weighted(array['key','floor','part'], array[35,45,20])
+      when 'R' then _pick_weighted(array['key','floor','title','part'], array[15,30,40,15])
+      when 'L' then _pick_weighted(array['title','part','key'], array[45,45,10])
+      else          _pick_weighted(array['part','title'], array[75,25]) end;
+    if att > 30 then t := 'key'; end if;  -- filet de sécurité : il reste toujours des clés libres
+
+    if t = 'key' then
+      select * into c from cards where r = any(case when tier='L' then array['L','M'] else array[tier] end) and lk <> 'p'
+        order by random() limit 1;
+      if not found then continue; end if;
+      for i in 1..8 loop
+        k := floor(random()*c.lots)::int;
+        insert into lots(card,k,owner) values (c.id,k,p) on conflict do nothing;
+        if found then
+          perform _add_value(p, c.arr, c.v);
+          return jsonb_build_object('t','key','card',c.id,'ks',jsonb_build_array(k),'tier',tier);
+        end if;
+      end loop;
+
+    elsif t = 'floor' then
+      select * into c from cards where r = any(case tier when 'C' then array['C'] when 'U' then array['C','U'] else array['U','R'] end)
+        and lk='l' and lots >= 2 and et >= 2 order by random() limit 1;
+      if not found then continue; end if;
+      f := 1 + floor(random()*c.et)::int;
+      lo := floor_lo(c.lots,c.et,f); hi := floor_hi(c.lots,c.et,f);
+      if hi - lo + 1 < 2 then continue; end if;
+      -- l'étage doit être entièrement libre
+      if exists (select 1 from lots where card=c.id and k between lo and hi) then continue; end if;
+      begin
+        insert into lots(card,k,owner) select c.id, g, p from generate_series(lo,hi) g;
+      exception when unique_violation then continue; end;
+      perform _add_value(p, c.arr, c.v*(hi-lo+1));
+      select array_agg(g) into ks from generate_series(lo,hi) g;
+      return jsonb_build_object('t','floor','card',c.id,'ks',to_jsonb(ks),'tier',tier);
+
+    elsif t = 'title' then
+      select * into c from cards cc where r = any(case tier when 'R' then array['C','U'] when 'L' then array['C','U','R'] else array['R','L'] end)
+        and lk <> 'p' and lots between 2 and (case tier when 'R' then 12 when 'L' then 40 else 80 end)
+        and not exists (select 1 from lots where card=cc.id)
+        order by random() limit 1;
+      if not found then continue; end if;
+      begin
+        insert into lots(card,k,owner) select c.id, g, p from generate_series(0,c.lots-1) g;
+      exception when unique_violation then continue; end;
+      perform _add_value(p, c.arr, c.v*c.lots);
+      insert into news(kind, arr, card, actor) values ('title', c.arr, c.id, p);
+      return jsonb_build_object('t','title','card',c.id,'ks',(select jsonb_agg(g) from generate_series(0,c.lots-1) g),'tier',tier);
+
+    else -- part
+      select * into c from cards where r = tier and lk='p' order by random() limit 1;
+      if not found then continue; end if;
+      perform 1 from cards where id=c.id for update;           -- verrou : un seul tirage à la fois sur ce monument
+      select coalesce(sum(x.n),0) into sold from parts x where x.card=c.id;
+      if sold >= c.lots then continue; end if;
+      n := least(case tier when 'U' then 3 when 'R' then 2 else 1 end, c.lots - sold);
+      insert into parts(card,owner,n) values (c.id,p,n) on conflict (card,owner) do update set n = parts.n + excluded.n;
+      perform _add_value(p, c.arr, c.v*n);
+      return jsonb_build_object('t','part','card',c.id,'n',n,'tier',tier);
+    end if;
+  end loop;
+  return null;
+end $$;
+revoke all on function _draw(uuid, char) from public, anon, authenticated;
+
+insert into spots(card, kind, lines) values
+(1578,'m',array['1','4','7','11','14']),
+(1579,'m',array['4']),
+(1580,'m',array['4']),
+(1581,'m',array['1']),
+(1582,'m',array['1','7']),
+(1583,'m',array['7']),
+(1584,'m',array['7','14']),
+(1585,'m',array['1']),
+(101896,'m',array['3']),
+(101897,'m',array['3']),
+(101898,'m',array['3','4']),
+(101899,'m',array['3']),
+(101900,'m',array['4','8','9']),
+(202033,'m',array['3','11']),
+(202034,'m',array['8']),
+(202035,'m',array['8']),
+(202036,'m',array['11']),
+(202037,'m',array['3','5','8','9','11']),
+(202038,'m',array['8']),
+(202039,'m',array['3']),
+(301901,'m',array['4']),
+(301902,'m',array['1','11']),
+(301903,'m',array['7']),
+(301904,'m',array['1']),
+(301905,'m',array['7']),
+(402728,'m',array['10']),
+(402729,'m',array['7']),
+(402730,'m',array['10']),
+(402731,'m',array['7','10']),
+(402732,'m',array['10']),
+(402733,'m',array['7']),
+(502588,'m',array['10']),
+(502589,'m',array['12']),
+(502590,'m',array['4','10']),
+(502591,'m',array['12']),
+(502592,'m',array['4']),
+(502593,'m',array['4']),
+(502594,'m',array['4']),
+(502595,'m',array['4']),
+(602929,'m',array['12']),
+(602930,'m',array['10','13']),
+(602931,'m',array['8']),
+(602932,'m',array['8','13']),
+(602933,'m',array['8']),
+(602934,'m',array['12']),
+(602935,'m',array['13']),
+(602936,'m',array['10','12']),
+(602937,'m',array['12']),
+(602938,'m',array['10']),
+(602939,'m',array['13']),
+(703297,'m',array['9']),
+(703298,'m',array['1','13']),
+(703299,'m',array['1','2','6']),
+(703300,'m',array['1','8','12']),
+(703301,'m',array['2']),
+(703302,'m',array['3']),
+(703303,'m',array['1','9']),
+(703304,'m',array['1']),
+(703305,'m',array['13']),
+(703306,'m',array['8','12','14']),
+(703307,'m',array['9','13']),
+(703308,'m',array['2']),
+(703309,'m',array['9']),
+(703310,'m',array['3','12','13','14']),
+(703311,'m',array['9']),
+(703312,'m',array['2']),
+(803146,'m',array['2']),
+(803147,'m',array['7']),
+(803148,'m',array['7','9']),
+(803149,'m',array['8','9']),
+(803150,'m',array['3','9']),
+(803151,'m',array['7']),
+(803152,'m',array['12']),
+(803153,'m',array['3','7','8']),
+(803154,'m',array['2','12']),
+(803155,'m',array['7']),
+(803156,'m',array['8','9']),
+(803157,'m',array['12']),
+(803158,'m',array['12']),
+(902918,'m',array['2','4']),
+(902919,'m',array['8','9']),
+(902920,'m',array['4']),
+(902921,'m',array['7']),
+(902922,'m',array['2']),
+(902923,'m',array['4','5','7']),
+(902924,'m',array['4','5']),
+(902925,'m',array['5']),
+(902926,'m',array['7','7bis']),
+(1004561,'m',array['2']),
+(1004562,'m',array['2']),
+(1004563,'m',array['5']),
+(1004564,'m',array['9']),
+(1004565,'m',array['2']),
+(1004566,'m',array['8']),
+(1004567,'m',array['11']),
+(1004568,'m',array['8']),
+(1004569,'m',array['2']),
+(1004570,'m',array['5','9']),
+(1004571,'m',array['3']),
+(1004572,'m',array['5']),
+(1004573,'m',array['9']),
+(1004574,'m',array['3']),
+(1004575,'m',array['9']),
+(1004576,'m',array['9']),
+(1103959,'m',array['1','5','8']),
+(1103960,'m',array['6']),
+(1103961,'m',array['6','14']),
+(1103962,'m',array['14']),
+(1103963,'m',array['6','8']),
+(1103964,'m',array['6']),
+(1103965,'m',array['1','14']),
+(1103966,'m',array['8']),
+(1103967,'m',array['8']),
+(1103968,'m',array['1','2','6','9']),
+(1103969,'m',array['6']),
+(1103970,'m',array['8']),
+(1103971,'m',array['8']),
+(1103972,'m',array['5']),
+(1103973,'m',array['1','8']),
+(1204454,'m',array['14']),
+(1204455,'m',array['5']),
+(1204456,'m',array['6']),
+(1204457,'m',array['6']),
+(1204458,'m',array['5','10']),
+(1204459,'m',array['6']),
+(1204460,'m',array['7']),
+(1204461,'m',array['7','14']),
+(1204462,'m',array['6']),
+(1204463,'m',array['14']),
+(1204464,'m',array['5','6','7']),
+(1204465,'m',array['7']),
+(1204466,'m',array['7']),
+(1204467,'m',array['7']),
+(1204468,'m',array['6']),
+(1204469,'m',array['5']),
+(1204470,'m',array['7']),
+(1304770,'m',array['4']),
+(1304771,'m',array['4','6']),
+(1304772,'m',array['6']),
+(1304773,'m',array['13']),
+(1304774,'m',array['4']),
+(1304775,'m',array['13']),
+(1304776,'m',array['13']),
+(1304777,'m',array['4']),
+(1304778,'m',array['13']),
+(1304779,'m',array['4','6']),
+(1304780,'m',array['6']),
+(1304781,'m',array['4']),
+(1406557,'m',array['10']),
+(1406558,'m',array['8']),
+(1406559,'m',array['6']),
+(1406560,'m',array['8']),
+(1406561,'m',array['6']),
+(1406562,'m',array['10']),
+(1406563,'m',array['8']),
+(1406564,'m',array['12']),
+(1406565,'m',array['6']),
+(1406566,'m',array['12']),
+(1406567,'m',array['8']),
+(1406568,'m',array['10']),
+(1406569,'m',array['6','8','10']),
+(1406570,'m',array['8']),
+(1406571,'m',array['4','6','12','13']),
+(1406572,'m',array['6','12']),
+(1406573,'m',array['12']),
+(1406574,'m',array['10']),
+(1406575,'m',array['6']),
+(1406576,'m',array['12']),
+(1406577,'m',array['12']),
+(1506816,'m',array['1']),
+(1506817,'m',array['6']),
+(1506818,'m',array['10']),
+(1506819,'m',array['10']),
+(1506820,'m',array['9']),
+(1506821,'m',array['9']),
+(1506822,'m',array['9']),
+(1506823,'m',array['6']),
+(1506824,'m',array['9']),
+(1506825,'m',array['9','10']),
+(1506826,'m',array['9','10']),
+(1506827,'m',array['10']),
+(1506828,'m',array['6']),
+(1506829,'m',array['10']),
+(1506830,'m',array['2']),
+(1506831,'m',array['9']),
+(1506832,'m',array['1']),
+(1506833,'m',array['9']),
+(1506834,'m',array['9']),
+(1506835,'m',array['6','9']),
+(1506836,'m',array['2']),
+(1606046,'m',array['13']),
+(1606047,'m',array['13']),
+(1606048,'m',array['3']),
+(1606049,'m',array['3']),
+(1606050,'m',array['14']),
+(1606051,'m',array['3']),
+(1606052,'m',array['13','14']),
+(1606053,'m',array['13']),
+(1606054,'m',array['2']),
+(1606055,'m',array['2','3']),
+(1606056,'m',array['3']),
+(1706091,'m',array['12']),
+(1706092,'m',array['2']),
+(1706093,'m',array['4']),
+(1706094,'m',array['13']),
+(1706095,'m',array['12']),
+(1706096,'m',array['2']),
+(1706097,'m',array['12']),
+(1706098,'m',array['4','12']),
+(1706099,'m',array['12']),
+(1706100,'m',array['2','13']),
+(1706101,'m',array['4']),
+(1706102,'m',array['12']),
+(1706103,'m',array['4']),
+(1804259,'m',array['7bis']),
+(1804260,'m',array['7bis']),
+(1804261,'m',array['7bis']),
+(1804262,'m',array['7']),
+(1804263,'m',array['7']),
+(1804264,'m',array['7bis']),
+(1804265,'m',array['2','5','7bis']),
+(1804266,'m',array['5']),
+(1804267,'m',array['5']),
+(1804268,'m',array['7bis','11']),
+(1804269,'m',array['7']),
+(1804270,'m',array['5']),
+(1804271,'m',array['7bis']),
+(1804272,'m',array['7']),
+(1804273,'m',array['2','5','7']),
+(1905308,'m',array['2','11']),
+(1905309,'m',array['9']),
+(1905310,'m',array['3','3bis']),
+(1905311,'m',array['11']),
+(1905312,'m',array['9']),
+(1905313,'m',array['3bis']),
+(1905314,'m',array['2','3']),
+(1905315,'m',array['2']),
+(1905316,'m',array['3']),
+(1905317,'m',array['9']),
+(1905318,'m',array['1']),
+(1905319,'m',array['3bis','11']),
+(1905320,'m',array['11']),
+(1905321,'m',array['3bis']),
+(1905322,'m',array['11']),
+(1586,'j',null),
+(502596,'j',null),
+(602940,'j',null),
+(1804274,'j',null),
+(703313,'j',null),
+(402734,'j',null),
+(1304782,'j',null),
+(1804275,'j',null),
+(1406578,'j',null),
+(1103974,'j',null),
+(1587,'j',null),
+(1588,'j',null),
+(1905323,'j',null),
+(1103975,'j',null),
+(1406579,'j',null),
+(602941,'j',null),
+(1506837,'j',null),
+(1506838,'b',null),
+(1103976,'b',null),
+(703314,'p',null),
+(1506839,'p',null),
+(301906,'p',null),
+(1103977,'p',null),
+(202040,'p',null),
+(1606057,'p',null),
+(1589,'p',null),
+(1706104,'p',null),
+(1103978,'p',null),
+(1204471,'p',null),
+(101901,'p',null),
+(101902,'p',null),
+(1590,'p',null),
+(502597,'p',null),
+(1591,'p',null),
+(703315,'p',null),
+(301907,'p',null),
+(803159,'p',null),
+(402735,'p',null),
+(402736,'p',null),
+(502598,'p',null),
+(301908,'p',null),
+(1304783,'p',null),
+(1606058,'p',null),
+(1706105,'p',null),
+(902927,'c',null)
+on conflict (card) do update set kind = excluded.kind, lines = excluded.lines;

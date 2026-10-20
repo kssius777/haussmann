@@ -31,6 +31,9 @@ const LINE_DARK = new Set(["1", "3bis", "5", "6", "7", "7bis", "8", "9", "13"]);
 let SPOTM = null;
 const spotOf = g => { if (!SPOTM && typeof IDX !== "undefined" && IDX?.spots) SPOTM = new Map(IDX.spots.map(s => [s[0], s])); return SPOTM?.get(g) || null; };
 const isStation = g => spotOf(g)?.[1] === "m";
+const SPOTN = { m: "Station", j: "Jardin", b: "Bois", p: "Place", c: "Canal" };
+// la station : ses lignes, et ce que rapporte le réseau (+1 % sur tous ses loyers par station, jusqu'à +15 %)
+const netLine = g => isStation(g) ? `<div class="netl"><span class="lnbs">${lineBadges(g, 18)}</span><span>+1 % sur tous vos loyers par station${myStations() ? `<b>vous : +${myStations()} %</b>` : ""}</span></div>` : "";
 const stationLines = g => (spotOf(g)?.[2] || "").split(",").filter(Boolean);
 const myStations = () => Math.min(15, [...ST.mineParts.keys()].filter(isStation).length);   // bonus réseau : +1 % par station, jusqu'à +15 %
 const lineBadges = (g, size = 20) => stationLines(g).map(n => `<i class="lnb${LINE_DARK.has(n) ? " dk" : ""}" style="--lc:${LINE_C[n] || "#64748B"};--ls:${size}px">${n.replace("bis", "b")}</i>`).join("");
@@ -131,7 +134,7 @@ function toast(msg, kind) {
 // ---------------- données statiques ----------------
 let IDX = null, FIELDS = [], ARR = [], BASE = null, MONS = null;
 const DATA = "/data/";
-const DATA_V = "20261019";   // à changer quand les fichiers de public/data changent (sinon le navigateur garde l'ancienne version un jour)
+const DATA_V = "20261020";   // à changer quand les fichiers de public/data changent (sinon le navigateur garde l'ancienne version un jour)
 async function getJSON(u) { const r = await fetch(u); if (!r.ok) throw new Error(u + " : HTTP " + r.status); return r.json(); }
 function decodeRing(f) { let x = f[0] + 235000, y = f[1] + 4886000; const o = [[x / 1e5, y / 1e5]]; for (let k = 2; k < f.length; k += 2) { x += f[k]; y += f[k + 1]; o.push([x / 1e5, y / 1e5]); } return o; }
 

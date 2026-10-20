@@ -1911,7 +1911,7 @@ body.mapfull #bar,body.mapfull #credbar,body.mapfull #tabs{backdrop-filter:none!
   body.mapfull .dicebar{position:relative;width:100%;justify-content:center}
   body.mapfull .dside.dspace{display:none}
   body.mapfull #b-pack{position:absolute;right:0;bottom:84px;margin:0}
-  body.mapfull .mapside{bottom:calc(env(safe-area-inset-bottom,0px) + 170px)}
+  body.mapfull .mapside{bottom:calc(env(safe-area-inset-bottom,0px) + 170px);grid-auto-flow:column}   /* la boussole à gauche de « tout Paris » : elle cachait la loupe */
   /* case ouverte ou choix de la destination : les onglets s'effacent, comme avant */
   body.mapfull.landopen #tabs,body.mapfull.picking #tabs,body.mapfull.picksel #tabs{transform:translateY(calc(100% + 30px))}
 }
@@ -2123,3 +2123,26 @@ body.inplace .pricetag,body.inplace .lbub,body.inplace .pawn,body.inplace #coach
   #tabs .t-chat{display:none!important}
   body.mapfull #b-chat{display:grid;position:absolute;left:0;bottom:84px;margin:0}
 }
+
+/* ===== les lieux : stations de métro, jardins, bois, places, canal (20/10/2026) ===== */
+.smark{display:flex;align-items:center;gap:5px;padding:2px 9px 2px 2px;border-radius:999px;background:#fff;border:2px solid var(--sk);box-shadow:0 2px 8px rgba(0,0,0,.18);
+  font:700 11.5px/1.1 "Inter Tight",system-ui,sans-serif;color:#1E293B;white-space:nowrap;cursor:pointer;--sk:#1F3A93}
+.smark .si{width:22px;height:22px;border-radius:50%;background:var(--sk);display:grid;place-items:center;flex:none}
+.smark .si svg{width:16px;height:16px;color:var(--sk)}
+.smark.k-j,.smark.k-b{--sk:#2F8F4E}
+.smark.k-p{--sk:#57534E}
+.smark.k-c{--sk:#0284C7}
+.smark.far{padding:2px;gap:0}
+.smark.far .sn,.smark.clash .sn{display:none}
+.smark.clash{padding:2px;gap:0}
+.smark.far .si{width:18px;height:18px}
+.smark.far .si svg{width:13px;height:13px}
+.smark.me{box-shadow:0 0 0 3px var(--act),0 2px 8px rgba(0,0,0,.18)}
+.smark.them{box-shadow:0 0 0 3px #F9A8D4,0 2px 8px rgba(0,0,0,.18)}
+.smark.sale{box-shadow:0 0 0 3px #F59E0B,0 2px 8px rgba(0,0,0,.18)}
+body.inplace .smark,body.picking .smark{display:none}
+.lnb{display:inline-grid;place-items:center;width:var(--ls);height:var(--ls);border-radius:50%;background:var(--lc);color:#fff;font:900 calc(var(--ls) * .56)/1 "Inter Tight",system-ui,sans-serif;flex:none}
+.lnb.dk{color:#111}
+.netl{display:flex;align-items:center;gap:10px;margin:8px 0;padding:8px 10px;border-radius:12px;background:#EEF2FF;font-size:13px;line-height:1.25}
+.netl .lnbs{display:flex;gap:3px;flex-wrap:wrap;max-width:104px}
+.netl b{display:block;color:#1F3A93;font-size:12px}

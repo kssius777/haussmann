@@ -152,7 +152,7 @@ function buildMap(base) {
       a.marker = new maplibregl.Marker({ element: el }).setLngLat(a.center).addTo(map);
     });
     buildMonMarkers(); buildSpotMarkers(); buildParkLabels(); map.on("move", queueDeclutter); map.on("resize", queueDeclutter);
-    map.on("zoom", renderMarks); map.on("zoomend", () => typeof declutterDest === "function" && declutterDest()); map.on("rotateend", () => typeof declutterDest === "function" && declutterDest()); map.on("moveend", renderTags);
+    map.on("zoom", renderMarks); map.on("zoomend", () => typeof declutterDest === "function" && declutterDest()); map.on("rotateend", () => typeof declutterDest === "function" && declutterDest()); map.on("moveend", renderTags); map.on("moveend", () => { renderSpots(map.getZoom()); declutterSpots(); });
     // la boussole n'apparaît que si la carte a été tournée ; elle remet le nord en haut
     map.on("rotate", () => { const b = map.getBearing(); $("#t-north").hidden = Math.abs(b) < 2; $("#needle").style.transform = `rotate(${-b}deg)`; });
     ARR.forEach((A, i) => { if (A?.cards) addArrToMap(i); });
@@ -172,10 +172,12 @@ const PLACES = [["La Seine", 2.2975, 48.8605, 12.5, "w"], ["La Seine", 2.3655, 4
   ["Montmartre", 2.3405, 48.8868, 12.6, "q"], ["Le Marais", 2.3600, 48.8590, 12.6, "q"], ["Quartier latin", 2.3445, 48.8490, 12.6, "q"], ["Saint-Germain-des-Prés", 2.3335, 48.8538, 12.8, "q"], ["Belleville", 2.3825, 48.8720, 12.6, "q"], ["Pigalle", 2.3375, 48.8822, 13.2, "q"], ["Les Halles", 2.3460, 48.8618, 13.2, "q"], ["Opéra", 2.3320, 48.8712, 13.2, "q"], ["Montparnasse", 2.3240, 48.8425, 12.8, "q"], ["Batignolles", 2.3195, 48.8865, 13, "q"], ["Butte-aux-Cailles", 2.3505, 48.8275, 13.2, "q"], ["Bercy", 2.3860, 48.8340, 13, "q"], ["Trocadéro", 2.2875, 48.8620, 13, "q"], ["Bastille", 2.3700, 48.8540, 13.2, "q"], ["Oberkampf", 2.3740, 48.8650, 13.4, "q"], ["Saint-Michel", 2.3440, 48.8530, 14, "q"]];
 let parkMarks = [];
 function buildParkLabels() {
-  parkMarks = [...PARKS, ...PLACES].map(([n, lon, lat, minz, k]) => { const el = document.createElement("div"); el.className = "plabel" + (k ? " " + k : ""); el.textContent = n; return { mk: new maplibregl.Marker({ element: el }).setLngLat([lon, lat]), minz, on: false }; });
+  const spotN = new Set((IDX.spots || []).map(s => s[5]));   // un jardin ou une place devenu carte : son repère remplace l'étiquette quand il s'affiche
+  parkMarks = [...PARKS, ...PLACES].map(([n, lon, lat, minz, k]) => { const el = document.createElement("div"); el.className = "plabel" + (k ? " " + k : ""); el.textContent = n; return { mk: new maplibregl.Marker({ element: el }).setLngLat([lon, lat]), minz, on: false, dup: spotN.has(n) }; });
 }
 // noms courts pour les étiquettes de la carte
 const SHORT = { "Centre national d'art et de culture Georges-Pompidou": "Centre Pompidou", "cathédrale Notre-Dame de Paris": "Notre-Dame", "basilique du Sacré-Cœur de Montmartre": "Sacré-Cœur", "arc de triomphe de l'Étoile": "Arc de Triomphe", "palais de l'Élysée": "Élysée", "Paris-Nord": "Gare du Nord", "grande mosquée de Paris": "Grande Mosquée", "palais du Luxembourg": "Sénat (Luxembourg)", "Musée du Louvre": "Louvre", "église de la Madeleine": "La Madeleine", "palais Garnier": "Opéra Garnier", "catacombes de Paris": "Catacombes", "Palais Omnisports de Paris-Bercy": "Accor Arena (Bercy)", "Paris-Lyon": "Gare de Lyon", "Muséum national d'histoire naturelle": "Muséum", "hôtel de ville de Paris": "Hôtel de Ville", "conciergerie de Paris": "Conciergerie", "Paris-Est": "Gare de l'Est", "Paris-Montparnasse": "Gare Montparnasse", "Paris-Saint-Lazare": "Gare Saint-Lazare", "Paris-Austerlitz": "Gare d'Austerlitz", "obélisque de Louxor": "Obélisque", "Tombeau de l'Empereur Napoléon aux Invalides": "Les Invalides", "église Saint-Sulpice de Paris": "Saint-Sulpice", "église Saint-Eustache de Paris": "Saint-Eustache", "abbaye Royale de Saint-Germain-des-Prés": "Saint-Germain-des-Prés", "basilique Sainte-Clotilde": "Sainte-Clotilde", "église de la Sainte-Trinité de Paris": "La Trinité", "église Saint-Augustin de Paris": "Saint-Augustin", "église du Val-de-Grâce": "Val-de-Grâce", "église Saint-Étienne-du-Mont": "Saint-Étienne-du-Mont", "église Saint-Vincent-de-Paul": "Saint-Vincent-de-Paul", "église Saint-Ambroise": "Saint-Ambroise", "église Saint-Paul-Saint-Louis de Paris": "Saint-Paul", "arc de triomphe du Carrousel": "Arc du Carrousel", "opéra Bastille": "Opéra Bastille" };
+const noAcc = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 const shortName = n => SHORT[n] || cap(n).replace(/^(Église|Musée|Théâtre|Hôtel|Palais|Basilique|Gare) /, "$1 ").replace(/ de Paris$/, "");
 let monMarks = [];
 function buildMonMarkers() {
@@ -199,22 +201,35 @@ const SPOT_ICO = {
 };
 let spotMarks = [];
 function buildSpotMarkers() {
-  spotMarks = (IDX.spots || []).map(([g, kind, lines, lon, lat]) => {
+  spotMarks = (IDX.spots || []).map(([g, kind, lines, lon, lat, name]) => {
     const el = document.createElement("button"); el.className = "smark k-" + kind;
-    el.innerHTML = `<i class="si">${SPOT_ICO[kind] || SPOT_ICO.p}</i><span class="sn"></span>`;
+    el.innerHTML = `<i class="si">${SPOT_ICO[kind] || SPOT_ICO.p}</i><span class="sn">${esc(shortName((name || "").replace(/^Métro /, "")))}</span>`;
     el.addEventListener("click", ev => { ev.stopPropagation(); onBuildingTap(g); });
-    return { g, kind, mk: new maplibregl.Marker({ element: el, anchor: "center" }).setLngLat([lon, lat]), el, on: false, named: false, st: -1 };
+    return { g, kind, lon, lat, name: name || "", mk: new maplibregl.Marker({ element: el, anchor: "center" }).setLngLat([lon, lat]), el, on: false, far: null, st: -1 };
   });
 }
 function renderSpots(z) {
-  const phone = innerWidth < 700;
+  if (!spotMarks.length) return;
+  const phone = innerWidth < 700, b = map.getBounds(), dx = (b.getEast() - b.getWest()) * .4, dy = (b.getNorth() - b.getSouth()) * .4;
+  const W = b.getWest() - dx, E = b.getEast() + dx, S = b.getSouth() - dy, N = b.getNorth() + dy;   // seulement autour de l'écran : moins de repères à déplacer sur téléphone
+  const ok = mode === "all" && !document.body.classList.contains("picking") && z < 19;
   for (const s of spotMarks) {
-    const m = s.kind === "m", show = mode === "all" && !document.body.classList.contains("picking") && z >= (m ? (phone ? 14.8 : 14.4) : (phone ? 13.8 : 13.4)) && z < 19;
-    if (show && !s.on) { s.mk.addTo(map); s.on = true; } else if (!show && s.on) { s.mk.remove(); s.on = false; }
+    const m = s.kind === "m", show = ok && z >= (m ? (phone ? 14.8 : 14.4) : (phone ? 13.8 : 13.4)) && s.lon > W && s.lon < E && s.lat > S && s.lat < N;
+    if (show && !s.on) { s.mk.addTo(map); s.el.setAttribute("aria-label", s.name); s.on = true; } else if (!show && s.on) { s.mk.remove(); s.on = false; }   // addTo met « Map marker »
     if (!show) continue;
-    s.el.classList.toggle("far", z < (m ? 15.8 : 14.6));
-    if (!s.named) { const c = card(s.g); if (c) { s.named = true; s.el.querySelector(".sn").textContent = shortName((c.name || "").replace(/^Métro /, "")); s.el.setAttribute("aria-label", c.name || ""); } else ensureCards([s.g]).then(() => renderSpots(map.getZoom())).catch(() => { }); }
+    const far = z < (m ? 15.8 : 14.6); if (far !== s.far) { s.far = far; s.el.classList.toggle("far", far); }
     const st = stateFor(s.g); if (st !== s.st) { s.st = st; s.el.classList.toggle("me", st === 3 || st === 5); s.el.classList.toggle("them", st === 2); s.el.classList.toggle("sale", st === 4); }
+  }
+}
+function declutterSpots() {
+  const vis = e => e && e.isConnected && getComputedStyle(e).display !== "none";
+  const boxes = [...monMarks.filter(m => m.on).map(m => m.el), ...IDX.arr.map(a => a.marker?.getElement())].filter(vis).map(e => e.getBoundingClientRect()).filter(r => r.width);
+  const hit = (r, b) => r.left < b.right + 2 && r.right > b.left - 2 && r.top < b.bottom + 2 && r.bottom > b.top - 2;
+  const on = spotMarks.filter(s => s.on && vis(s.el)); on.forEach(s => s.el.classList.remove("clash"));
+  for (const s of on.sort((a, b) => (a.kind === "m") - (b.kind === "m"))) {   // les jardins et places d'abord, puis les stations
+    let r = s.el.getBoundingClientRect(); if (!r.width) continue;
+    if (boxes.some(b => hit(r, b))) { s.el.classList.add("clash"); r = s.el.getBoundingClientRect(); }
+    boxes.push(r);
   }
 }
 // vue dézoomée : quel parti tient chaque mairie (légende en haut de la carte)
@@ -241,7 +256,8 @@ function renderMarks() {
   });
   renderPartyLegend(z);
   // noms des quartiers et des parcs : un peu plus tard qu'avant (carte moins chargée)
-  for (const p of parkMarks) { const show = z >= p.minz + (p.minz < 12.6 ? 0 : .6) && z < 17.5; if (show && !p.on) { p.mk.addTo(map); p.on = true; } else if (!show && p.on) { p.mk.remove(); p.on = false; } }
+  const spotZ = mode === "all" && !document.body.classList.contains("picking") ? (innerWidth < 700 ? 13.8 : 13.4) : 99;
+  for (const p of parkMarks) { const show = z >= p.minz + (p.minz < 12.6 ? 0 : .6) && z < 17.5 && !(p.dup && z >= spotZ); if (show && !p.on) { p.mk.addTo(map); p.on = true; } else if (!show && p.on) { p.mk.remove(); p.on = false; } }
   renderSpots(z);
   for (const m of monMarks) {
     const show = z >= (m.r === "M" ? (innerWidth < 700 ? 13.8 : 13.4) : 14.4); m.el.classList.toggle("far", z < (m.r === "M" ? (innerWidth < 700 ? 14.8 : 14.4) : 15.5)); if (show && !m.on) { m.mk.addTo(map); m.on = true; } else if (!show && m.on) { m.mk.remove(); m.on = false; }
@@ -346,8 +362,9 @@ function initMapUI() {
   document.addEventListener("pointerdown", e => { if (!$("#search").hidden && !e.target.closest("#search,#t-search")) closeSearch(); });
   $("#q").addEventListener("input", () => {
     const v = $("#q").value.trim().toLowerCase(); const out = $("#results"); if (v.length < 2) { out.innerHTML = ""; return; }
-    const hits = [];
-    for (const [g, n, r] of IDX.mons) { if (n.toLowerCase().includes(v)) hits.push([0, ORDER.indexOf(r), g, cap(n), r]); if (hits.length > 40) break; }
+    const hits = [], nv = noAcc(v);   // « chatelet » trouve Châtelet
+    for (const [g, n, r] of IDX.mons) { if (noAcc(n).includes(nv)) hits.push([0, ORDER.indexOf(r), g, cap(n), r]); if (hits.length > 40) break; }
+    for (const s of IDX.spots || []) if (hits.length < 50 && noAcc(s[5] || "").includes(nv)) hits.push([0, ORDER.indexOf(s[6]), s[0], s[5], s[6]]);
     const ia = FIELDS.indexOf("adr"), ir = FIELDS.indexOf("r");
     for (let i = 0; i < 20 && hits.length < 60; i++) { const A = ARR[i]; if (!A?.cards) continue; A.cards.forEach((row, k) => { const a = row[ia]; if (a && a.toLowerCase().includes(v) && hits.length < 60) hits.push([1, ORDER.indexOf(row[ir]), i * 1e5 + k, a, row[ir]]); }); }
     hits.sort((a, b) => a[0] - b[0] || a[1] - b[1]);

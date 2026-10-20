@@ -462,7 +462,7 @@ async function buildingPage(g) {
     <div class="bp-info">
       <h1 class="h1">${esc(title(c))}</h1>
       <p class="sub">${esc(kindLabel(c))} · ${ord(c.arr)} arr.${c.y ? ` · vers ${esc(c.y)}` : ""} · <button class="lnk" data-mapto="${g}">voir sur la carte</button></p>
-      ${isP ? occHTML(c, myCount, othersCount, free) : ""}
+      ${netLine(g)}${isP ? occHTML(c, myCount, othersCount, free) : ""}
       ${far ? mine + actbar : actbar + mine}${offersHTML}${plan}${about}
       ${ST.admin ? adminGiftBox(c, g, free) : ""}
     </div>
