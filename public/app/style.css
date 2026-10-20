@@ -2053,10 +2053,11 @@ body.mapfull #bar,body.mapfull #credbar,body.mapfull #tabs{backdrop-filter:none!
 /* téléphone : les noms de lieux trop près de la barre du haut sont cachés (19/10/2026, « ne pas surcharger la partie haute ») */
 .undertop{opacity:0!important;pointer-events:none!important}
 /* =====================================================================
-   Le chat du Champ-de-Mars (place.js, 20/10/2026) : le jeu s'efface, la carte reste
+   Le monde ouvert, essai dans le 7e (place.js, 20/10/2026 ; avant : le chat du Champ-de-Mars) : le jeu s'efface, la carte reste ;
+   la case d'un immeuble s'ouvre comme d'habitude (le monde s'efface le temps qu'elle est ouverte)
    ===================================================================== */
 body.inplace #bar,body.inplace #credbar,body.inplace #tabs,body.inplace .dicebar,body.inplace #filter,body.inplace .maptop,
-body.inplace .mapside,body.inplace #partyleg,body.inplace #score,body.inplace #stripsum,body.inplace #pawnoff,body.inplace #movebar,
+body.inplace .mapside,body.inplace #partyleg,body.inplace #score,body.inplace #stripsum,body.inplace #pawnoff,
 body.inplace #preview,body.inplace #destcard,body.inplace #search,body.inplace .amark,body.inplace .mmark,body.inplace .plabel,
 body.inplace .pricetag,body.inplace .lbub,body.inplace .pawn,body.inplace #coach{display:none!important}
 #place{position:fixed;inset:0;z-index:60;pointer-events:none;--kb:0px}
@@ -2145,7 +2146,7 @@ body.inplace .pricetag,body.inplace .lbub,body.inplace .pawn,body.inplace #coach
 .smark.me{box-shadow:0 0 0 3px var(--act),0 2px 8px rgba(0,0,0,.18)}
 .smark.them{box-shadow:0 0 0 3px #F9A8D4,0 2px 8px rgba(0,0,0,.18)}
 .smark.sale{box-shadow:0 0 0 3px #F59E0B,0 2px 8px rgba(0,0,0,.18)}
-body.inplace .smark,body.picking .smark{display:none}
+body.picking .smark{display:none}
 .lnb{display:inline-grid;place-items:center;width:var(--ls);height:var(--ls);border-radius:50%;background:var(--lc);color:#fff;font:900 calc(var(--ls) * .56)/1 "Inter Tight",system-ui,sans-serif;flex:none}
 .lnb.dk{color:#111}
 .netl{display:flex;align-items:center;gap:10px;margin:8px 0;padding:8px 10px;border-radius:12px;background:#EEF2FF;font-size:13px;line-height:1.25}
@@ -2242,3 +2243,17 @@ body.inplace .smark,body.picking .smark{display:none}
 }
 .landing.v3 .lhero{max-width:none}
 .landing.v3 .fan-c{transition:none}
+
+/* le monde ouvert (20/10/2026) : km du jour, revenir sur soi, le métro */
+body.inworld.landopen #place,body.inworld:has(#p-detail:not([hidden])) #place{display:none}
+.plh .plkm{display:flex;align-items:center;gap:4px;height:30px;padding:0 10px 0 8px;border-radius:999px;background:#EEF2FF;color:#1F3A93;font:800 12.5px/1 var(--f);white-space:nowrap;flex:none}
+.plh .plkm:empty{display:none}
+.plh .plkm.out{background:#FFF7ED;color:#C2410C}
+.plloc{position:absolute;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 72px + var(--kb));width:46px;height:46px;border-radius:50%;background:#fff;color:#0B0C10;display:grid;place-items:center;box-shadow:0 6px 18px rgba(15,23,42,.2);pointer-events:auto}
+@media (min-width:900px){.plloc{right:20px;bottom:22px}}
+.plp{margin:0 0 14px;font:600 14px/1.35 var(--f);color:var(--ink2)}
+.mtls{display:grid;gap:12px}
+.mtl{display:grid;grid-template-columns:28px 1fr;gap:8px;align-items:start}
+.mtl>div{display:flex;flex-wrap:wrap;gap:6px}
+.mts{padding:7px 11px;border-radius:999px;background:#F1F5F9;color:#0B0C10;font:700 13px/1.1 var(--f)}
+.mts.here{background:var(--act);color:#fff}

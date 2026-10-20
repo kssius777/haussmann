@@ -43,7 +43,7 @@ async function startGame(first) {
   go("map"); renderWallet(); initPawnUI(); renderDice();
   rpc("is_admin").then(v => { ST.admin = v === true; }).catch(() => { });
   refreshOffers(); setInterval(refreshOffers, 60000);
-  try { initPlace(); } catch (e) { console.warn("chat", e); }   // le chat du Champ-de-Mars (place.js)
+  try { initPlace(); } catch (e) { console.warn("monde", e); }   // le monde ouvert, essai dans le 7e (place.js)
   setTimeout(claimGift, 1500);
   try { if (first) { if (localStorage.getItem("hm_tut") == null) localStorage.setItem("hm_tut", "1"); } else if (localStorage.getItem("hm_tut") == null) localStorage.setItem("hm_tut", "99"); } catch (e) { }
   setInterval(tutTick, 700);

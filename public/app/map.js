@@ -142,7 +142,7 @@ function buildMap(base) {
     mapReady = true; pumpGeo();
     if (window.THREE && window.addMonuments) addMonuments(map, IDX.models);
     map.on("click", "mfill", e => { const f = e.features[0]; if (f) onBuildingTap(f.id); });
-    map.on("click", e => { if (e.defaultPrevented || document.body.classList.contains("inplace")) return;   // au chat, le toucher sert à marcher (place.js)
+    map.on("click", e => { if (e.defaultPrevented || document.body.classList.contains("inplace")) return;   // dans le monde ouvert, le toucher sert à marcher (place.js)
       // un toucher sur la carte ferme la case ouverte, sans déplacer la carte (on regarde là où on a touché)
       if (panelKind === "land" && !moving) { justBought = null; setMovebar(""); closeSearch(); return; }
       if (!map.queryRenderedFeatures(e.point).some(f => /^(bd|rf)\d|^mfill$/.test(f.layer.id))) hidePreview(); closeSearch(); });

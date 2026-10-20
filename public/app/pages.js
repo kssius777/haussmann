@@ -11,7 +11,7 @@ const TABS = ["map", "booster", "assets", "market", "paris"];
 const cur = () => stack.length ? "detail" : tab;
 
 function go(t) {
-  if (t === "chat") return openPlace();   // le chat du Champ-de-Mars : pas une page, une vue de la carte (place.js)
+  if (t === "chat") return openPlace();   // le monde ouvert (essai dans le 7e) : pas une page, une vue de la carte (place.js)
   stack.length = 0; $("#p-detail").hidden = true;
   tab = t; if (t === "assets") assetMort = false; if (t === "market") marketSell = false;
   for (const x of TABS) { const el = $("#p-" + x); const on = x === t; if (on && el.hidden) { el.hidden = false; el.classList.remove("enter"); void el.offsetWidth; el.classList.add("enter"); } else el.hidden = !on; }
@@ -695,7 +695,7 @@ document.addEventListener("click", e => { const b = e.target.closest("[data-arrm
 
 // ---------------- BOUTIQUE, PROFIL ----------------
 // ---------------- MON ARGENT : historique ----------------
-const LK = { offer: ["🤝", "Offre de rachat"], rent: ["🏠", "Loyers"], rent_away: ["🌙", "Loyers pendant votre absence"], tax: ["🏛️", "Taxe des maires"], tax_in: ["👑", "Taxe de maire reçue"], salary: ["💼", "Salaire du tour"], toll_paid: ["💸", "Loyer de passage payé"], toll_in: ["💰", "Loyer de passage reçu"], buy: ["🔑", "Achat"], sale: ["🤝", "Vente"], chance: ["🃏", "Carte Chance"], booster: ["📦", "Booster"], rolls: ["🎲", "Lancers"], mortgage: ["🏦", "Hypothèque"], lift: ["🏦", "Hypothèque remboursée"], repay: ["🏦", "Crédit remboursé"], bonus: ["🏠", "Bonus"], credit: ["🏦", "Remboursement des crédits"] };
+const LK = { offer: ["🤝", "Offre de rachat"], rent: ["🏠", "Loyers"], rent_away: ["🌙", "Loyers pendant votre absence"], tax: ["🏛️", "Taxe des maires"], tax_in: ["👑", "Taxe de maire reçue"], salary: ["💼", "Salaire du tour"], toll_paid: ["💸", "Loyer de passage payé"], toll_in: ["💰", "Loyer de passage reçu"], buy: ["🔑", "Achat"], sale: ["🤝", "Vente"], chance: ["🃏", "Carte Chance"], booster: ["📦", "Booster"], rolls: ["🎲", "Lancers"], mortgage: ["🏦", "Hypothèque"], lift: ["🏦", "Hypothèque remboursée"], repay: ["🏦", "Crédit remboursé"], bonus: ["🏠", "Bonus"], credit: ["🏦", "Remboursement des crédits"], walk: ["🚶", "Marche"], metro: ["🚇", "Métro"] };
 async function moneyPage() {
   let rows = []; try { rows = await rpc("my_ledger"); } catch (e) { }
   await ensureCards(rows.filter(r => r.card != null).map(r => r.card));

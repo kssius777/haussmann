@@ -50,7 +50,8 @@ function paintTargets() {
   if (g != null && map.getSource("b" + ai(g))) { map.setFeatureState({ source: "b" + ai(g), id: g }, { tgt: 1 }); landPainted = g; }
 }
 function onBuildingTap(g) {
-  if (moving || document.body.classList.contains("inplace")) return;
+  if (moving) return;
+  if (document.body.classList.contains("inworld")) return worldTapCard(g);   // le monde ouvert : la case, « Y aller » (place.js)
   if (panelKind === "land" && !landView) { justBought = null; setMovebar(""); return; }   // 1er toucher : on ferme la case où l'on est tombé
   previewBuilding(g);
 }
@@ -272,9 +273,11 @@ function showLand(L, gv) {
   }
   if (view) {
     const listed = ST.sale.has(g);
-    btns = `${free > 0 ? `<div class="farbuy">🎲 Pour l'acheter, tombez dessus avec le dé.</div>` : ""}<button class="btn block ${listed ? "buy" : "light"}" data-lopen="${g}"><span>${listed ? "En vente au Marché · voir l'offre" : isP ? "Voir la fiche" : "Voir la fiche de l'immeuble"}</span></button>`;
+    const inW = document.body.classList.contains("inworld");
+    btns = `${inW ? worldLandBtns(g, true) : free > 0 ? `<div class="farbuy">🎲 Pour l'acheter, tombez dessus avec le dé.</div>` : ""}<button class="btn block ${listed ? "buy" : "light"}" data-lopen="${g}"><span>${listed ? "En vente au Marché · voir l'offre" : isP ? "Voir la fiche" : "Voir la fiche de l'immeuble"}</span></button>`;
   }
   // racheter à un autre joueur : faire une offre (pas pendant l'écran « Acheté ! »)
+  if (!view && document.body.classList.contains("inworld")) btns += worldLandBtns(g, false);   // devant une station : le métro
   if (!jb && others > 0 && !isP && !ST.sale.has(g)) btns += `<button class="btn block light" data-lofr="${g}">🤝 Proposer de racheter ${owners.length === 1 ? "au propriétaire" : "à un propriétaire"}</button>`;
   if (jb) {   // juste acheté : ce qui a été payé, ce que ça rapporte ; s'il reste des logements libres, on peut continuer à acheter ici
     const n = justBought.whole ? tot : 1, price = c.v * n, dn = Math.ceil(price * downRate()), rent = c.rent * n * (justBought.whole ? 1.6 : 1);
@@ -361,7 +364,7 @@ function initPawnUI() {
   $("#movebar").addEventListener("click", async e => {
     if (e.target.closest("[data-mvclose]")) {   // croix ou « Continuer » de la case où l'on est tombé : on revient sur la montgolfière
       const home = panelKind === "land" && !landView; justBought = null; setMovebar("");
-      if (home && !moving && pawnPos() != null && map) map.easeTo({ center: centerOf(pawnPos()), offset: pawnView().offset, duration: 500 });
+      if (home && !moving && pawnPos() != null && map && !document.body.classList.contains("inworld")) map.easeTo({ center: centerOf(pawnPos()), offset: pawnView().offset, duration: 500 });
       return;
     }
     if (e.target.closest("[data-buyrolls]")) { if (await act("buy_rolls", {}, "5 lancers en plus !")) { setMovebar(""); renderDice(); } return; }

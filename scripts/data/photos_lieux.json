@@ -1,6 +1,6 @@
 {
 "_base": 134,
-"_next": 255,
+"_next": 373,
 "g:1202667": {
 "ph": [
 134,
@@ -2008,5 +2008,933 @@
 ],
 "cr": "Photo Jebulon · CC0",
 "f": "Pont Alexandre III from pont de la Concorde, Paris 17 May 2012.jpg"
+},
+"q:Q450976": {
+"ph": [
+140,
+16
+],
+"cr": "Photo Cramos · CC BY-SA 3.0",
+"f": "Alésia (métro Paris) MP59 n°013 par Cramos.JPG"
+},
+"q:Q508256": {
+"ph": [
+140,
+17
+],
+"cr": "Photo Chabe01 · CC BY-SA 4.0",
+"f": "Entrée Station Métro Bastille Boulevard Beaumarchais - Paris XI (FR75) - 2021-06-16 - 1.jpg"
+},
+"q:Q513655": {
+"ph": [
+140,
+18
+],
+"cr": "Photo Guilhem Vellut from Paris, France · CC BY 2.0",
+"f": "Pont de la Tournelle, Paris 3 April 2016.jpg"
+},
+"q:Q517739": {
+"ph": [
+140,
+19
+],
+"cr": "Photo Chabe01 · CC BY-SA 4.0",
+"f": "Station Mirabeau Métro Paris Ligne 10 - Paris XVI (FR75) - 2022-07-04 - 3.jpg"
+},
+"q:Q517844": {
+"ph": [
+140,
+20
+],
+"cr": "Photo Jérôme · CC BY-SA 3.0",
+"f": "Paris station Avron 2009.jpg"
+},
+"q:Q524191": {
+"ph": [
+140,
+21
+],
+"cr": "Photo Joseolgon · CC BY-SA 4.0",
+"f": "Metro Chemin Vert (2).JPG"
+},
+"q:Q526595": {
+"ph": [
+140,
+22
+],
+"cr": "Photo Chabe01 · CC BY-SA 4.0",
+"f": "Place Tertre - Paris XVIII (FR75) - 2026-04-10 - 1.jpg"
+},
+"q:Q532113": {
+"ph": [
+140,
+23
+],
+"cr": "Photo Jean-Louis Vandevivère · CC BY-SA 2.0",
+"f": "070922 Parce des Buttes Chaumont 005.jpg"
+},
+"q:Q540781": {
+"ph": [
+140,
+24
+],
+"cr": "Photo Guilhem Vellut from Paris, France · CC BY 2.0",
+"f": "Paris 75007 Port de Suffren 20161101 Pont d'Iéna.jpg"
+},
+"q:Q541391": {
+"ph": [
+140,
+25
+],
+"cr": "Photo Arne Müseler · CC BY-SA 3.0 de",
+"f": "Paris Stade Sébastien Charléty.jpg"
+},
+"q:Q550": {
+"ph": [
+140,
+26
+],
+"cr": "Photo SoWhat · CC BY-SA 2.0",
+"f": "Avenue des Champs-Élysées, Paris 3 October 2010.jpg"
+},
+"q:Q550042": {
+"ph": [
+140,
+27
+],
+"cr": "Photo Jiel Beaumadier (http://jiel.b.free.fr) · CC BY-SA 3.0",
+"f": "Jielbeaumadier metro st-sebastien-froissart paris 2009.jpg"
+},
+"q:Q567806": {
+"ph": [
+140,
+28
+],
+"cr": "Photo Claude Shoshany · CC BY-SA 3.0",
+"f": "Métro Rome Guimard.jpg"
+},
+"q:Q568013": {
+"ph": [
+140,
+29
+],
+"cr": "Photo Clicsouris · CC BY-SA 3.0",
+"f": "Metro Paris - Ligne 12 - station Falguiere.jpg"
+},
+"q:Q571159": {
+"ph": [
+140,
+30
+],
+"cr": "Photo Chabe01 · CC BY-SA 4.0",
+"f": "Station Métro Bibliothèque François Mitterrand Ligne 14 - Paris XIII (FR75) - 2021-12-19 - 6.jpg"
+},
+"q:Q571446": {
+"ph": [
+140,
+31
+],
+"cr": "Photo Chabe01 · CC BY-SA 4.0",
+"f": "Station Métro Porte Villette Ligne 7 - Paris XIX (FR75) - 2022-06-18 - 3.jpg"
+},
+"q:Q575604": {
+"ph": [
+140,
+32
+],
+"cr": "Photo Geralix · CC BY-SA 3.0",
+"f": "Notre-Dame-de-Lorette 02.jpg"
+},
+"q:Q587093": {
+"ph": [
+140,
+33
+],
+"cr": "Photo Vincent BABILOTTE · CC BY 2.5",
+"f": "Metro 5 Saint-Marcel.jpg"
+},
+"q:Q589000": {
+"ph": [
+140,
+34
+],
+"cr": "Photo Nan Palmero from San Antonio, TX, USA · CC BY 2.0",
+"f": "Pont du Carrousel, Paris October 2012.jpg"
+},
+"q:Q589686": {
+"ph": [
+140,
+35
+],
+"cr": "Photo Vincent BABILOTTE · CC BY-SA 2.5",
+"f": "Metro 6 Picpus quais.JPG"
+},
+"q:Q601484": {
+"ph": [
+140,
+36
+],
+"cr": "Photo Chabe01 · CC BY-SA 4.0",
+"f": "Accès Station Métro Châtelet Place Sainte Opportune - Paris I (FR75) - 2021-12-21 - 4.jpg"
+},
+"q:Q602615": {
+"ph": [
+140,
+38
+],
+"cr": "Photo Cramos · CC BY-SA 4.0",
+"f": "Dugommier (1) par Cramos.JPG"
+},
+"q:Q604550": {
+"ph": [
+140,
+39
+],
+"cr": "Photo Arne Müseler · CC BY-SA 3.0 de",
+"f": "Paris Jardin des Serres d’Auteuil.jpg"
+},
+"q:Q605912": {
+"ph": [
+141,
+0
+],
+"cr": "Photo ignis · CC BY-SA 3.0",
+"f": "Passerelle Solferino Paris FRA 002.jpg"
+},
+"q:Q606164": {
+"ph": [
+141,
+1
+],
+"cr": "Photo Chabe01 · CC BY-SA 4.0",
+"f": "Station Porte Lilas Métro Paris Ligne 3bis - Paris XX (FR75) - 2022-06-24 - 4.jpg"
+},
+"q:Q607342": {
+"ph": [
+141,
+2
+],
+"cr": "Photo Alexander Steffler · CC BY 2.0",
+"f": "Cardinal Lemoine metro station.jpg"
+},
+"q:Q608305": {
+"ph": [
+141,
+3
+],
+"cr": "Photo Greenski · CC BY-SA 3.0",
+"f": "Commerce - Quai décalé (2).JPG"
+},
+"q:Q610012": {
+"ph": [
+141,
+4
+],
+"cr": "Photo Clicsouris · CC BY-SA 3.0",
+"f": "Metro de Paris - Ligne 2 - Place de Clichy 01.jpg"
+},
+"q:Q612971": {
+"ph": [
+141,
+5
+],
+"cr": "Photo Clicsouris · CC BY-SA 3.0",
+"f": "Metro de Paris - Ligne 2 - Anvers 03.jpg"
+},
+"q:Q614049": {
+"ph": [
+141,
+6
+],
+"cr": "Photo Chabe01 · CC BY-SA 4.0",
+"f": "Accès Station Métro Gare Lyon Boulevard Diderot - Paris XII (FR75) - 2021-12-21 - 13.jpg"
+},
+"q:Q614636": {
+"ph": [
+141,
+7
+],
+"cr": "Photo BrokenSphere · CC BY-SA 3.0",
+"f": "Varenne Metro interior 2.JPG"
+},
+"q:Q616619": {
+"ph": [
+141,
+8
+],
+"cr": "Photo Milliped · CC BY-SA 3.0",
+"f": "MichelBizot1.JPG"
+},
+"q:Q617430": {
+"ph": [
+141,
+9
+],
+"cr": "Photo Hegor · CC BY-SA 3.0",
+"f": "Joffrin-quai-rame-L12.jpg"
+},
+"q:Q630642": {
+"ph": [
+141,
+10
+],
+"cr": "Photo Vincent BABILOTTE · CC BY-SA 2.5",
+"f": "Metro 12 quais Convention.JPG"
+},
+"q:Q631114": {
+"ph": [
+141,
+11
+],
+"cr": "Photo Gunnar Klack · CC BY-SA 4.0",
+"f": "Gare-Montparnasse-Paris-02-2018.jpg"
+},
+"q:Q631846": {
+"ph": [
+141,
+12
+],
+"cr": "Photo Roland Godefroy · CC BY-SA 3.0",
+"f": "Paris-Metro-maraichers1.jpg"
+},
+"q:Q632881": {
+"ph": [
+141,
+13
+],
+"cr": "Photo Zeugma fr (Antoine FLEURY-GOBERT) · CC BY-SA 3.0",
+"f": "Metro Charles Michel Paris.jpg"
+},
+"q:Q635744": {
+"ph": [
+141,
+14
+],
+"cr": "Photo Chabe01 · CC BY-SA 4.0",
+"f": "Station Ternes Métro Paris Ligne 2 - Paris XVII (FR75) - 2022-07-01 - 3.jpg"
+},
+"q:Q641548": {
+"ph": [
+141,
+15
+],
+"cr": "Photo Rodelar · CC BY-SA 4.0",
+"f": "Anfiteatro de París 01.jpg"
+},
+"q:Q643520": {
+"ph": [
+141,
+16
+],
+"cr": "Photo Des Racines et des Ailes · CC BY 3.0",
+"f": "Place Vendôme vue aérienne.png"
+},
+"q:Q644398": {
+"ph": [
+141,
+17
+],
+"cr": "Photo Szilas · CC BY-SA 4.0",
+"f": "Pont de la Concorde 2009-06-02 Paris 01.jpg"
+},
+"q:Q645400": {
+"ph": [
+141,
+18
+],
+"cr": "Photo Chabe01 · CC BY-SA 4.0",
+"f": "Station Argentine Métro Paris Ligne 1 - Paris XVII (FR75) - 2022-07-02 - 8.jpg"
+},
+"q:Q646376": {
+"ph": [
+141,
+19
+],
+"cr": "Photo Chabe01 · CC BY-SA 4.0",
+"f": "Station Rambuteau Métro Paris Ligne 11 - Paris III (FR75) - 2022-06-24 - 5.jpg"
+},
+"q:Q646583": {
+"ph": [
+141,
+20
+],
+"cr": "Photo Chabe01 · CC BY-SA 4.0",
+"f": "Station Courcelles Métro Paris Ligne 2 - Paris XVII (FR75) - 2022-07-01 - 5.jpg"
+},
+"q:Q647271": {
+"ph": [
+141,
+21
+],
+"cr": "Photo Chabe01 · CC BY-SA 4.0",
+"f": "Station Reuilly Diderot Métro Paris Ligne 1 - Paris XII (FR75) - 2022-06-28 - 2.jpg"
+},
+"q:Q649273": {
+"ph": [
+141,
+22
+],
+"cr": "Photo Ralf.treinen · CC BY-SA 3.0",
+"f": "Paris metro st augustin.jpg"
+},
+"q:Q661846": {
+"ph": [
+141,
+23
+],
+"cr": "Photo Mbzt · CC BY-SA 3.0",
+"f": "P7250082 Paris XIII statin nationale reductwk.JPG"
+},
+"q:Q666009": {
+"ph": [
+141,
+24
+],
+"cr": "Photo DominikPeters · CC BY 4.0",
+"f": "Métro Tuileries - 2023-06-15.jpg"
+},
+"q:Q669850": {
+"ph": [
+141,
+25
+],
+"cr": "Photo Clicsouris · CC BY-SA 2.5",
+"f": "Metro - Paris - Ligne 3 - station Reaumur - Sebastopol.jpg"
+},
+"q:Q670081": {
+"ph": [
+141,
+26
+],
+"cr": "Photo Clicsouris · CC BY-SA 3.0",
+"f": "Metro de Paris - Ligne 3 - Pereire 01.jpg"
+},
+"q:Q680787": {
+"ph": [
+141,
+27
+],
+"cr": "Photo Cameron Parkins · CC BY 2.0",
+"f": "Parisian Metro.jpg"
+},
+"q:Q683208": {
+"ph": [
+141,
+28
+],
+"cr": "Photo Chabe01 · CC BY-SA 4.0",
+"f": "Accès Station Campo Formio Métro Paris Boulevard Hôpital - Paris XIII (FR75) - 2024-11-10 - 3.jpg"
+},
+"q:Q690975": {
+"ph": [
+141,
+29
+],
+"cr": "Photo Chabe01 · CC BY-SA 4.0",
+"f": "Station Métro George V Ligne 1 - Paris VIII (FR75) - 2022-05-27 - 1.jpg"
+},
+"q:Q713944": {
+"ph": [
+141,
+30
+],
+"cr": "Photo Cramos · CC BY-SA 4.0",
+"f": "Arts et Métiers 3 (métro Paris) vers Levallois par Cramos.JPG"
+},
+"q:Q730948": {
+"ph": [
+141,
+31
+],
+"cr": "Photo Benh LIEU SONG · CC BY 3.0",
+"f": "Paris 75005 Grande Galerie de l'Evolution 20070804.jpg"
+},
+"q:Q736458": {
+"ph": [
+141,
+32
+],
+"cr": "Photo Zenzebil · CC0",
+"f": "Canal Saint Denis, Paris, France.jpg"
+},
+"q:Q738879": {
+"ph": [
+141,
+33
+],
+"cr": "Photo Chabe01 · CC BY-SA 4.0",
+"f": "Station Guy Môquet Métro Paris Ligne 13 - Paris XVII (FR75) - 2022-07-05 - 1.jpg"
+},
+"q:Q740744": {
+"ph": [
+141,
+34
+],
+"cr": "Photo Clicsouris · CC BY-SA 3.0",
+"f": "Metro de Paris - Ligne 12 - Assemblee Nationale 02.jpg"
+},
+"q:Q746288": {
+"ph": [
+141,
+35
+],
+"cr": "Photo Hegor · CC BY-SA 3.0",
+"f": "Ligne7-Crimée-rame part nord.jpg"
+},
+"q:Q746647": {
+"ph": [
+141,
+36
+],
+"cr": "Photo Elisabetta Cipolla, Tantalas · Public domain",
+"f": "Monmartre Cemetery.JPG"
+},
+"q:Q751245": {
+"ph": [
+141,
+37
+],
+"cr": "Photo Clicsouris · CC BY-SA 3.0",
+"f": "Metro de Paris - Ligne 7bis - Pre-Saint-Gervais 04.jpg"
+},
+"q:Q757180": {
+"ph": [
+141,
+38
+],
+"cr": "Photo Gilbert Bochenek · CC BY 3.0",
+"f": "Paris-Gare de l'Est-2009.jpg"
+},
+"q:Q763411": {
+"ph": [
+141,
+39
+],
+"cr": "Photo lmnop88a · CC BY 2.0",
+"f": "Saint-Placide station.jpg"
+},
+"q:Q764106": {
+"ph": [
+142,
+0
+],
+"cr": "Photo Gregory Deryckère · CC BY 2.5",
+"f": "Station de Poissonniere Ligne 7 - Quais 27-02-06.jpg"
+},
+"q:Q764465": {
+"ph": [
+142,
+1
+],
+"cr": "Photo Clicsouris · CC BY-SA 3.0",
+"f": "Metro Paris - Ligne 13 - station Montparnasse - Bienvenue 01.jpg"
+},
+"q:Q766618": {
+"ph": [
+142,
+2
+],
+"cr": "Photo Clicsouris · CC BY-SA 3.0",
+"f": "Metro de Paris - Ligne 3 - Europe 01.jpg"
+},
+"q:Q769848": {
+"ph": [
+142,
+3
+],
+"cr": "Photo Clicsouris · CC BY-SA 3.0",
+"f": "Metro Paris - Ligne 12 - station Vaugirard.jpg"
+},
+"q:Q771548": {
+"ph": [
+142,
+4
+],
+"cr": "Photo Polymagou · CC BY-SA 4.0",
+"f": "Métro rue de la Pompe, Paris 16e 4.jpg"
+},
+"q:Q777553": {
+"ph": [
+142,
+5
+],
+"cr": "Photo Clicsouris · CC BY-SA 3.0",
+"f": "Metro Paris - Ligne 5 - station Breguet - Sabin 01.jpg"
+},
+"q:Q778784": {
+"ph": [
+142,
+6
+],
+"cr": "Photo Guillaume Flament · CC BY-SA 4.0",
+"f": "Place de la Bastille depuis l'Opéra.jpg"
+},
+"q:Q780625": {
+"ph": [
+142,
+7
+],
+"cr": "Photo Chabe01 · CC BY-SA 4.0",
+"f": "Station Fourche Métro Paris Ligne 13 - Paris XVIII (FR75) - 2022-07-01 - 5.jpg"
+},
+"q:Q781873": {
+"ph": [
+142,
+8
+],
+"cr": "Photo Clicsouris · CC BY-SA 3.0",
+"f": "Metro Paris - Ligne 4 - station Saint-Germain-des-Pres 01.jpg"
+},
+"q:Q790593": {
+"ph": [
+142,
+9
+],
+"cr": "Photo Geralix · CC BY-SA 3.0",
+"f": "Avenue Émile Zola métro 02.jpg"
+},
+"q:Q800624": {
+"ph": [
+142,
+10
+],
+"cr": "Photo Chabe01 · CC BY-SA 4.0",
+"f": "Station Métro Charles Gaulle Étoile Ligne 1 - Paris XVII (FR75) - 2022-06-18 - 1.jpg"
+},
+"q:Q804647": {
+"ph": [
+142,
+11
+],
+"cr": "Photo Greenski · CC BY-SA 3.0",
+"f": "Metro - Paris - Ligne 8 - Balard.jpg"
+},
+"q:Q807893": {
+"ph": [
+142,
+12
+],
+"cr": "Photo Roehrensee · CC BY-SA 4.0",
+"f": "Barbès – Rochechouart IMG 9985.jpg"
+},
+"q:Q815061": {
+"ph": [
+142,
+13
+],
+"cr": "Photo Geralix · CC BY-SA 3.0",
+"f": "Bel-Air métro Q01.jpg"
+},
+"q:Q815946": {
+"ph": [
+142,
+14
+],
+"cr": "Photo Hegor · CC BY-SA 3.0",
+"f": "Belleville-11rame.jpg"
+},
+"q:Q818517": {
+"ph": [
+142,
+15
+],
+"cr": "Photo Tangopaso · Public domain",
+"f": "Grande Roue de Paris - Louvre et Jardins des Tuileries.jpg"
+},
+"q:Q818853": {
+"ph": [
+142,
+16
+],
+"cr": "Photo Clicsouris · CC BY-SA 3.0",
+"f": "Metro de Paris - Ligne 6 - Bercy 03.jpg"
+},
+"q:Q860172": {
+"ph": [
+142,
+17
+],
+"cr": "Photo JLPC · CC BY-SA 3.0",
+"f": "Paris Canal St-Martin écluses Récollets 2013.jpg"
+},
+"q:Q881406": {
+"ph": [
+142,
+18
+],
+"cr": "Photo Clicsouris · CC BY-SA 3.0",
+"f": "Metro de Paris - Ligne 2 - Blanche 01.jpg"
+},
+"q:Q891105": {
+"ph": [
+142,
+19
+],
+"cr": "Photo Hegor · CC BY-SA 3.0",
+"f": "Boissiere-ramepart.jpg"
+},
+"q:Q891362": {
+"ph": [
+142,
+20
+],
+"cr": "Photo Clicsouris · CC BY-SA 3.0",
+"f": "Metro de Paris - Ligne 7bis - Bolivar 03.jpg"
+},
+"q:Q892720": {
+"ph": [
+142,
+21
+],
+"cr": "Photo Abdeaitali · CC BY-SA 4.0",
+"f": "Bonne Nouvelle Metro Paris 2019.jpg"
+},
+"q:Q894930": {
+"ph": [
+142,
+22
+],
+"cr": "Photo Olivier92 · CC BY 3.0",
+"f": "Paris Métro Botzaris 7bis.JPG"
+},
+"q:Q894984": {
+"ph": [
+142,
+23
+],
+"cr": "Photo Greenski · CC BY-SA 3.0",
+"f": "Ligne 8 - Boucicaut - 3.jpg"
+},
+"q:Q895259": {
+"ph": [
+142,
+24
+],
+"cr": "Photo Tomasmi1996 · CC BY-SA 3.0",
+"f": "Bourse station, Paris 20 October 2011.jpg"
+},
+"q:Q898629": {
+"ph": [
+142,
+25
+],
+"cr": "Photo AlNo (discuter/talk/hablar/falar) · CC BY-SA 3.0",
+"f": "Paris PlaceDesVosges NordNordEst.JPG"
+},
+"q:Q923435": {
+"ph": [
+142,
+26
+],
+"cr": "Photo Clicsouris · CC BY-SA 3.0",
+"f": "Metro de Paris - Ligne 13 - Brochant 15.jpg"
+},
+"q:Q927829": {
+"ph": [
+142,
+27
+],
+"cr": "Photo Arthur Weidmann · CC BY-SA 4.0",
+"f": "Edicule Métro Chardon Lagache.jpg"
+},
+"q:Q937680": {
+"ph": [
+142,
+28
+],
+"cr": "Photo Eric Pouhier · CC BY-SA 2.5",
+"f": "Metro ligne6.jpg"
+},
+"q:Q938430": {
+"ph": [
+142,
+29
+],
+"cr": "Photo Clicsouris · CC BY-SA 3.0",
+"f": "Metro de Paris - Ligne 7 - Censier - Daubenton 03.jpg"
+},
+"q:Q944564": {
+"ph": [
+142,
+30
+],
+"cr": "Photo Hegor · CC BY-SA 3.0",
+"f": "Wagram-quai2.jpg"
+},
+"q:Q945229": {
+"ph": [
+142,
+31
+],
+"cr": "Photo Clicsouris · CC BY-SA 3.0",
+"f": "Metro de Paris - Ligne 3 - Quatre-Septembre 03.jpg"
+},
+"q:Q945251": {
+"ph": [
+142,
+32
+],
+"cr": "Photo Photographer and original uploader was Sebjarod at fr.wikipedia · Public domain",
+"f": "Les Prairies de Bercy1.jpg"
+},
+"q:Q946441": {
+"ph": [
+142,
+33
+],
+"cr": "Photo Poudou99 · CC BY-SA 3.0",
+"f": "Station métro Porte-Dorée - 20130606 163840.jpg"
+},
+"q:Q946826": {
+"ph": [
+142,
+34
+],
+"cr": "Photo 8508PA · Public domain",
+"f": "Le MF 67 C2 N° 043 à Gambetta sur la ligne 3 du métro de la RATP.jpg"
+},
+"q:Q948012": {
+"ph": [
+142,
+35
+],
+"cr": "Photo Cramos · CC BY-SA 3.0",
+"f": "Charonne (métro Paris) vers Montreuil par Cramos.JPG"
+},
+"q:Q950314": {
+"ph": [
+142,
+36
+],
+"cr": "Photo Geralix · CC BY-SA 3.0",
+"f": "Corvisart metro 02.jpg"
+},
+"q:Q950446": {
+"ph": [
+142,
+37
+],
+"cr": "Photo Mbzt · CC BY 3.0",
+"f": "P1010851 Paris XX Parc de Belleville reductwk.JPG"
+},
+"q:Q951466": {
+"ph": [
+142,
+38
+],
+"cr": "Photo FloSch · CC BY-SA 3.0",
+"f": "Paris Metro Lafayette.jpg"
+},
+"q:Q953454": {
+"ph": [
+142,
+39
+],
+"cr": "Photo Vincent BABILOTTE · CC BY 2.5",
+"f": "Metro 7 Porte de Choisy quais.JPG"
+},
+"q:Q954301": {
+"ph": [
+143,
+0
+],
+"cr": "Photo Stefano Brivio · CC BY 2.0",
+"f": "Metrò.jpg"
+},
+"q:Q954566": {
+"ph": [
+143,
+1
+],
+"cr": "Photo Geralix · CC BY-SA 3.0",
+"f": "Rue du Bac 03.jpg"
+},
+"q:Q956826": {
+"ph": [
+143,
+2
+],
+"cr": "Photo Benchaum · CC BY-SA 3.0",
+"f": "Jardin de Bagatelle-Mai 2010.JPG"
+},
+"q:Q957172": {
+"ph": [
+143,
+3
+],
+"cr": "Photo Métroën · CC0",
+"f": "Château Rouge - Ligne 4 - 2025 - Quai Bagneux 1.jpg"
+},
+"q:Q963509": {
+"ph": [
+143,
+4
+],
+"cr": "Photo Szilas · CC BY-SA 4.0",
+"f": "Pont Marie 2009-06-02 Paris 01.jpg"
+},
+"q:Q968336": {
+"ph": [
+143,
+5
+],
+"cr": "Photo Tomasmi1996 · CC BY-SA 3.0",
+"f": "JPEG.Img 121300.jpg"
+},
+"q:Q968939": {
+"ph": [
+143,
+6
+],
+"cr": "Photo Chabe01 · CC BY-SA 4.0",
+"f": "Station Métro Hôtel Ville Ligne 1 - Paris IV (FR75) - 2022-05-27 - 3.jpg"
+},
+"q:Q970075": {
+"ph": [
+143,
+7
+],
+"cr": "Photo Chabe01 · CC BY-SA 4.0",
+"f": "Accès Station Métro Concorde Place Concorde - Paris VIII (FR75) - 2021-12-21 - 2.jpg"
+},
+"q:Q970844": {
+"ph": [
+143,
+8
+],
+"cr": "Photo Chabe01 · CC BY-SA 4.0",
+"f": "Station Exelmans Métro Paris Ligne 9 - Paris XVI (FR75) - 2022-07-04 - 4.jpg"
+},
+"q:Q974510": {
+"ph": [
+143,
+9
+],
+"cr": "Photo Clicsouris · CC BY-SA 3.0",
+"f": "Metro de Paris - Ligne 10 - Mabillon 01.jpg"
+},
+"q:Q980380": {
+"ph": [
+143,
+10
+],
+"cr": "Photo Chabe01 · CC BY-SA 4.0",
+"f": "Station Métro Lamarck Caulaincourt Ligne 12 - Paris XVIII (FR75) - 2022-06-01 - 5.jpg"
+},
+"q:Q995228": {
+"ph": [
+143,
+11
+],
+"cr": "Photo Greenski · CC BY-SA 3.0",
+"f": "Metro Paris - Ligne 10 - Michel Ange Auteil.jpg"
+},
+"q:Q999159": {
+"ph": [
+143,
+12
+],
+"cr": "Photo Milliped · CC BY-SA 3.0",
+"f": "Montgallet4.JPG"
 }
 }

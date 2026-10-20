@@ -62,14 +62,33 @@ for i in range(0, len(files), 50):
         meta[fn] = {"thumb": ii.get("thumburl"), "w": ii.get("width"), "h": ii.get("height"), "artist": artist[:70], "lic": clean(em.get("LicenseShortName", {}).get("value"))}
     json.dump(meta, open(meta_p, "w"), ensure_ascii=False); print(f"métadonnées {min(i + 50, len(files))}/{len(files)}", flush=True); time.sleep(2)
 
-# 2) les vignettes
+# 2) les vignettes. Wikimedia limite fort la fabrication des vignettes (429) mais sert sans souci celles qui sont déjà prêtes :
+#    on essaie toutes les tailles standard (https://w.wiki/GHai) sans attendre, photo par photo, puis on refait un tour plus tard
+SIZES = ["330px", "500px", "250px", "960px", "1280px"]
+def thumb_any(url):
+    for w in SIZES:
+        u = re.sub(r"/\d+px-", "/" + w + "-", url).split("?")[0]
+        try: return urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": UA}), timeout=60).read()
+        except urllib.error.HTTPError as e:
+            if e.code not in (429, 503, 502, 404): raise
+        except Exception: pass
+        time.sleep(1)
+    return None
+for tour in range(1 if OFFLINE else 12):
+    todo = [(k, fn) for k, fn in sorted(want.items()) if (meta.get(fn) or meta.get(fn.replace("_", " ")) or {}).get("thumb")
+            and not os.path.exists(os.path.join(CACHE, hashlib.md5(fn.encode()).hexdigest() + ".jpg"))]
+    if not todo: break
+    if OFFLINE: print(len(todo), "photos pas encore téléchargées", flush=True); break
+    got = 0
+    for k, fn in todo:
+        m = meta.get(fn) or meta.get(fn.replace("_", " ")); b = thumb_any(m["thumb"])
+        if b: open(os.path.join(CACHE, hashlib.md5(fn.encode()).hexdigest() + ".jpg"), "wb").write(b); got += 1
+        time.sleep(2)
+    print(f"tour {tour + 1} : {got} photos de plus, {len(todo) - got} restent", flush=True)
+    if got == len(todo): break
+    time.sleep(900)
 for k, fn in sorted(want.items()):
-    m = meta.get(fn) or meta.get(fn.replace("_", " "))
-    if not m or not m.get("thumb"): print("  pas trouvé sur Commons :", k, fn, flush=True); continue
-    dst = os.path.join(CACHE, hashlib.md5(fn.encode()).hexdigest() + ".jpg")
-    if os.path.exists(dst): continue
-    if OFFLINE: print("  pas encore téléchargée :", k, flush=True); continue
-    b = get(m["thumb"], binary=True); open(dst, "wb").write(b); time.sleep(4)
+    if not (meta.get(fn) or meta.get(fn.replace("_", " ")) or {}).get("thumb"): print("  pas trouvé sur Commons :", k, fn, flush=True)
 print("vignettes prêtes", flush=True)
 
 # 3) les planches : 400 × 300 recadrées au centre (un peu plus haut pour les façades)
