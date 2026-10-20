@@ -10,7 +10,7 @@ async function claimGift() {
   if (!code) return;
   try {
     const r = await rpc("claim_gift", { p_code: code }); setState(r.state);
-    await Promise.all([refreshHold(), refreshMap()]).catch(() => { }); renderWallet(); paintAll?.(); renderDice?.();
+    await Promise.all([refreshHold(), refreshMap()]).catch(() => { }); renderWallet(); paintAll?.(); renderDock?.();
     if (r.card) await ensureCards([r.card]);
     const c = r.card ? card(r.card) : null;
     const parts = [r.got && c ? `${r.got > 1 ? r.got + " " + lotWord(c, r.got) : (c.lk === "p" ? "1 part" : "1 " + lotWord(c, 1))} au ${title(c)}` : "", r.boosters ? `${r.boosters} booster${r.boosters > 1 ? "s" : ""}` : ""].filter(Boolean);
@@ -40,10 +40,10 @@ async function startGame(first) {
   await refreshAll();
   try { buildMap(BASE); } catch (e) { console.error(e); $("#map").innerHTML = `<div class="empty" style="margin:120px 16px 0">La carte 3D ne peut pas s'afficher sur cet appareil. Le reste du jeu fonctionne.</div>`; }
   $("#loading")?.remove();
-  go("map"); renderWallet(); initPawnUI(); renderDice();
+  go("map"); renderWallet(); initPawnUI();
   rpc("is_admin").then(v => { ST.admin = v === true; }).catch(() => { });
   refreshOffers(); setInterval(refreshOffers, 60000);
-  try { initPlace(); } catch (e) { console.warn("monde", e); }   // le monde ouvert, essai dans le 7e (place.js)
+  try { initWorld(); } catch (e) { console.warn("monde", e); }   // Paris à pied (place.js) : on y entre dès que la carte est prête
   setTimeout(claimGift, 1500);
   try { if (first) { if (localStorage.getItem("hm_tut") == null) localStorage.setItem("hm_tut", "1"); } else if (localStorage.getItem("hm_tut") == null) localStorage.setItem("hm_tut", "99"); } catch (e) { }
   setInterval(tutTick, 700);
@@ -73,10 +73,10 @@ function showWelcome() {
   R.innerHTML = `<div class="bstage"><div class="rays"></div><div class="welcome">
     <p class="eyebrow" style="color:#9FB4D6">Bienvenue à Paris</p>
     <h2>${esc(p.pseudo)}, Paris est à prendre</h2>
-    <div class="wl"><span>🎲</span><div><b>Lancez le dé</b><p>Votre personnage marche dans les vraies rues. Il s'arrête sur un immeuble : s'il est libre, achetez-le.</p></div></div>
+    <div class="wl"><span>🚶</span><div><b>Promenez-vous dans Paris</b><p>Touchez une rue : votre personnage y marche. Un immeuble libre à côté de vous ? Achetez-le.</p></div></div>
     <div class="wl"><span>💶</span><div><b>${fmtE(p.cash)} et ${p.welcome} boosters pour démarrer</b><p>Un booster, c'est 4 biens de Paris au hasard + 1 carte Chance.</p></div></div>
     <div class="wl"><span>🏛️</span><div><b>Devenez maire</b><p>Le plus gros propriétaire d'un arrondissement touche 8 % des loyers des autres.</p></div></div>
-    <div class="bbtns"><button class="btn white block" data-w="open">Ouvrir mon premier booster</button><button class="btn glass block" data-w="map">Lancer le dé d'abord</button></div>
+    <div class="bbtns"><button class="btn white block" data-w="open">Ouvrir mon premier booster</button><button class="btn glass block" data-w="map">Aller dans Paris d'abord</button></div>
   </div></div>`;
   R.onclick = e => { const b = e.target.closest("[data-w]"); if (!b) return; R.onclick = null; R.hidden = true; R.innerHTML = "";
     if (b.dataset.w === "open") openBooster("welcome"); else { go("map"); showHint(); } };
@@ -93,46 +93,51 @@ window.addEventListener("unhandledrejection", e => { const m = String(e.reason?.
 
 
 // =====================================================================
-//  Tutoriel en jouant : une bulle à la fois, au moment où la règle sert
-//  1 lancer le dé · 2 la case (libre / chez un autre / Chance) · 3 après l'achat · 4 les boosters · 5 les mairies
+//  Tutoriel en jouant : une bulle à la fois, au moment où la règle sert (20/10/2026 : plus de dé, on se promène)
+//  1 acheter près de soi (ou marcher) · 2 la case · 3 après l'achat · 3.5 marcher · 4 les boosters · 5 les mairies · 99 fini
 // =====================================================================
-let tutShown = "";
+let tutShown = "", tutMv = -1;
 function tutGet() { try { return +(localStorage.getItem("hm_tut") || 99); } catch (e) { return 99; } }
 function tutSet(n) { try { localStorage.setItem("hm_tut", String(n)); } catch (e) { } tutTick(); }
 function tutTick() {
   const st = tutGet(); let k = "", anchor = null, html = "", ok = false;
-  const idle = cur() === "map" && $("#reveal").hidden && $("#onb").hidden && !moving;
-  if (st === 1 && idle && destMarks.length) { if (destSel == null) { k = "1p"; anchor = ".dpin"; html = "<b>Où voulez-vous aller ?</b>Touchez une flèche : votre montgolfière y vole. Vert : à acheter. Rose : chez un joueur, vous payez son loyer."; } }
-  else if (st === 1 && idle && !panelKind) { k = "1"; anchor = "#b-roll"; html = "<b>Lancez le dé 🎲</b>Puis choisissez sur la carte l'immeuble où votre montgolfière va se poser."; }
-  else if (st === 1 && panelKind === "land" && !landView) tutSet(2);
-  else if (st === 2 && panelKind === "land" && !landView && !moving) {
-    if (justBought) return tutSet(3);
-    const g = landPos(), L = lastLanding && lastLanding.card === g ? lastLanding : null, fr = g != null ? freeOf(g) : 0;
-    k = "2" + (L?.toll > 0 ? "t" : L?.chance ? "c" : fr > 0 ? "f" : "x"); anchor = "#movebar .lb"; ok = true;
-    html = L?.toll > 0 ? "<b>Chez un autre joueur</b>Quand vous tombez sur son immeuble, vous lui payez une journée de loyer. À vous d'acheter les immeubles où les autres passent !"
-      : L?.chance ? "<b>Case Chance 🃏</b>Environ une case sur huit : une surprise, bonne ou mauvaise. Ici, l'immeuble reste à acheter s'il est libre."
-      : fr > 0 ? "<b>Il est libre : achetez-le !</b>À crédit, vous ne payez qu'une petite partie maintenant : la banque prête le reste, remboursé tout seul par le loyer."
-      : "<b>Tout est déjà pris ici</b>Relancez le dé pour trouver un immeuble libre.";
+  const idle = cur() === "map" && $("#reveal").hidden && $("#onb").hidden && !moving && W.on;
+  const caseOpen = panelKind === "land" && !landView;
+  if (st === 1 && caseOpen) return tutSet(2);
+  else if (st === 1 && idle && !panelKind) {
+    if (W.near.length) { k = "1b"; anchor = "#b-main"; html = "<b>Achetez près de vous 🏠</b>En vert : à vendre, à portée de main. Touchez « Acheter »."; }
+    else { k = "1w"; html = "<b>Touchez une rue 🚶</b>Votre personnage y marche. Un immeuble libre à côté de vous ? Achetez-le."; }
   }
-  else if (st === 2 && !panelKind && idle) tutSet(4);
-  else if (st === 2.5) { if (justBought && panelKind === "land") return tutSet(3); if (!panelKind && idle) return tutSet(4); }
+  else if (st === 2 && caseOpen) {
+    if (justBought) return tutSet(3);
+    const g = landPos(), fr = g != null ? freeOf(g) : 0;
+    k = "2" + (fr > 0 ? "f" : "x"); anchor = "#movebar .lb"; ok = true;
+    html = fr > 0 ? "<b>Il est libre : achetez-le !</b>À crédit, vous ne payez qu'une petite partie maintenant : la banque prête le reste, remboursé tout seul par le loyer."
+      : "<b>Tout est déjà pris ici</b>Promenez-vous : il y a des immeubles libres partout dans Paris.";
+  }
+  else if ((st === 2 || st === 2.5) && !panelKind && idle) return tutSet(3.5);
+  else if (st === 2.5 && justBought && caseOpen) return tutSet(3);
   else if (st === 3 && panelKind === "land") { k = "3"; anchor = ".money"; ok = true; html = "<b>Bravo, c'est votre premier bien !</b>Il vous rapporte des loyers en continu, même quand vous n'êtes pas connecté. Touchez votre argent, ici, pour voir tout l'historique."; }
-  else if (st === 3 && !panelKind && idle) tutSet(4);
+  else if (st === 3 && !panelKind && idle) return tutSet(3.5);
+  else if (st === 3.5 && idle && !panelKind) {
+    if (tutMv < 0) tutMv = W.mv; else if (W.mv > tutMv) return tutSet(4);
+    k = "w"; ok = true; html = "<b>Promenez-vous 🚶</b>Touchez une rue : votre personnage y marche. Chaque km rapporte un salaire. Devant chez les autres, on paie un petit péage.";
+  }
   else if (st === 4 && idle && !panelKind) { k = "4"; anchor = "#b-pack"; html = "<b>Ouvrez vos boosters</b>Chacun contient 4 vrais biens de Paris et 1 carte Chance. Vous en avez à ouvrir !"; }
-  else if (st === 4 && (cur() === "booster" || !$("#reveal").hidden)) tutSet(5);
+  else if (st === 4 && (cur() === "booster" || !$("#reveal").hidden)) return tutSet(5);
   else if (st === 5 && idle && !panelKind) { k = "5"; anchor = null; ok = true; html = "<b>Dernière chose : devenez maire 👑</b>Le plus gros propriétaire d'un arrondissement en devient le maire et touche 8 % des loyers du quartier. Bonne conquête de Paris !"; }
   // affichage de la bulle
   let el = $("#coach");
   if (!k) { if (el) el.remove(); tutShown = ""; return; }
   if (!el) { el = document.createElement("div"); el.id = "coach"; document.body.appendChild(el);
-    el.addEventListener("click", e => { if (e.target.closest("[data-tok]")) { const s2 = tutGet(); tutSet(s2 === 2 ? 2.5 : s2 === 3 ? 4 : s2 === 5 ? 99 : s2); if (s2 === 2) el.remove(); } if (e.target.closest("[data-tskip]")) tutSet(99); }); }
+    el.addEventListener("click", e => { if (e.target.closest("[data-tok]")) { const s2 = tutGet(); tutSet(s2 === 2 ? 2.5 : s2 === 3 ? 3.5 : s2 === 3.5 ? 4 : s2 === 5 ? 99 : s2); if (s2 === 2) el.remove(); } if (e.target.closest("[data-tskip]")) tutSet(99); }); }
   if (tutShown !== k) { tutShown = k; el.innerHTML = `<div class="ct">${html}</div><div class="cb">${ok ? `<button class="btn sm" data-tok>${st === 5 ? "C'est parti" : "OK"}</button>` : ""}<button class="lnk" data-tskip>Passer le tutoriel</button></div><i class="arr"></i>`; }
   // position : au-dessus ou en dessous de l'élément visé
-  const a = anchor && document.querySelector(anchor), W = innerWidth, H = innerHeight, bw = Math.min(320, W - 24);
+  const a = anchor && document.querySelector(anchor), W0 = innerWidth, H = innerHeight, bw = Math.min(320, W0 - 24);
   el.style.width = bw + "px";
-  if (!a) { el.style.left = (W - bw) / 2 + "px"; el.style.top = Math.round(H * .3) + "px"; el.className = "noarr"; return; }
+  if (!a || !a.getBoundingClientRect().width) { el.style.left = (W0 - bw) / 2 + "px"; el.style.top = Math.round(H * .3) + "px"; el.className = "noarr"; return; }
   const r = a.getBoundingClientRect(), below = r.top < H / 2, cx = r.left + r.width / 2;
-  const left = Math.max(12, Math.min(W - bw - 12, cx - bw / 2)); el.style.left = left + "px";
+  const left = Math.max(12, Math.min(W0 - bw - 12, cx - bw / 2)); el.style.left = left + "px";
   el.className = below ? "below" : "above"; el.style.setProperty("--ax", (cx - left) + "px");
   if (below) el.style.top = (r.bottom + 12) + "px"; else el.style.top = Math.max(8, r.top - el.offsetHeight - 12) + "px";
 }

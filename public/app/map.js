@@ -2,7 +2,7 @@
 // =====================================================================
 //  Carte 3D de Paris : écran d'accueil, couleurs « soirée électorale »
 // =====================================================================
-let map = null, mapReady = false, mode = "all", sel = null;
+let map = null, mapReady = false, mode = "all", sel = null, tapGuard = 0;
 const hideSet = new Set(), lastState = new Map(); let painted = new Set();
 // Palette « Paris » : pierre de taille et toits en zinc
 // (les toits sont un gris chaud clair : un Paris beige, pas bleu ; les immeubles des autres joueurs sont en terre cuite)
@@ -18,18 +18,11 @@ const GROUND = { bg: "#EEE8DC", parks: "#A8D38C", water: "#6DB3E2", major: "#FFF
 // ombre portée des immeubles sur le sol (un simple décalage de leur emprise)
 const SHADOW_T = ["interpolate", ["linear"], ["zoom"], 13.5, ["literal", [1.5, 1]], 15, ["literal", [5, 3.5]], 16, ["literal", [10, 7]], 18, ["literal", [38, 27]]];
 
-function geoArr(i) {
-  const A = ARR[i], feats = []; const ih = FIELDS.indexOf("h"), ir = FIELDS.indexOf("r"), iu = FIELDS.indexOf("u");
-  A.geo.forEach((enc, k) => {
-    const g = i * 1e5 + k; if (hideSet.has(g)) return; const row = A.cards[k]; if (row[iu] === "met" || row[iu] === "jar" || row[iu] === "pla") return;   // un lieu : son repère suffit
-    const h = Math.max(4, row[ih] || 0);
-    const polys = enc.map(f => { const d = decodeRing(f); return [d.concat([d[0]])]; });
-    feats.push({ type: "Feature", id: g, properties: { h, r: row[ir] }, geometry: polys.length === 1 ? { type: "Polygon", coordinates: polys[0] } : { type: "MultiPolygon", coordinates: polys } });
-  });
-  return { type: "FeatureCollection", features: feats };
-}
-const linesGeo = list => ({ type: "FeatureCollection", features: list.map(([k, f]) => ({ type: "Feature", properties: { k }, geometry: { type: "LineString", coordinates: decodeRing(f) } })) });
-const polysGeo = list => ({ type: "FeatureCollection", features: list.map(rs => ({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: rs.map(r => { const d = decodeRing(r); return d.concat([d[0]]); }) } })) });
+// La carte en tuiles vectorielles (20/10/2026, « 3 Go de mémoire ») : scripts/make_tiles.py écrit public/data/t/{z}/{x}/{y}.pbf ;
+// la carte ne charge que les tuiles à l'écran (avant : les 78 000 immeubles en 52 sources GeoJSON, ~600 Mo dans son worker).
+// Couches : b immeubles (id = carte, h, r) · roads · major · water · parks · st (noms des rues).
+const BLD = { source: "pv", sourceLayer: "b" };
+const pvSource = () => ({ type: "vector", tiles: [location.origin + "/data/t/{z}/{x}/{y}.pbf?v=" + DATA_V], minzoom: 11, maxzoom: 15, bounds: [2.215, 48.81, 2.475, 48.906] });
 
 function colorExprs(m) {
   const st = ["coalesce", ["feature-state", "s"], 0], se = ["boolean", ["feature-state", "sel"], false], tg = ["coalesce", ["feature-state", "tgt"], 0], nr = ["coalesce", ["feature-state", "near"], 0];
@@ -44,36 +37,8 @@ function partyFill() {
   return ["match", ["coalesce", ["feature-state", "p"], ""], ...PARTY_ORDER.flatMap(k => [k, PARTIES[k].c]), "#FFFFFF"];
 }
 
-// géométrie construite petit à petit, seulement quand la carte est visible
-const geoQ = []; let geoBusy = false;
-function addArrToMap(i) {
-  geoQ.push({ i, f: () => {
-    if (map.getSource("b" + i)) return;
-    map.addSource("b" + i, { type: "geojson", data: geoArr(i), maxzoom: 15, buffer: 32, tolerance: .5 });
-    map.addSource("r" + i, { type: "geojson", data: linesGeo(ARR[i].roads), maxzoom: 15, buffer: 32 });
-    const e = colorExprs(mode);
-    map.addLayer({ id: "sh" + i, type: "fill", source: "b" + i, minzoom: 13.5, paint: { "fill-color": GROUND.shadow, "fill-opacity": GROUND.shadowOp, "fill-translate": SHADOW_T, "fill-translate-anchor": "map" } }, "anchor-g");
-    map.addLayer({ id: "rd" + i, type: "line", source: "r" + i, minzoom: 14, paint: { "line-color": GROUND.road, "line-opacity": .95, "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 14, ["match", ["get", "k"], 1, 1.2, .5], 18, ["match", ["get", "k"], 1, 10, 3]] } }, "sh" + i);
-    map.addLayer({ id: "bd" + i, type: "fill-extrusion", source: "b" + i, minzoom: 12.6, paint: { "fill-extrusion-color": e.body, "fill-extrusion-height": ["-", ["get", "h"], 1], "fill-extrusion-opacity": 1, "fill-extrusion-vertical-gradient": true } }, "anchor-top");
-    map.addLayer({ id: "rf" + i, type: "fill-extrusion", source: "b" + i, minzoom: 15.2, paint: { "fill-extrusion-color": e.roof, "fill-extrusion-height": ["get", "h"], "fill-extrusion-base": ["-", ["get", "h"], 1], "fill-extrusion-opacity": 1 } }, "anchor-top");
-    for (const L of ["bd" + i, "rf" + i]) {
-      map.on("click", L, ev => { const f = ev.features[0]; if (f) { ev.preventDefault(); onBuildingTap(f.id); } });
-      map.on("mouseenter", L, () => map.getCanvas().style.cursor = "pointer"); map.on("mouseleave", L, () => map.getCanvas().style.cursor = "");
-    }
-    for (const g of [...lastState.keys()]) if (ai(g) === i) lastState.delete(g);
-    paintAll();
-  } });
-  pumpGeo();
-}
-function pumpGeo() {
-  if (geoBusy || !mapReady || cur() !== "map" || !geoQ.length) return;
-  geoBusy = true;
-  const c = map.getCenter(); const d = i => Math.hypot(IDX.arr[i].center[0] - c.lng, IDX.arr[i].center[1] - c.lat);
-  geoQ.sort((a, b) => d(a.i) - d(b.i));
-  const it = geoQ.shift(); try { it.f(); } catch (e) { console.warn(e); }
-  setTimeout(() => { geoBusy = false; pumpGeo(); }, 60);
-}
-window.onArrLoaded = i => { if (map) addArrToMap(i); };
+function pumpGeo() { }   // (ancien chargement des immeubles par arrondissement : les tuiles s'en chargent)
+window.onArrLoaded = i => { if (map && mapReady) paintAll(); };   // les cartes d'un arrondissement arrivent : on peut colorier ses immeubles
 
 function stateFor(g) {
   const o = ST.own.get(g);
@@ -86,11 +51,12 @@ function paintAll() {
   if (cur() !== "map" || !$("#reveal").hidden) { paintAll.pending = true; return; } paintAll.pending = false;
   const want = new Set([...ST.own.keys(), ...ST.sale]); if (sel !== null) want.add(sel);
   for (const g of new Set([...painted, ...want])) {
-    if (!ARR[ai(g)]?.cards || !map.getSource("b" + ai(g)) || hideSet.has(g)) continue;
+    if (!ARR[ai(g)]?.cards || hideSet.has(g)) continue;
     const s = stateFor(g), se = g === sel, k = s * 2 + (se ? 1 : 0); if (lastState.get(g) === k) continue;
-    lastState.set(g, k); map.setFeatureState({ source: "b" + ai(g), id: g }, { s, sel: se });
+    lastState.set(g, k); map.setFeatureState(Object.assign({ id: g }, BLD), { s, sel: se });
   }
   painted = want; renderMarks(); renderTags(); renderScore(); renderFilterCounts(); paintTargets();
+  updateNear();   // qui a acheté quoi a changé : ce qui reste à vendre autour de soi aussi
 }
 let arrKey = "";
 function updateArrFill() {
@@ -100,7 +66,7 @@ function updateArrFill() {
 }
 function applyMode() {
   if (!mapReady) return; const e = colorExprs(mode);
-  for (let i = 0; i < 20; i++) { if (map.getLayer("rf" + i)) map.setPaintProperty("rf" + i, "fill-extrusion-color", e.roof); if (map.getLayer("bd" + i)) map.setPaintProperty("bd" + i, "fill-extrusion-color", e.body); }
+  if (map.getLayer("rf")) map.setPaintProperty("rf", "fill-extrusion-color", e.roof); if (map.getLayer("bd")) map.setPaintProperty("bd", "fill-extrusion-color", e.body);
   map.setPaintProperty("arrfill", "fill-opacity", mode === "all" ? ["interpolate", ["linear"], ["zoom"], 11, .62, 12.6, .45, 13.2, .12, 13.8, 0] : ["interpolate", ["linear"], ["zoom"], 11, .18, 14, 0]);
   renderTags(); renderMarks();
 }
@@ -111,27 +77,36 @@ function buildMap(base) {
     const kx = 111320 * Math.cos(m.lat * Math.PI / 180), ky = 110574; const ca = Math.cos(m.ang), sa = Math.sin(m.ang);
     const pts = [[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]].map(([u, v]) => { const x = u * m.L / 2, y = v * m.W / 2; return [m.lon + (x * ca - y * sa) / kx, m.lat + (x * sa + y * ca) / ky]; });
     return { type: "Feature", id: m.g, properties: {}, geometry: { type: "Polygon", coordinates: [pts] } }; }) };
-  const ev = ST.state?.event;
+  const ev = ST.state?.event, BLD_SRC = { source: "pv", "source-layer": "b" };
   map = new maplibregl.Map({
     container: "map", attributionControl: false, center: [2.3440, 48.8566], zoom: 14.2, pitch: 55, bearing: 0, maxPitch: 75, minZoom: 10.8,
-    maxBounds: [[2.16, 48.77], [2.54, 48.95]], fadeDuration: 0, dragRotate: true, touchPitch: true, pitchWithRotate: true,
+    maxBounds: [[2.16, 48.77], [2.54, 48.95]], fadeDuration: 0, maxTileCacheSize: 48,   // peu de tuiles gardées en mémoire (téléphones) dragRotate: true, touchPitch: true, pitchWithRotate: true,
     style: { version: 8, glyphs: "/fonts/{fontstack}/{range}.pbf",
       light: GROUND.light, sky: GROUND.sky,
-      sources: { water: { type: "geojson", data: polysGeo(base.water) }, parks: { type: "geojson", data: polysGeo(base.parks) }, major: { type: "geojson", data: linesGeo(base.major) }, arr: { type: "geojson", data: outline }, mfill: { type: "geojson", data: mfill } },
+      sources: { pv: pvSource(), arr: { type: "geojson", data: outline }, mfill: { type: "geojson", data: mfill } },
       layers: [
         { id: "bg", type: "background", paint: { "background-color": GROUND.bg } },
         { id: "arrfill", type: "fill", source: "arr", paint: { "fill-color": partyFill(), "fill-opacity": ["interpolate", ["linear"], ["zoom"], 11, .62, 12.6, .45, 13.2, .12, 13.8, 0] } },
-        { id: "parks", type: "fill", source: "parks", paint: { "fill-color": GROUND.parks, "fill-opacity": 1 } },
-        { id: "water", type: "fill", source: "water", paint: { "fill-color": GROUND.water } },
-        { id: "major-case", type: "line", source: "major", paint: { "line-color": GROUND.majorCase, "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "k"], 3, 1.6, .6], 18, ["match", ["get", "k"], 3, 34, 20]] } },
-        { id: "major", type: "line", source: "major", paint: { "line-color": GROUND.major, "line-blur": GROUND.glow * 1.6, "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "k"], 3, 1.2, .4], 18, ["match", ["get", "k"], 3, 30, 17]] } },
+        { id: "parks", type: "fill", source: "pv", "source-layer": "parks", paint: { "fill-color": GROUND.parks, "fill-opacity": 1 } },
+        { id: "water", type: "fill", source: "pv", "source-layer": "water", paint: { "fill-color": GROUND.water } },
+        // les ponts : un tablier en pierre au-dessus de l'eau (20/10/2026, « mets les ponts, sinon ça fait bizarre »)
+        { id: "br", type: "fill-extrusion", source: "pv", "source-layer": "bridges", minzoom: 13, paint: { "fill-extrusion-color": "#F0E8D6", "fill-extrusion-height": 2.4, "fill-extrusion-base": 0, "fill-extrusion-opacity": 1, "fill-extrusion-vertical-gradient": false } },
+        { id: "major-case", type: "line", source: "pv", "source-layer": "major", paint: { "line-color": GROUND.majorCase, "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "k"], 3, 1.6, .6], 18, ["match", ["get", "k"], 3, 34, 20]] } },
+        { id: "major", type: "line", source: "pv", "source-layer": "major", paint: { "line-color": GROUND.major, "line-blur": GROUND.glow * 1.6, "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "k"], 3, 1.2, .4], 18, ["match", ["get", "k"], 3, 30, 17]] } },
         { id: "mfill", type: "fill", source: "mfill", paint: { "fill-color": "#F5D98A", "fill-opacity": ["interpolate", ["linear"], ["zoom"], 12, .35, 16, .25] } },
         { id: "mfill-line", type: "line", source: "mfill", paint: { "line-color": "#B8860B", "line-width": 1.5, "line-dasharray": [2, 1.5] } },
+        { id: "rd", type: "line", source: "pv", "source-layer": "roads", minzoom: 14, paint: { "line-color": GROUND.road, "line-opacity": .95, "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 14, ["match", ["get", "k"], 1, 1.2, .5], 18, ["match", ["get", "k"], 1, 10, 3]] } },
+        { id: "sh", type: "fill", ...BLD_SRC, minzoom: 13.5, paint: { "fill-color": GROUND.shadow, "fill-opacity": GROUND.shadowOp, "fill-translate": SHADOW_T, "fill-translate-anchor": "map" } },
         { id: "anchor-g", type: "background", layout: { visibility: "none" }, paint: {} },   // sous ce repère : rues et ombres des arrondissements
         { id: "anchor-b", type: "background", layout: { visibility: "none" }, paint: {} },   // entre les deux : passants, voitures, trafic, sillages (life.js)
         { id: "arrline", type: "line", source: "arr", paint: { "line-color": GROUND.arrline, "line-width": ["interpolate", ["linear"], ["zoom"], 11, 1.6, 16, 3] } },
         { id: "evline", type: "line", source: "arr", filter: ["==", ["id"], ev ? ev.arr - 1 : -1], paint: { "line-color": "#F59E0B", "line-width": ["interpolate", ["linear"], ["zoom"], 11, 3, 16, 6], "line-dasharray": [2, 1.2] } },
-        { id: "anchor-top", type: "background", layout: { visibility: "none" }, paint: {} }
+        { id: "bd", type: "fill-extrusion", ...BLD_SRC, minzoom: 13, paint: { "fill-extrusion-color": colorExprs(mode).body, "fill-extrusion-height": ["-", ["get", "h"], 1], "fill-extrusion-opacity": 1, "fill-extrusion-vertical-gradient": true } },
+        { id: "rf", type: "fill-extrusion", ...BLD_SRC, minzoom: 15.2, paint: { "fill-extrusion-color": colorExprs(mode).roof, "fill-extrusion-height": ["get", "h"], "fill-extrusion-base": ["-", ["get", "h"], 1], "fill-extrusion-opacity": 1 } },
+        { id: "anchor-top", type: "background", layout: { visibility: "none" }, paint: {} },
+        // noms des rues, comme sur une carte classique (données de la Ville de Paris), quand on zoome
+        { id: "snames", type: "symbol", source: "pv", "source-layer": "st", minzoom: 15.3, layout: { "symbol-placement": "line", "text-field": ["get", "n"], "text-font": ["Noto Sans Medium"], "text-size": ["interpolate", ["linear"], ["zoom"], 15.3, 10.5, 18, 14], "text-max-angle": 30, "symbol-spacing": 320, "text-padding": 4 },
+          paint: { "text-color": GROUND.names, "text-halo-color": GROUND.namesHalo, "text-halo-width": 1.6 } }
       ] }
   });
   map.touchZoomRotate.enableRotation();
@@ -139,13 +114,20 @@ function buildMap(base) {
   const fitMin = () => { const c = map.cameraForBounds([[2.235, 48.818], [2.455, 48.900]], { padding: 8 }); if (c?.zoom) map.setMinZoom(Math.max(10.5, Math.min(12.6, c.zoom - .15))); };
   addEventListener("resize", () => setTimeout(fitMin, 50));
   map.on("load", () => { fitMin();
-    mapReady = true; pumpGeo();
+    mapReady = true;
+    for (const L of ["bd", "rf"]) {
+      map.on("click", L, ev => { const f = ev.features[0]; if (f && f.id != null) { ev.preventDefault(); onBuildingTap(f.id); } });
+      map.on("mouseenter", L, () => map.getCanvas().style.cursor = "pointer"); map.on("mouseleave", L, () => map.getCanvas().style.cursor = "");
+    }
     if (window.THREE && window.addMonuments) addMonuments(map, IDX.models);
-    map.on("click", "mfill", e => { const f = e.features[0]; if (f) onBuildingTap(f.id); });
-    map.on("click", e => { if (e.defaultPrevented || document.body.classList.contains("inplace")) return;   // dans le monde ouvert, le toucher sert à marcher (place.js)
-      // un toucher sur la carte ferme la case ouverte, sans déplacer la carte (on regarde là où on a touché)
+    map.on("click", "mfill", e => { const f = e.features[0]; if (f) { e.preventDefault(); onBuildingTap(f.id); } });
+    map.on("click", e => { if (e.defaultPrevented) return;   // un immeuble : sa case (onBuildingTap)
+      // une case ouverte ou la recherche : le toucher les ferme, sans déplacer la carte ni marcher
       if (panelKind === "land" && !moving) { justBought = null; setMovebar(""); closeSearch(); return; }
-      if (!map.queryRenderedFeatures(e.point).some(f => /^(bd|rf)\d|^mfill$/.test(f.layer.id))) hidePreview(); closeSearch(); });
+      if (!$("#search").hidden || performance.now() - tapGuard < 700) { closeSearch(); return; }   // ce toucher fermait la recherche : on ne part pas marcher
+      hidePreview();
+      worldMapClick(e);   // toucher une rue : son personnage y marche (place.js)
+    });
     IDX.arr.forEach((a, i) => {
       const el = document.createElement("button"); el.className = "amark"; el.innerHTML = `<b>${ord(a.n)}</b><span id="am${i}"></span>`;
       el.addEventListener("click", ev => { ev.stopPropagation(); push("arr", i); });
@@ -155,14 +137,7 @@ function buildMap(base) {
     map.on("zoom", renderMarks); map.on("zoomend", () => typeof declutterDest === "function" && declutterDest()); map.on("rotateend", () => typeof declutterDest === "function" && declutterDest()); map.on("moveend", renderTags); map.on("moveend", () => { renderSpots(map.getZoom()); declutterSpots(); });
     // la boussole n'apparaît que si la carte a été tournée ; elle remet le nord en haut
     map.on("rotate", () => { const b = map.getBearing(); $("#t-north").hidden = Math.abs(b) < 2; $("#needle").style.transform = `rotate(${-b}deg)`; });
-    ARR.forEach((A, i) => { if (A?.cards) addArrToMap(i); });
-    // noms des rues, comme sur une carte classique (données de la Ville de Paris), quand on zoome
-    fetch("/data/streets.json").then(r => r.json()).then(list => {
-      map.addSource("snames", { type: "geojson", data: { type: "FeatureCollection", features: list.map(([n, c]) => ({ type: "Feature", properties: { n }, geometry: { type: "LineString", coordinates: c } })) } });
-      map.addLayer({ id: "snames", type: "symbol", source: "snames", minzoom: 15.3, layout: { "symbol-placement": "line", "text-field": ["get", "n"], "text-font": ["Noto Sans Medium"], "text-size": ["interpolate", ["linear"], ["zoom"], 15.3, 10.5, 18, 14], "text-max-angle": 30, "symbol-spacing": 320, "text-padding": 4 },
-        paint: { "text-color": GROUND.names, "text-halo-color": GROUND.namesHalo, "text-halo-width": 1.6 } });
-    }).catch(() => { });   // arrondissements chargés avant la carte (ex. celui du pion)
-    updateArrFill(); applyMode(); paintAll(); initPawnLayers();
+    updateArrFill(); applyMode(); paintAll(); worldMapReady();
     loadAllProgressive();
   });
 }
@@ -339,9 +314,9 @@ function flyTo(g) { if (!map || !mapReady) return; const m = IDX.models.find(x =
 function showOnMap(g) { go("map"); setTimeout(() => { flyTo(g); previewBuilding(g); }, 80); }
 
 // aperçu d'un immeuble : le même panneau que la case (à droite sur ordinateur, en bas sur téléphone)
-async function previewBuilding(g) {
+async function previewBuilding(g) {   // à portée : on peut l'acheter ; trop loin : la case le dit, avec « Y aller » (place.js)
   await ensureCards([g]); if (!card(g)) return; closeSearch(); hideHint();
-  if (g === landPos()) { landView = false; showLand(); } else showLand(null, g);
+  if (g === landPos()) { landView = false; showLand(); } else worldTapCard(g);
 }
 function hidePreview() { if (!moving && (panelKind !== "land" || landView)) setMovebar(""); const pv = $("#preview"); if (pv && !pv.hidden) { pv.hidden = true; sel = null; paintAll(); if (false) $("#strip").hidden = false; } }
 function closeSearch() { $("#search").hidden = true; }
@@ -366,7 +341,7 @@ function initMapUI() {
   $("#t-filter").addEventListener("click", e => { e.stopPropagation(); $("#filter").classList.toggle("open"); });
   $("#filter").addEventListener("click", () => setTimeout(() => $("#filter").classList.remove("open"), 150));
   $("#t-search").addEventListener("click", e => { e.stopPropagation(); const s = $("#search"); s.hidden = !s.hidden; if (!s.hidden) $("#q").focus(); });
-  document.addEventListener("pointerdown", e => { if (!$("#search").hidden && !e.target.closest("#search,#t-search")) closeSearch(); });
+  document.addEventListener("pointerdown", e => { if (!$("#search").hidden && !e.target.closest("#search,#t-search")) { closeSearch(); tapGuard = performance.now(); } });
   $("#q").addEventListener("input", () => {
     const v = $("#q").value.trim().toLowerCase(); const out = $("#results"); if (v.length < 2) { out.innerHTML = ""; return; }
     const hits = [], nv = noAcc(v);   // « chatelet » trouve Châtelet
@@ -381,8 +356,9 @@ function initMapUI() {
 }
 
 // petit message d'aide sur la carte, jusqu'au premier achat ou aperçu
-function showHint() { try { if (localStorage.getItem("hm_hint") || +(localStorage.getItem("hm_tut") || 99) < 99) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "🎲 Lancez le dé, puis choisissez l'immeuble où votre montgolfière se pose. S'il est libre, achetez-le !"; $("#p-map").appendChild(h); }
-function hideHint() { $("#maphint")?.remove(); try { localStorage.setItem("hm_hint", "1"); } catch (e) { } }
+// (20/10/2026 : pour ceux qui jouaient avec le dé, une fois) on se promène maintenant
+function showHint() { try { if (localStorage.getItem("hm_hint2") || +(localStorage.getItem("hm_tut") || 99) < 99) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "<b>Nouveau : le dé laisse place à la marche.</b> Touchez une rue pour marcher, achetez ce qui est à portée."; h.onclick = hideHint; $("#p-map").appendChild(h); }
+function hideHint() { if (!$("#maphint")) return; $("#maphint").remove(); try { localStorage.setItem("hm_hint2", "1"); } catch (e) { } }
 function celebrate(c) { toast(`Félicitations ! ${title(c)} est à vous. Loyer : +${fmtE(c.rent)}/jour`, "good"); if (window.confetti) confetti("#0EA5A0", 30); }
 
 // ---- rangée de cartes en bas de la carte : mes biens / à vendre ----------------------------
@@ -408,7 +384,7 @@ function showStrip(kind) {
   stripKind = kind;
   const items = kind === "mine" ? holdings().sort((a, b) => b.c.v * unitsOf(b) - a.c.v * unitsOf(a)).map(h => ({ g: h.g, c: h.c, item: { t: "own", ks: h.ks, n: h.n } }))
     : [...ST.sale].map(g => ({ g, c: card(g) })).filter(x => x.c);
-  if (!items.length) { stripKind = kind; showStrip("all"); return toast(kind === "mine" ? "Vous n'avez encore aucun bien : lancez le dé ou ouvrez un booster !" : "Rien à vendre en ce moment."); }
+  if (!items.length) { stripKind = kind; showStrip("all"); return toast(kind === "mine" ? "Vous n'avez encore aucun bien : promenez-vous ou ouvrez un booster !" : "Rien à vendre en ce moment."); }
   // pas de rangée de cartes : seulement les points sur la carte (demande du propriétaire)
   el.hidden = true; setStripPins(items); document.body.classList.add("mymode"); document.body.classList.toggle("salemode", kind === "sale"); map.setPaintProperty("arrfill", "fill-opacity", 0);
   stripCount(items); renderMarks();

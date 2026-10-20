@@ -93,7 +93,7 @@ function applyDecor(force) {
   sp("major", "line-color", GROUND.major); sp("major", "line-blur", GROUND.glow * 1.6); sp("major-case", "line-color", GROUND.majorCase);
   sp("major", "line-opacity", GROUND.glow > .5 ? ["interpolate", ["linear"], ["zoom"], 12, .9, 15, .6, 18, .32] : 1);   // la nuit : grands axes éclairés, discrets de près
   sp("arrline", "line-color", GROUND.arrline); sp("snames", "text-color", GROUND.names); sp("snames", "text-halo-color", GROUND.namesHalo);
-  for (let i = 0; i < 20; i++) { sp("rd" + i, "line-color", GROUND.road); sp("sh" + i, "fill-color", GROUND.shadow); sp("sh" + i, "fill-opacity", GROUND.shadowOp); }
+  sp("rd", "line-color", GROUND.road); sp("sh", "fill-color", GROUND.shadow); sp("sh", "fill-opacity", GROUND.shadowOp);
   sp("trees", "fill-extrusion-color", treeColors());
   sp("wakes", "fill-opacity", DECOR.night ? .14 : .5);   // sillages des bateaux : discrets la nuit
   try { map.setLight(GROUND.light); map.setSky(GROUND.sky); } catch (e) { }

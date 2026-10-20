@@ -158,7 +158,7 @@ function baseRent(h) {
 // --- temps réel ---------------------------------------------------------
 let rtT = null;
 function startRealtime(onChange) {
-  const bump = (what) => { clearTimeout(rtT); rtT = setTimeout(() => onChange(what), 700); };
+  const bump = (what) => { clearTimeout(rtT); rtT = setTimeout(() => onChange(what), 700 + Math.random() * 2300); };   // (un peu de hasard : tous les joueurs ne relisent pas la carte au même instant)
   if (LOCAL_MODE) { setInterval(() => bump("poll"), 8000); return; }
   SB.channel("hm-live")
     .on("postgres_changes", { event: "*", schema: "public", table: "lots" }, () => bump("map"))

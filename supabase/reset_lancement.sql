@@ -11,6 +11,7 @@
 --  retire juste après pour qu'il ne puisse jamais être rejoué).
 -- =====================================================================
 truncate lots, parts, arr_value, arr_state, listings, sales, news, fx, day_event, city_week, pay,
-         ledger, offers, gifts, stat_day, active_day restart identity cascade;
+         ledger, offers, gifts, stat_day, active_day,
+         walkers, world_people, chance_taken, chat_msg, place_people, chat_bans restart identity cascade;   -- (Paris à pied : positions, km du jour, « ? », bulles)
 delete from profiles;
 delete from auth.users where id not in (select id from admins);

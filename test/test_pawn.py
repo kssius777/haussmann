@@ -1,94 +1,31 @@
-import sys, uuid, time; sys.path.insert(0, 'test'); import db
+"""La position du joueur, depuis que le dé est retiré (20/10/2026 : on se promène dans Paris, migration_monde_paris.sql).
+On n'achète à la banque que l'immeuble devant lequel on est (world_arrive pose profiles.land) ; le dé, la téléportation et
+l'achat de lancers sont refusés ; les loyers d'absence restent."""
+import sys, uuid; sys.path.insert(0, 'test'); import db
 R = []
 def check(n, ok, info=""): ok = bool(ok); R.append(ok); print(("PASS " if ok else "FAIL ") + n + (f"  · {info}" if info != "" else ""), flush=True)
 def err(f):
     try: f(); return None
     except Exception as e: return str(e).split("\n")[0]
-# lancer le dé puis choisir une destination (par défaut la première proposée, ou celle dans la direction q)
-def roll_go(u, q=None, pick=None):
-    r = db.rpc(u, "roll")
-    if "options" not in r: return r
-    opts = r["options"]; o = next((x for x in opts if q is not None and x["dir"] == q), None) or (pick(opts) if pick else opts[0])
-    x = db.rpc(u, "go_to", p_card=o["card"]); x["options"] = opts; return x
-A, B = uuid.uuid4(), uuid.uuid4()
-for u in (A, B): db.sql("insert into auth.users(id) values (%s)", str(u))
-s = db.rpc(A, "join_game", p_pseudo="Pion" + str(A)[:4], p_party=None); db.rpc(B, "join_game", p_pseudo="Rival" + str(B)[:4], p_party="poing")
-p = s["profile"]; check("nouveau joueur : pion posé devant Notre-Dame, 10 lancers", p["pos"] == 400761 and p["rolls"] == 10, (p["pos"], p["rolls"]))
+c0 = db.conn(); cur = c0.cursor()
+for f in ["migration_monde.sql", "migration_monde_paris.sql"]: cur.execute(open("supabase/" + f).read())
+c0.commit()
+A = uuid.uuid4(); db.sql("insert into auth.users(id) values (%s)", str(A))
+s = db.rpc(A, "join_game", p_pseudo="Pion" + str(A)[:4], p_party=None)
+p = s["profile"]; check("nouveau joueur : posé devant Notre-Dame (18 rue de la Bûcherie)", p["pos"] == 400761, p["pos"])
 far = db.sql("select id from cards where lk='l' and id not in (select card from lots) and _dist(400761, id) > 2000 limit 1")[0][0]
-check("avant de lancer : pas d'achat à la banque", "tomber dessus" in (err(lambda: db.rpc(A, "bank_buy", p_card=far, p_k=None)) or ""))
-t = time.time(); r0 = db.rpc(A, "roll"); dt = time.time() - t
-check("le dé propose plusieurs destinations (une par direction)", 1 <= len(r0["options"]) <= 4 and len({o["card"] for o in r0["options"]}) == len(r0["options"]), [o["dir"] for o in r0["options"]])
-check("relancer sans choisir repropose les mêmes destinations (pas de lancer perdu)", [o["card"] for o in db.rpc(A, "roll")["options"]] == [o["card"] for o in r0["options"]] and db.rpc(A, "state")["profile"]["rolls"] == 9)
-check("impossible d'aller ailleurs que sur une destination proposée", "Lancez" in (err(lambda: db.rpc(A, "go_to", p_card=r0["options"][0]["card"] + 1 if r0["options"][0]["card"] + 1 not in [o["card"] for o in r0["options"]] else 1)) or ""))
-r = db.rpc(A, "go_to", p_card=r0["options"][-1]["card"]); r["die"] = r0["die"]
-path, L = r["path"], r["landing"]
-check(f"lancer ({dt*1000:.0f} ms) : dé {r['die']} → {len(path)-1} pas", 1 <= r["die"] <= 6 and 1 <= len(path) - 1 <= r["die"] * 4)
-check("on ne retombe jamais sur sa case de départ (≥ 60 m)", db.sql("select _dist(%s,%s)", path[0], path[-1])[0][0] >= 59)
-check("le pion marche d'immeuble voisin en immeuble voisin", path[0] == 400761 and all(db.sql("select 1 from edges where a=%s and b=%s", a, b) for a, b in zip(path, path[1:])))
-st = db.rpc(A, "state")["profile"]
-check("le pion s'arrête sur la dernière case, achetable", st["pos"] == path[-1] == L["card"] and st["land"] == L["card"] and st["rolls"] == 9)
-check("un petit salaire à chaque lancer", L["salary"] == 20000 and (L.get("chance") or st["cash"] >= 1000000 + 20000 - L["toll"]), (L["salary"], st["cash"]))
-db.sql("update profiles set cash=cash+100000000 where id=%s", str(A))
-if L["free"] > 0:
-    db.rpc(A, "bank_buy", p_card=L["card"], p_k=None)
-    check("achat de l'immeuble où l'on est tombé", db.sql("select count(*)+0 from lots where card=%s and owner=%s", L["card"], str(A))[0][0] + db.sql("select coalesce(sum(n),0) from parts where card=%s and owner=%s", L["card"], str(A))[0][0] >= 1)
-check("achat ailleurs refusé", "tomber dessus" in (err(lambda: db.rpc(A, "bank_buy", p_card=far, p_k=None)) or ""))
-# loyer de passage : B possède l'immeuble d'arrivée → on force l'arrivée en mettant tout autour à B
-db.sql("update profiles set pos=400761, heading=0 where id=%s", str(A))
-def land_on_b():   # on repart de Notre-Dame et on choisit une destination qui appartient à B (pas une case Chance)
-    ownB = lambda g: bool(db.sql("select 1 from lots where card=%s and owner=%s", g, str(B))) and not db.sql("select _is_chance(%s)", g)[0][0]
-    for _ in range(20):
-        db.sql("update profiles set pos=400761, rolls=10 where id=%s", str(A))
-        x = roll_go(A, pick=lambda opts: next((o for o in opts if ownB(o["card"])), opts[0])); t2 = x["landing"]["card"]
-        if ownB(t2): return x
-    return None
-# donne à B tous les immeubles proches pour être sûr de payer
-near = [g for (g,) in db.sql("select id from cards where lk<>'p' and _dist(400761, id) < 600 and id not in (select card from lots where owner=%s)", str(A))]
-db.sql("delete from lots where card = any(%s) and owner<>%s", near, str(A))
-db.sql("insert into lots(card,k,owner) select c.id, 0, %s from cards c where c.id = any(%s) on conflict do nothing", str(B), near)
-db.sql("update profiles set rolls=10, rent_at=now() where id=%s", str(A))
-x = land_on_b()
-check("tomber chez un autre joueur : on lui paie son loyer", x and x["landing"]["toll"] > 0 and not x["landing"]["payees"][0]["pseudo"].startswith("Pion" + str(A)[:4]), x and (x["landing"]["toll"], x["landing"]["payees"][:1]))
-check("loyer plafonné à 20 % de la trésorerie", x and x["landing"]["toll"] <= 0.2 * 1e8 + 1e6)
-# chez soi : bonus
-mine_card = db.sql("select card from lots where owner=%s limit 1", str(A))
-pos0 = db.rpc(A, "state")["profile"]["pos"]
-check("téléportation retirée du jeu : refusée, le pion ne bouge pas", "retirée" in (err(lambda: db.rpc(A, "teleport", p_card=mine_card[0][0] if mine_card else far)) or "") and db.rpc(A, "state")["profile"]["pos"] == pos0)
-check("téléportation : plus aucun joueur ne peut l'appeler", not db.sql("select has_function_privilege('authenticated', 'teleport(int)', 'execute') or has_function_privilege('anon', 'teleport(int)', 'execute')")[0][0])
-db.sql("update profiles set rolls=0, rolls_at=now() where id=%s", str(A))
-check("plus de lancers : message avec le délai", "prochain arrive" in (err(lambda: db.rpc(A, "roll")) or ""))
-db.sql("update profiles set rolls_at=now() - interval '75 minutes' where id=%s", str(A))
-check("les lancers se rechargent (1 toutes les 30 min)", db.rpc(A, "state")["profile"]["rolls"] == 2)
-# autour de Notre-Dame : 15 lancers, le pion doit quitter l'île au lieu de tourner en rond
-C = uuid.uuid4(); db.sql("insert into auth.users(id) values (%s)", str(C)); db.rpc(C, "join_game", p_pseudo="Ile" + str(C)[:4], p_party=None)
-far_ = 0; same = 0; prev = 300658
-for _ in range(15):
-    db.sql("update profiles set rolls=10 where id=%s", str(C)); x = roll_go(C); t2 = x["landing"]["card"]
-    same += (t2 == prev); prev = t2; far_ = max(far_, db.sql("select _dist(400761,%s)", t2)[0][0])
-check("autour de Notre-Dame : le pion s'éloigne (pas de boucle)", far_ > 400 and same == 0, f"{far_:.0f} m au plus loin")
-# acheter des lancers
-db.sql("update profiles set rolls=0, cash=10000000, rb_n=0, rb_day=null where id=%s", str(A))
-p0 = db.rpc(A, "state")["rolls_price"]; db.rpc(A, "buy_rolls"); st = db.rpc(A, "state")
-check("acheter 5 lancers avec l'argent du jeu, prix qui double", st["profile"]["rolls"] == 5 and st["rolls_price"] == p0 * 2, (p0, st["rolls_price"]))
-nch = db.sql("select count(*) from (select id from cards order by id limit 1200) x where _is_chance(id)")[0][0]
-check("cases Chance réparties sur la carte (≈ 1 sur 8)", 100 < nch < 210, nch)
-# choisir sa direction : vers l'est puis vers l'ouest, le pion part bien de ce côté
-D = uuid.uuid4(); db.sql("insert into auth.users(id) values (%s)", str(D)); db.rpc(D, "join_game", p_pseudo="Dir" + str(D)[:4], p_party=None)
-ok_e = ok_w = 0
-for i in range(8):
-    db.sql("update profiles set rolls=10 where id=%s", str(D)); p0 = db.rpc(D, "state")["profile"]["pos"]
-    x = roll_go(D, q=0 if i % 2 == 0 else 2); t2 = x["landing"]["card"]
-    dx = db.sql("select (b.cx - a.cx) from cards a, cards b where a.id=%s and b.id=%s", p0, t2)[0][0]
-    if i % 2 == 0: ok_e += dx > 0
-    else: ok_w += dx < 0
-check("choisir sa destination après le dé : vers l'est ou vers l'ouest", ok_e + ok_w >= 6, (ok_e, ok_w))
-check("après le déplacement, plus de destination en attente", db.sql("select pend from profiles where id=%s", str(D))[0][0] is None)
+db.sql("update profiles set cash = cash + 100000000 where id=%s", str(A))
+check("loin d'un immeuble : pas d'achat à la banque", "Approchez" in (err(lambda: db.rpc(A, "bank_buy", p_card=far, p_k=None)) or ""))
+check("le dé n'existe plus (lancer, aller, acheter des lancers)", all("n'existe plus" in (err(lambda f=f, a=a: db.rpc(A, f, **a)) or "") for f, a in (("roll", {}), ("go_to", {"p_card": far}), ("buy_rolls", {}))))
+check("téléportation retirée : refusée, et plus aucun joueur ne peut l'appeler", "retirée" in (err(lambda: db.rpc(A, "teleport", p_card=far)) or "")
+      and not db.sql("select has_function_privilege('authenticated', 'teleport(int)', 'execute') or has_function_privilege('anon', 'teleport(int)', 'execute')")[0][0])
+# devant un immeuble (dans le monde) : on l'achète
+db.rpc(A, "world_join"); fx, fy = map(float, db.sql("select cx / 1e5, cy / 1e5 from cards where id=%s", far)[0])
+db.sql("update walkers set lon=%s, lat=%s, lon0=%s, lat0=%s, dur=0, path=null, settled=true where user_id=%s", fx, fy, fx, fy, str(A))
+db.rpc(A, "world_arrive", p_card=far); db.rpc(A, "bank_buy", p_card=far, p_k=None)
+check("devant l'immeuble : achat à la banque", db.sql("select count(*) from lots where card=%s and owner=%s", far, str(A))[0][0] == 1)
 db.sql("update profiles set rent_at=now()-interval '2 days 4 hours' where id=%s", str(A)); db.rpc(A, "state")
 lab = db.sql("select label from ledger where owner=%s and kind='rent_away' order by at desc limit 1", str(A))
 check("loyers d'absence : une ligne à part avec la durée", bool(lab) and "2 j 4 h" in lab[0][0], lab)
-# les ponts (migration_ponts.sql) : depuis l'île de la Cité, le dé propose aussi la rive droite
-db.sql(open("supabase/migration_ponts.sql").read())
-opts = db.sql("select _options(%s, 301003, 6)", str(D))[0][0]
-north = [o["card"] for o in opts if db.sql("select cy from cards where id=%s", o["card"])[0][0] > 4885750]
-check("îles : depuis la Cité, le dé propose aussi l'autre rive (ponts)", len(north) >= 1, [o["card"] for o in opts])
 print(f"\n{sum(R)}/{len(R)} OK")
+sys.exit(0 if all(R) else 1)

@@ -11,13 +11,13 @@ const TABS = ["map", "booster", "assets", "market", "paris"];
 const cur = () => stack.length ? "detail" : tab;
 
 function go(t) {
-  if (t === "chat") return openPlace();   // le monde ouvert (essai dans le 7e) : pas une page, une vue de la carte (place.js)
+  if (t === "chat" || !TABS.includes(t)) t = "map";   // (l'ancien onglet « Balade » : le monde est maintenant la carte)
   stack.length = 0; $("#p-detail").hidden = true;
   tab = t; if (t === "assets") assetMort = false; if (t === "market") marketSell = false;
   for (const x of TABS) { const el = $("#p-" + x); const on = x === t; if (on && el.hidden) { el.hidden = false; el.classList.remove("enter"); void el.offsetWidth; el.classList.add("enter"); } else el.hidden = !on; }
   $$("#tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === t));
   setMapFull();
-  if (t === "map") { if (map) { map.resize(); pumpGeo(); if (paintAll.pending) setTimeout(paintAll, 0); renderTags(); } } else { hidePreview?.(); if (!moving && panelKind) { justBought = null; setMovebar(""); } }   // changer d'onglet ferme la case ouverte
+  if (t === "map") { if (map) { map.resize(); pumpGeo(); if (paintAll.pending) setTimeout(paintAll, 0); renderTags(); } startTick(); } else { hidePreview?.(); if (!moving && panelKind) { justBought = null; setMovebar(""); } }   // changer d'onglet ferme la case ouverte
   renderTab(t);
 }
 // carte plein écran : sur l'onglet Carte (sans page ouverte par-dessus), la carte passe sous les barres, qui flottent dessus
@@ -38,7 +38,7 @@ function push(kind, arg) { stack.push({ kind, arg }); renderDetail(true); }
 function back() {
   stack.pop(); if (stack.length) return renderDetail(true);
   $("#p-detail").hidden = true; sel = null; setMapFull(); renderTab(tab);
-  if (tab === "map" && map) { pumpGeo(); paintAll(); }   // retour sur la carte : elle reste là où on regardait (bug du 19/10/2026 : elle revenait sur la montgolfière)
+  if (tab === "map" && map) { pumpGeo(); paintAll(); startTick(); }   // retour sur la carte : elle reste là où on regardait (bug du 19/10/2026) ; les gens repartent
 }
 async function renderDetail(anim) {
   const top = stack[stack.length - 1]; if (!top) return; const el = $("#p-detail");
@@ -73,6 +73,7 @@ function renderWallet() {
   const pr = PARTIES[s.profile.party]; const av = $("#avatar");
   av.textContent = (s.profile.pseudo || "?")[0].toUpperCase(); av.style.background = pr ? pr.c : "#94A3B8";
   // la pastille du booster : combien il en reste, sinon (ordinateur) dans combien de temps le prochain gratuit
+  if (typeof renderDock === "function") renderDock();   // le bouton du milieu (km du jour, « Acheter »)
   const n = packsReady(), b = $("#packbadge"), m = Math.ceil(freeIn() / 60); b.hidden = false; b.textContent = n || (m >= 60 ? `${Math.floor(m / 60)} h` : `${m} min`); b.dataset.l = n > 1 ? " boosters" : n ? " booster" : "";
   const bp = $("#b-pack"); bp.classList.toggle("zero", !n); bp.setAttribute("aria-label", n ? `Ouvrir mes boosters (${n})` : "Boosters");
 }
@@ -527,14 +528,14 @@ async function adminPage() {
     <div class="box" style="margin-top:10px"><b>14 derniers jours</b>${bars}</div>
     ${R ? retentionHTML(R) : ""}
     <h2 class="h3">Activité</h2>
-    <div class="kpis k4">${K("Lancers de dé", N(d.rolls_today), `${N(d.rolls_7d)} sur 7 j`)}${K("Boosters ouverts", N(d.boosters_today), `${N(d.boosters_7d)} sur 7 j`)}${K("Achats", N(d.buys_today), `${N(d.buys_7d)} sur 7 j`)}${K("Ventes au Marché", N(d.sales_7d), "sur 7 j")}</div>
+    <div class="kpis k4">${K("Trajets à pied", N(d.rolls_today), `${N(d.rolls_7d)} sur 7 j`)}${K("Boosters ouverts", N(d.boosters_today), `${N(d.boosters_7d)} sur 7 j`)}${K("Achats", N(d.buys_today), `${N(d.buys_7d)} sur 7 j`)}${K("Ventes au Marché", N(d.sales_7d), "sur 7 j")}</div>
     <h2 class="h3">Économie</h2>
     <div class="kpis k4">${K("Argent en circulation", fmtE(d.cash_total))}${K("Crédits en cours", fmtE(d.loans_total))}${K("Logements possédés", N(d.lots_owned))}${K("Partis", `<span style="font-size:14px;line-height:1.35;display:block">${Object.entries(d.parties || {}).map(([k, n]) => `${esc(PARTIES[k]?.n || "Sans parti")} ${n}`).join(" · ") || "—"}</span>`)}</div>
     <h2 class="h3">Classement</h2>
     <div class="box adlist">${(d.top || []).map((x, i) => `<div><span>${i + 1}. ${esc(x.pseudo)}</span><b class="num">${fmtE(x.worth)}</b></div>`).join("") || "—"}</div>
     <h2 class="h3">Derniers inscrits</h2>
     <div class="box adlist">${(d.latest || []).map(x => `<div><span>${esc(x.pseudo)} <small class="muted">${x.lots} logt · vu ${ago2(x.seen_at)}</small></span><small class="muted">inscrit ${ago2(x.created_at)}</small></div>`).join("") || "—"}</div>
-    <p class="sub" style="font-size:12px;margin-top:12px">« Actif » = a lancé le dé, acheté ou ouvert un booster (compté depuis le 17/10/2026 pour les boosters).</p>
+    <p class="sub" style="font-size:12px;margin-top:12px">« Actif » = a marché (ou lancé le dé, avant le 20/10/2026), acheté ou ouvert un booster (compté depuis le 17/10/2026 pour les boosters).</p>
   </div>`;
 }
 // taux de retour : parmi les inscrits d'un jour, combien reviennent le lendemain, 7 jours après, 30 jours après
@@ -695,7 +696,7 @@ document.addEventListener("click", e => { const b = e.target.closest("[data-arrm
 
 // ---------------- BOUTIQUE, PROFIL ----------------
 // ---------------- MON ARGENT : historique ----------------
-const LK = { offer: ["🤝", "Offre de rachat"], rent: ["🏠", "Loyers"], rent_away: ["🌙", "Loyers pendant votre absence"], tax: ["🏛️", "Taxe des maires"], tax_in: ["👑", "Taxe de maire reçue"], salary: ["💼", "Salaire du tour"], toll_paid: ["💸", "Loyer de passage payé"], toll_in: ["💰", "Loyer de passage reçu"], buy: ["🔑", "Achat"], sale: ["🤝", "Vente"], chance: ["🃏", "Carte Chance"], booster: ["📦", "Booster"], rolls: ["🎲", "Lancers"], mortgage: ["🏦", "Hypothèque"], lift: ["🏦", "Hypothèque remboursée"], repay: ["🏦", "Crédit remboursé"], bonus: ["🏠", "Bonus"], credit: ["🏦", "Remboursement des crédits"], walk: ["🚶", "Marche"], metro: ["🚇", "Métro"] };
+const LK = { offer: ["🤝", "Offre de rachat"], rent: ["🏠", "Loyers"], rent_away: ["🌙", "Loyers pendant votre absence"], tax: ["🏛️", "Taxe des maires"], tax_in: ["👑", "Taxe de maire reçue"], salary: ["💼", "Salaire de la marche"], toll_paid: ["💸", "Loyer de passage payé"], toll_in: ["💰", "Loyer de passage reçu"], buy: ["🔑", "Achat"], sale: ["🤝", "Vente"], chance: ["🃏", "Carte Chance"], booster: ["📦", "Booster"], rolls: ["🎲", "Lancers"], mortgage: ["🏦", "Hypothèque"], lift: ["🏦", "Hypothèque remboursée"], repay: ["🏦", "Crédit remboursé"], bonus: ["🏠", "Bonus"], credit: ["🏦", "Remboursement des crédits"], walk: ["🚶", "Marche"], metro: ["🚇", "Métro"] };
 async function moneyPage() {
   let rows = []; try { rows = await rpc("my_ledger"); } catch (e) { }
   await ensureCards(rows.filter(r => r.card != null).map(r => r.card));
@@ -740,6 +741,7 @@ async function profilePage() {
     <h2 class="h2">Réglages</h2>
     <button class="btn block light" id="lifeb">${(() => { try { return localStorage.getItem("hm_life") === "0" ? "🚶 Passants et voitures masqués · afficher" : "🚶 Passants et voitures · masquer"; } catch (e) { return "🚶 Passants"; } })()}</button>
     <button class="btn block light" id="mute">${(() => { try { return localStorage.getItem("hm_sound") === "1" ? "🔊 Sons activés · couper" : "🔇 Sons coupés · activer"; } catch (e) { return "🔇 Sons"; } })()}</button>
+    <button class="btn block light" id="chatoff" style="margin-top:8px">${p.chat_off ? "💬 Messages des joueurs masqués · afficher" : "💬 Messages des joueurs · masquer"}</button>
     <button class="btn block light" id="nooffers" style="margin-top:8px">${p.no_offers ? "🚫 Offres de rachat refusées · les accepter" : "🤝 J'accepte de recevoir des offres de rachat · désactiver"}</button>
     <h2 class="h2">Compte</h2>
     <button class="btn block ghost" id="logout">Se déconnecter</button>
@@ -793,6 +795,7 @@ async function partyClick(e) {
   if (e.target.closest("#party-save")) { if (await act("set_party", { p_party: pickParty }, `Vous rejoignez : ${PARTIES[pickParty].n}`)) { renderWallet(); back(); } return; }
   if (e.target.closest("#logout")) return signOut();
   if (e.target.closest("#nooffers")) { await act("set_no_offers", { p_on: !ST.state.profile.no_offers }, ST.state.profile.no_offers ? "Vous recevez à nouveau les offres" : "Vous ne recevrez plus d'offres"); return renderDetail(false); }
+  if (e.target.closest("#chatoff")) { await setChatOff(!ST.state.profile.chat_off); return renderDetail(false); }
   if (e.target.closest("#lifeb")) { try { localStorage.setItem("hm_life", localStorage.getItem("hm_life") === "0" ? "1" : "0"); } catch (x) { } return renderDetail(false); }
   if (e.target.closest("#mute")) { try { localStorage.setItem("hm_sound", localStorage.getItem("hm_sound") === "1" ? "0" : "1"); } catch (x) { } return renderDetail(false); }
 }

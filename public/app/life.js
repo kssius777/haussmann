@@ -107,7 +107,7 @@ function lifeTarget() {   // combien d'habitants selon le zoom et la taille de l
   const z = map.getZoom(), area = innerWidth * innerHeight / (390 * 700), f = Math.min(1.6, area) * Math.min(1, (z - LIFE_Z + .6) / 1.2);
   return { car: Math.round(14 * f), bus: Math.round(1.5 * f), bike: Math.round(7 * f), ped: Math.round(30 * f), pigeons: Math.round(3 * f) };
 }
-function lifeStep(dt) {
+function lifeStep(dt, draw) {
   const L = lifeLines(), want = lifeTarget(), b = map.getBounds().toArray(), pad = .004;
   const inView = (x, y) => x > b[0][0] - pad && x < b[1][0] + pad && y > b[0][1] - pad && y < b[1][1] + pad;
   const count = {}; LIFE.agents = LIFE.agents.filter(a => {
@@ -133,19 +133,25 @@ function lifeStep(dt) {
     if (a.kind === "pigeons") { for (const p of a.flock) feats.push({ type: "Feature", properties: { i: "pigeon", r: p.a - 90, s: p.fly > 0 ? 1.25 : 1 }, geometry: { type: "Point", coordinates: [a.x + p.dx / M_LON, a.y + p.dy / M_LAT] } }); continue; }
     feats.push({ type: "Feature", properties: { i: a.icon, r: a.ang - 90, s: 1 }, geometry: { type: "Point", coordinates: [a.x, a.y] } });
   }
-  map.getSource("life")?.setData({ type: "FeatureCollection", features: feats });
+  if (draw) map.getSource("life")?.setData({ type: "FeatureCollection", features: feats });
   LIFE.cars3d = boxes;
 }
 
 
 // ---- volumes 3D (voitures, bus, bateaux) : petites boîtes extrudées ----
 const CAR_COLS = ["#E5484D", "#2563EB", "#F8FAFC", "#1F2937", "#F59E0B", "#10B981", "#94A3B8", "#F8FAFC", "#64748B", "#FACC15"];
-function box(out, x, y, ang, along, len, wid, base, h, col) {   // rectangle orienté (mètres) autour d'un point, extrudé de base à h
-  const r = ang * Math.PI / 180, fx = Math.sin(r), fy = Math.cos(r), sx = fy, sy = -fx, cx = x + fx * along / M_LON, cy = y + fy * along / M_LAT;
-  const P = (a, b) => [cx + (fx * a + sx * b) / M_LON, cy + (fy * a + sy * b) / M_LAT];
-  const l = len / 2, w = wid / 2;
-  out.push({ type: "Feature", properties: { c: col, b: base, h }, geometry: { type: "Polygon", coordinates: [[P(l, w), P(l, -w), P(-l, -w), P(-l, w), P(l, w)]] } });
+// (20/10/2026, mémoire des téléphones) : les boîtes sont dessinées par three.js (models.js, people3d.boxes), sans repasser par la carte
+// à chaque image ; boxFeature() seulement si three.js n'est pas là
+function box(out, x, y, ang, along, len, wid, base, h, col) {   // rectangle orienté (mètres) autour d'un point, de base à h
+  const r = ang * Math.PI / 180;
+  out.push({ x: x + Math.sin(r) * along / M_LON, y: y + Math.cos(r) * along / M_LAT, a: ang, l: len, w: wid, b: base, h, c: col });
 }
+function boxFeature(q) {
+  const r = q.a * Math.PI / 180, fx = Math.sin(r), fy = Math.cos(r), sx = fy, sy = -fx, l = q.l / 2, w = q.w / 2;
+  const P = (a, b) => [q.x + (fx * a + sx * b) / M_LON, q.y + (fy * a + sy * b) / M_LAT];
+  return { type: "Feature", properties: { c: q.c, b: q.b, h: q.h }, geometry: { type: "Polygon", coordinates: [[P(l, w), P(l, -w), P(-l, -w), P(-l, w), P(l, w)]] } };
+}
+function drawBoxes(list) { if (window.people3d?.boxes) people3d.boxes(list); else map.getSource("life3d")?.setData({ type: "FeatureCollection", features: list.map(boxFeature) }); }
 function vehicle(out, a) {
   const { x, y, ang } = a, k = 1.5;   // un peu plus gros que nature pour qu'on les voie
   if (a.kind === "bus") {
@@ -285,17 +291,18 @@ function lifeLoop(t) {
   const street = base && z >= LIFE_Z - .3, flow = base && z >= 12.4 && z < 15.4, boats = base && z >= 12.2;
   if (!street && LIFE.on) { LIFE.on = false; LIFE.agents = []; LIFE.cars3d = []; map.getSource("life")?.setData(EMPTY()); LIFE.bubble?.end(); }
   if (!flow && FLOW.dots.length) { FLOW.dots = []; map.getSource("flow")?.setData(EMPTY()); }
-  if (!base || !(street || flow || boats)) { if (LIFE.any) { LIFE.any = false; map.getSource("life3d")?.setData(EMPTY()); map.getSource("wakes")?.setData(EMPTY()); } return; }
+  if (!base || !(street || flow || boats)) { if (LIFE.any) { LIFE.any = false; drawBoxes([]); map.getSource("wakes")?.setData(EMPTY()); } return; }
   if (street && !LIFE.on) { LIFE.on = true; LIFE.nextTalk = t + 25000; }
   if (t - LIFE.last < 55) return;   // ~18 images par seconde suffisent
-  const dt = Math.min(.2, (t - LIFE.last) / 1000 || .05); LIFE.last = t; LIFE.any = true;
-  if (street) lifeStep(dt); else LIFE.cars3d = [];
+  const dt = Math.min(.2, (t - LIFE.last) / 1000 || .05); LIFE.last = t; LIFE.any = true; LIFE.tick++;
+  // les passants, le trafic en points et les sillages bougent lentement : la carte ne les relit qu'une image sur deux (ou trois)
+  if (street) lifeStep(dt, LIFE.tick % 2 === 0); else LIFE.cars3d = [];
   const box3d = (LIFE.cars3d || []).slice(), wakes = [];
   if (!BOATS.length) boatsInit();
   boatStep(dt, boats ? box3d : [], wakes);
-  map.getSource("life3d")?.setData({ type: "FeatureCollection", features: box3d });
-  map.getSource("wakes")?.setData({ type: "FeatureCollection", features: boats ? wakes : [] });
-  if (flow) { const f = []; flowStep(dt, f); map.getSource("flow")?.setData({ type: "FeatureCollection", features: f }); }
+  drawBoxes(box3d);
+  if (LIFE.tick % 3 === 0) map.getSource("wakes")?.setData({ type: "FeatureCollection", features: boats ? wakes : [] });
+  if (flow) { const f = []; flowStep(dt, f); if (LIFE.tick % 2 === 0) map.getSource("flow")?.setData({ type: "FeatureCollection", features: f }); }
   if (street && t > LIFE.nextTalk) { LIFE.nextTalk = t + rnd(40000, 70000); lifeTalk(); }
 }
 function lifeInit() {

@@ -219,52 +219,11 @@ window.addMonuments=function(map,models){
     const halo=new T.Mesh(new T.RingGeometry(Math.max(m.L,m.W)*.62,Math.max(m.L,m.W)*.7,48),new T.MeshBasicMaterial({color:COL.pink,transparent:true,opacity:.28,side:T.DoubleSide})); halo.rotation.x=-Math.PI/2; halo.position.y=.3; g.add(halo);
     let ang=m.ang; if(m.m!=="sacrecoeur"&&Math.cos(ang)<0) ang+=Math.PI; g.position.set((m.lon-lon0)*kx,0,-(m.lat-lat0)*ky); g.rotation.y=ang; scene.add(g); merge(g);
   }
-  // le joueur : une montgolfière (née à Paris en 1783) aux couleurs de son parti, qui survole les toits ;
-  // au sol, un anneau qui pulse marque l'immeuble où elle est posée
-  const pawn=new T.Group(); pawn.visible=false;
-  const bal=new T.Group(); pawn.add(bal);
-  const SM=c=>new T.MeshStandardMaterial({color:c,roughness:.55,metalness:0,flatShading:false,side:T.DoubleSide});
-  const colMat=SM(0x1C3FA8), whiteMat=SM(0xFFFFFF), goldMat=new T.MeshStandardMaterial({color:0xF2C14E,roughness:.4,metalness:.3});
-  const wickerMat=new T.MeshStandardMaterial({color:0x9A6A3C,roughness:.9,flatShading:true}), ropeMat=new T.LineBasicMaterial({color:0x5B4630});
-  // enveloppe en forme de goutte, en 12 fuseaux alternés couleur / blanc
-  const prof=[]; for(let i=0;i<=24;i++){ const t=i/24, a=-Math.PI/2+t*Math.PI; const r=t<.32? 4+ (14-4)*Math.sin(t/.32*Math.PI/2): 14*Math.cos((t-.32)/.68*Math.PI/2*.98)+.01; prof.push(new T.Vector2(Math.max(.01,r), (t<.32? t/.32*16 : 16+Math.sin((t-.32)/.68*Math.PI/2)*15))); }
-  const ENV_Y=46, N=12;
-  for(let i=0;i<N;i++){ const m=new T.Mesh(new T.LatheGeometry(prof,6,i*Math.PI*2/N,Math.PI*2/N),i%2?whiteMat:colMat); m.position.y=ENV_Y; bal.add(m); }
-  const band=new T.Mesh(new T.TorusGeometry(10.6,.55,8,40),goldMat); band.rotation.x=Math.PI/2; band.position.y=ENV_Y+6; bal.add(band);
-  const top=new T.Mesh(new T.SphereGeometry(2.2,12,8),goldMat); top.position.y=ENV_Y+31; bal.add(top);
-  // nacelle et cordes
-  const basket=new T.Mesh(new T.BoxGeometry(6,4.5,6),wickerMat); basket.position.y=ENV_Y-9.5; bal.add(basket);
-  const rim=new T.Mesh(new T.BoxGeometry(6.6,.8,6.6),new T.MeshStandardMaterial({color:0x6B4527,roughness:.9})); rim.position.y=ENV_Y-7.1; bal.add(rim);
-  for(const [x,z] of [[3,3],[3,-3],[-3,3],[-3,-3]]){ const g=new T.BufferGeometry().setFromPoints([new T.Vector3(x,ENV_Y-7,z),new T.Vector3(x*1.3,ENV_Y+.5,z*1.3)]); bal.add(new T.Line(g,ropeMat)); }
-  const flame=new T.Mesh(new T.ConeGeometry(1,3,8),new T.MeshBasicMaterial({color:0xFFB020,transparent:true,opacity:.9})); flame.position.y=ENV_Y-4.5; bal.add(flame);
-  // fil vertical discret jusqu'au sol + ombre + anneau
-  const tether=new T.Mesh(new T.CylinderGeometry(.18,.18,ENV_Y-12,6),new T.MeshBasicMaterial({color:0x0F1B2D,transparent:true,opacity:.25,depthWrite:false})); tether.position.y=(ENV_Y-12)/2; pawn.add(tether);
-  const ringMat=new T.MeshBasicMaterial({color:0x1C3FA8,transparent:true,opacity:.85,depthWrite:false,side:T.DoubleSide});
-  const ring=new T.Mesh(new T.RingGeometry(9,11.5,48),ringMat); ring.rotation.x=-Math.PI/2; ring.position.y=.8; pawn.add(ring);
-  const ring2=new T.Mesh(new T.RingGeometry(9,10.5,48),ringMat.clone()); ring2.rotation.x=-Math.PI/2; ring2.position.y=.9; pawn.add(ring2);
-  const disc=new T.Mesh(new T.CircleGeometry(9,40),new T.MeshBasicMaterial({color:0x0F1B2D,transparent:true,opacity:.2,depthWrite:false})); disc.rotation.x=-Math.PI/2; disc.position.y=.7; pawn.add(disc);
-  scene.add(pawn);
-  let lastPos=null, moveUntil=0, vx=0, vz=0;
-  window.pawn3d={
-    set(lng,lat){ const x=(lng-lon0)*kx, z=-(lat-lat0)*ky;
-      if(lastPos){ const dx=x-lastPos[0], dz=z-lastPos[1]; if(Math.hypot(dx,dz)>.05){ vx=dx; vz=dz; moveUntil=performance.now()+220; } }
-      lastPos=[x,z]; pawn.position.set(x,0,z); pawn.visible=true; map.triggerRepaint(); },
-    color(hex){ colMat.color.set(hex); ringMat.color.set(hex); ring2.material.color.set(hex); map.triggerRepaint(); },
-    hide(){ pawn.visible=false; map.triggerRepaint(); },
-    k(z){ return Math.max(1,Math.pow(2,(16.2-z)*.8))*(innerWidth<700?1.35:1); },   /* plus gros sur téléphone : on doit voir tout de suite que c'est nous */
-    H:80
-  };
-  const animPawn=()=>{ const tt=performance.now()/1000, mv=performance.now()<moveUntil;
-    bal.position.y=Math.sin(tt*1.6)*1.4; bal.rotation.y=tt*.25;
-    const L=Math.hypot(vx,vz)||1, tilt=mv?.12:0; bal.rotation.x=tilt*(vz/L); bal.rotation.z=-tilt*(vx/L);
-    flame.scale.y=.8+.4*Math.abs(Math.sin(tt*9)); flame.material.opacity=mv?.95:.6;
-    const pz=1+1.1*((tt*.7)%1); ring2.scale.set(pz,pz,1); ring2.material.opacity=.85*(1-((tt*.7)%1)); };
   let renderer=null;
   const layer={id:"monuments",type:"custom",renderingMode:"3d",
-    onAdd(map,gl){ renderer=new T.WebGLRenderer({canvas:map.getCanvas(),context:gl,antialias:true}); renderer.autoClear=false; },
+    onAdd(map,gl){ renderer=sharedRenderer(map,gl); },
     render(gl,matrix){
       if(map.getZoom()<12.4) return;
-      if(pawn.visible){ const z=map.getZoom(); const k=window.pawn3d.k(z); pawn.scale.setScalar(k); animPawn(); if(performance.now()<moveUntil+1200) map.triggerRepaint(); }   /* on ne redessine en boucle que pendant le vol (sinon le téléphone rame) */
       const rot=new T.Matrix4().makeRotationAxis(new T.Vector3(1,0,0),Math.PI/2);
       const l=new T.Matrix4().makeTranslation(origin.x,origin.y,origin.z).scale(new T.Vector3(s,-s,s)).multiply(rot);
       camera.projectionMatrix=new T.Matrix4().fromArray(matrix).multiply(l);
@@ -273,5 +232,166 @@ window.addMonuments=function(map,models){
       if(spinners.length&&map.getZoom()>15.5){ const c=map.getCenter(); if(Math.abs(c.lng-2.3323)<.01&&Math.abs(c.lat-48.8841)<.007) map.triggerRepaint(); }
     }};
   map.addLayer(layer,"anchor-top");
+};
+// un seul moteur three.js pour les deux calques (maquettes, personnages) : moins de mémoire sur téléphone
+let R0=null;
+function sharedRenderer(map,gl){ if(!R0){ R0=new T.WebGLRenderer({canvas:map.getCanvas(),context:gl,antialias:true}); R0.autoClear=false; } return R0; }
+
+// =====================================================================
+//  Les personnages en 3D (20/10/2026, demande du propriétaire : « le perso est un peu trop 2D, ça fait South Park »).
+//  Un petit bonhomme (tête, cheveux, haut, pantalon ou jupe, bras et jambes qui bougent quand il marche) aux couleurs de
+//  « Mon personnage » (place.js donne les couleurs). Dessiné par-dessus les immeubles, comme une épingle de carte, et grossi
+//  quand on dézoome pour rester visible ; l'anneau de portée (ce qu'on peut acheter d'ici) est au sol, caché par les immeubles.
+//  Repère : mètres, x = est, y = haut, z = sud ; le personnage regarde vers +z.
+// =====================================================================
+const mat4=(x,y,z,rx,ry,rz,sx,sy,sz)=>new T.Matrix4().compose(new T.Vector3(x||0,y||0,z||0),new T.Quaternion().setFromEuler(new T.Euler(rx||0,ry||0,rz||0)),new T.Vector3(sx||1,sy||1,sz||1));
+function piece(geo,color,m){
+  const g=geo.index?geo.toNonIndexed():geo; if(g!==geo) geo.dispose(); if(m) g.applyMatrix4(m);
+  const n=g.attributes.position.count, c=new T.Color(color), a=new Float32Array(n*3);
+  for(let i=0;i<n;i++){ a[3*i]=c.r; a[3*i+1]=c.g; a[3*i+2]=c.b; }
+  g.setAttribute("color",new T.BufferAttribute(a,3)); return g;
+}
+function bake(list){
+  let n=0; for(const q of list) n+=q.attributes.position.count;
+  const P=new Float32Array(n*3), N=new Float32Array(n*3), C=new Float32Array(n*3); let o=0;
+  for(const q of list){ P.set(q.attributes.position.array,o*3); N.set(q.attributes.normal.array,o*3); C.set(q.attributes.color.array,o*3); o+=q.attributes.position.count; q.dispose(); }
+  const g=new T.BufferGeometry(); g.setAttribute("position",new T.BufferAttribute(P,3)); g.setAttribute("normal",new T.BufferAttribute(N,3)); g.setAttribute("color",new T.BufferAttribute(C,3));
+  g.computeBoundingSphere(); return g;
+}
+const HIP=.92, LEG=.92, HY=1.77, HR=.205;   // hanches, jambes (jusqu'au sol), centre et rayon de la tête
+// s : { g (1 = femme), skin, hair, cut (0 court, 1 long, 2 chignon, 3 bouclé, 4 carré, 5 rasé), top, bot, acc (0 rien, 1 lunettes, 2 lunettes de soleil, 3 béret, 4 casquette) }
+function charGeos(s){
+  const f=s.g===1, tw=f?.165:.2, tb=f?.14:.168, body=[];
+  // une jambe (pivot à la hanche) : pantalon, ou jambe nue sous la jupe ; baskets blanches
+  const r=f?.058:.078, leg=bake([
+    piece(new T.CylinderGeometry(r,r*.88,LEG-.06,8),f?s.skin:s.bot,mat4(0,-(LEG-.06)/2,0)),
+    piece(new T.BoxGeometry(.13,.08,.27),"#F7F7F4",mat4(0,-LEG+.065,.045)),
+    piece(new T.BoxGeometry(.135,.026,.28),"#BFC5CF",mat4(0,-LEG+.013,.045))]);
+  // un bras (pivot à l'épaule) : manche du haut, avant-bras et main
+  const arm=bake([
+    piece(new T.SphereGeometry(.066,8,6),s.top,mat4(0,0,0)),
+    piece(new T.CylinderGeometry(.064,.058,.3,8),s.top,mat4(0,-.13,0)),
+    piece(new T.CylinderGeometry(.05,.046,.27,8),s.skin,mat4(0,-.4,0)),
+    piece(new T.SphereGeometry(.058,8,6),s.skin,mat4(0,-.56,0))]);
+  // jupe, ou bassin du pantalon
+  if(f){ body.push(piece(new T.CylinderGeometry(.155,.285,.44,14,1,true),s.bot,mat4(0,.73,0)));
+         body.push(piece(new T.CircleGeometry(.285,14),s.bot,mat4(0,.51,0,Math.PI/2,0,0))); }
+  else body.push(piece(new T.CylinderGeometry(.17,.165,.2,12),s.bot,mat4(0,HIP,0)));
+  body.push(piece(new T.CylinderGeometry(tw,tb,.52,12),s.top,mat4(0,1.2,0)));                                 // buste
+  body.push(piece(new T.SphereGeometry(tw,12,6,0,Math.PI*2,0,Math.PI/2),s.top,mat4(0,1.455,0,0,0,0,1,.42,1)));   // épaules
+  body.push(piece(new T.CylinderGeometry(.058,.062,.12,8),s.skin,mat4(0,1.53,0)));                             // cou
+  body.push(piece(new T.SphereGeometry(HR,14,10),s.skin,mat4(0,HY,0)));                                        // tête
+  for(const x of [-.062,.062]) body.push(piece(new T.SphereGeometry(.024,6,5),"#1F2430",mat4(x,HY+.015,HR*.9)));   // yeux
+  body.push(piece(new T.SphereGeometry(.026,6,5),s.skin,mat4(0,HY-.025,HR*.97)));                              // nez
+  // cheveux : une calotte inclinée vers l'arrière (front dégagé), plus selon la coupe
+  const H=s.hair, cap=(rr,th,tilt)=>piece(new T.SphereGeometry(rr,14,8,0,Math.PI*2,0,th),H,mat4(0,HY,0,tilt,0,0));
+  if(s.cut===5) body.push(cap(HR+.006,Math.PI*.46,-.25));
+  else body.push(cap(HR+.014,Math.PI*.55,-.38));
+  if(s.cut===1) body.push(piece(new T.CylinderGeometry(HR+.02,HR+.055,.4,14,1,true,Math.PI*.3,Math.PI*1.4),H,mat4(0,HY-.13,-.012)));   // longs
+  if(s.cut===2) body.push(piece(new T.SphereGeometry(HR*.5,10,8),H,mat4(0,HY+HR*.72,-HR*.72)));                                              // chignon
+  if(s.cut===3) for(const [x,y,z] of [[0,.17,-.03],[.08,.14,.03],[-.08,.14,.03],[.13,.07,-.07],[-.13,.07,-.07],[.09,.06,-.15],[-.09,.06,-.15],[0,.09,-.17],[.15,-.01,-.03],[-.15,-.01,-.03]])
+    body.push(piece(new T.SphereGeometry(HR*.42,8,6),H,mat4(x*HR/.17,HY+y*HR/.17,z*HR/.17)));                                          // bouclés
+  if(s.cut===4) body.push(piece(new T.CylinderGeometry(HR+.03,HR+.04,.22,14,1,true,Math.PI*.24,Math.PI*1.52),H,mat4(0,HY-.06,-.01)));  // carré
+  // accessoires
+  const ink="#1F2430";
+  if(s.acc===1){ for(const x of [-.062,.062]) body.push(piece(new T.TorusGeometry(.037,.009,6,14),ink,mat4(x,HY+.015,HR*.93+.012))); body.push(piece(new T.BoxGeometry(.05,.01,.01),ink,mat4(0,HY+.02,HR+.01))); }
+  if(s.acc===2){ for(const x of [-.06,.06]) body.push(piece(new T.BoxGeometry(.088,.05,.02),"#111827",mat4(x,HY+.015,HR*.93+.012))); body.push(piece(new T.BoxGeometry(.05,.012,.012),"#111827",mat4(0,HY+.025,HR+.01))); }
+  if(s.acc===3){ body.push(piece(new T.CylinderGeometry(HR+.035,HR+.045,.075,16),"#1F2937",mat4(-.015,HY+HR*.95,-.01,0,0,.16))); body.push(piece(new T.CylinderGeometry(.012,.012,.04,6),"#1F2937",mat4(-.05,HY+HR*.95+.06,0))); }
+  if(s.acc===4){ body.push(piece(new T.SphereGeometry(HR+.022,14,7,0,Math.PI*2,0,Math.PI*.5),s.top,mat4(0,HY+.01,0,-.12,0,0))); body.push(piece(new T.BoxGeometry(.22,.022,.17),s.top,mat4(0,HY+.055,HR+.06,-.14,0,0))); }
+  return { body:bake(body), leg, arm, sw:f?.08:.092, sh:tw+.05 };
+}
+window.MON.charGeos=charGeos;   // pour les tests (aperçu des personnages)
+window.addPeople=function(map){
+  const lon0=2.3488, lat0=48.8534, origin=maplibregl.MercatorCoordinate.fromLngLat([lon0,lat0],0), s=origin.meterInMercatorCoordinateUnits();
+  const kx=111320*Math.cos(lat0*Math.PI/180), ky=110574;
+  const scene=new T.Scene(), ringScene=new T.Scene(), camera=new T.Camera();   // ringScene : ce qui est au sol, caché par les immeubles (l'anneau, les voitures)
+  scene.add(new T.HemisphereLight(0xffffff,0xcfc2a8,.78)); const sun=new T.DirectionalLight(0xffffff,.42); sun.position.set(-.5,1,.65); scene.add(sun);
+  const MAT=new T.MeshLambertMaterial({vertexColors:true,side:T.DoubleSide});
+  const SHG=new T.CircleGeometry(.36,20); SHG.rotateX(-Math.PI/2);
+  const SH=new T.MeshBasicMaterial({color:0x0F172A,transparent:true,opacity:.2,depthWrite:false}), SHME=new T.MeshBasicMaterial({color:0x2563EB,transparent:true,opacity:.35,depthWrite:false});
+  // l'anneau de portée, au sol (caché derrière les immeubles)
+  const ringG=new T.Group(); ringG.visible=false; ringScene.add(ringG);
+  { const rg=new T.RingGeometry(.975,1,96); rg.rotateX(-Math.PI/2); const fg=new T.CircleGeometry(1,96); fg.rotateX(-Math.PI/2);
+    ringG.add(new T.Mesh(fg,new T.MeshBasicMaterial({color:0x2563EB,transparent:true,opacity:.07,depthWrite:false,side:T.DoubleSide})));
+    ringG.add(new T.Mesh(rg,new T.MeshBasicMaterial({color:0x2563EB,transparent:true,opacity:.55,depthWrite:false,side:T.DoubleSide}))); ringG.position.y=.6; }
+  // les voitures, bus et bateaux de life.js : une boîte par morceau, toutes dans un seul maillage (plus de GeoJSON à chaque image)
+  ringScene.add(new T.HemisphereLight(0xffffff,0xcfc2a8,.8)); { const s2=new T.DirectionalLight(0xffffff,.45); s2.position.set(-.5,1,.65); ringScene.add(s2); }
+  const BOXG=new T.BoxGeometry(1,1,1), BOXM=new T.MeshLambertMaterial({color:0xffffff}), bm=new T.Matrix4(), bq=new T.Quaternion(), bv=new T.Vector3(), bs=new T.Vector3(), bc=new T.Color(), up=new T.Vector3(0,1,0);
+  let boxIM=null, boxCap=0, ringWant=false;
+  const P=new Map(), cache=new Map();
+  const geos=sp=>{ const key=JSON.stringify(sp); let c=cache.get(key); if(!c){ c=Object.assign(charGeos(sp),{key,n:0}); cache.set(key,c); } c.n++; return c; };
+  const drop=c=>{ if(--c.n>0) return; cache.delete(c.key); c.body.dispose(); c.leg.dispose(); c.arm.dispose(); };
+  function dress(p,sp){
+    if(p.c) { p.inner.remove(p.body,p.legL,p.legR,p.armL,p.armR); drop(p.c); }
+    const c=p.c=geos(sp);
+    p.body=new T.Mesh(c.body,MAT); p.legL=new T.Mesh(c.leg,MAT); p.legR=new T.Mesh(c.leg,MAT); p.armL=new T.Mesh(c.arm,MAT); p.armR=new T.Mesh(c.arm,MAT);
+    p.legL.position.set(-c.sw,HIP,0); p.legR.position.set(c.sw,HIP,0);
+    p.armL.position.set(-c.sh,1.43,0); p.armR.position.set(c.sh,1.43,0); p.armL.rotation.z=-.09; p.armR.rotation.z=.09;
+    p.inner.add(p.body,p.legL,p.legR,p.armL,p.armR); map.triggerRepaint();
+  }
+  let mvp=null, kNow=16, CW=0, CH=0, tPrev=performance.now();
+  const api={
+    k(z){ return Math.min(60,Math.max(3.5,(innerWidth<700?17:19)*Math.pow(2,(16.5-z)*.8))); },
+    add(id,sp,me){
+      if(P.has(id)) return api.look(id,sp);
+      const g=new T.Group(), inner=new T.Group(); g.add(inner); g.visible=false;
+      const sh=new T.Mesh(SHG,me?SHME:SH); sh.position.y=.02; g.add(sh);
+      const p={g,inner,c:null,head:0,walk:false,vis:false,ph:0,a:0,x:0,z:0}; dress(p,sp); scene.add(g); P.set(id,p);
+    },
+    look(id,sp){ const p=P.get(id); if(p) dress(p,sp); },
+    remove(id){ const p=P.get(id); if(!p) return; scene.remove(p.g); drop(p.c); P.delete(id); map.triggerRepaint(); },
+    pose(id,lon,lat,head,walk,vis){ const p=P.get(id); if(!p) return; p.x=(lon-lon0)*kx; p.z=-(lat-lat0)*ky; p.g.position.set(p.x,0,p.z); p.head=head||0; p.walk=!!walk; p.vis=!!vis; map.triggerRepaint(); },
+    // où est le personnage à l'écran (haut de la tête, pieds), d'après la dernière image dessinée — pour les noms et les bulles
+    screen(id){ const p=P.get(id); if(!p||!mvp||!p.g.visible) return null;
+      const h=new T.Vector4(p.x,2.02*kNow,p.z,1).applyMatrix4(mvp), f=new T.Vector4(p.x,0,p.z,1).applyMatrix4(mvp); if(h.w<=0||f.w<=0) return null;
+      return { hx:(h.x/h.w+1)/2*CW, hy:(1-h.y/h.w)/2*CH, fx:(f.x/f.w+1)/2*CW, fy:(1-f.y/f.w)/2*CH }; },
+    ring(lon,lat,r,on){ ringWant=!!on; if(on){ ringG.position.set((lon-lon0)*kx,.6,-(lat-lat0)*ky); ringG.scale.set(r,1,r); } map.triggerRepaint(); },
+    // q : {x, y (lon, lat du centre), a (cap en degrés), l (longueur), w (largeur), b (bas), h (haut), c (couleur)}
+    boxes(list){
+      const n=list.length;
+      if(n>boxCap){ if(boxIM){ ringScene.remove(boxIM); boxIM.dispose(); } boxCap=Math.max(96,n*2); boxIM=new T.InstancedMesh(BOXG,BOXM,boxCap);
+        boxIM.instanceMatrix.setUsage(T.DynamicDrawUsage); boxIM.frustumCulled=false; boxIM.setColorAt(0,bc.set(0xffffff)); ringScene.add(boxIM); }
+      if(!boxIM) return;
+      for(let i=0;i<n;i++){ const q=list[i];
+        bq.setFromAxisAngle(up,Math.PI-q.a*Math.PI/180); bv.set((q.x-lon0)*kx,(q.b+q.h)/2,-(q.y-lat0)*ky); bs.set(q.w,Math.max(.05,q.h-q.b),q.l);
+        boxIM.setMatrixAt(i,bm.compose(bv,bq,bs)); boxIM.setColorAt(i,bc.set(q.c)); }
+      boxIM.count=n; boxIM.instanceMatrix.needsUpdate=true; if(boxIM.instanceColor) boxIM.instanceColor.needsUpdate=true; map.triggerRepaint();
+    },
+    count(){ return P.size; }
+  };
+  window.people3d=api;
+  let renderer=null;
+  map.addLayer({id:"people",type:"custom",renderingMode:"3d",
+    onAdd(m,gl){ renderer=sharedRenderer(m,gl); },
+    render(gl,matrix){
+      const z=map.getZoom(), now=performance.now(), dt=Math.min(.1,(now-tPrev)/1000); tPrev=now;
+      ringG.visible=ringWant&&z>=14.2;
+      const people=z>=13.6, ground=ringG.visible||(boxIM&&boxIM.count>0);
+      if(!people&&!ground){ mvp=null; return; }
+      const rot=new T.Matrix4().makeRotationAxis(new T.Vector3(1,0,0),Math.PI/2);
+      const l=new T.Matrix4().makeTranslation(origin.x,origin.y,origin.z).scale(new T.Vector3(s,-s,s)).multiply(rot);
+      const m=new T.Matrix4().fromArray(matrix).multiply(l); camera.projectionMatrix=m;
+      if(!people){ mvp=null; renderer.resetState(); renderer.render(ringScene,camera); return; }
+      mvp=m; kNow=api.k(z);
+      const cv=map.getCanvas(); CW=cv.clientWidth; CH=cv.clientHeight;
+      const face=-map.getBearing()*Math.PI/180; let busy=false;
+      for(const p of P.values()){
+        p.g.visible=p.vis; if(!p.vis) continue;
+        p.g.scale.setScalar(kNow);
+        // en marchant : dans le sens du trajet ; à l'arrêt : il se tourne vers nous
+        const want=p.walk?Math.PI-p.head:face; let d=want-p.g.rotation.y; d=Math.atan2(Math.sin(d),Math.cos(d));
+        if(Math.abs(d)>.01){ p.g.rotation.y+=d*Math.min(1,dt*(p.walk?14:5)); busy=true; } else p.g.rotation.y=want;
+        const at=p.walk?1:0; if(Math.abs(p.a-at)>.01){ p.a+=(at-p.a)*Math.min(1,dt*8); busy=true; } else p.a=at;
+        if(p.a>0) p.ph+=dt*11;
+        const sw=Math.sin(p.ph)*.62*p.a;
+        p.legL.rotation.x=sw; p.legR.rotation.x=-sw; p.armL.rotation.x=-sw*.8; p.armR.rotation.x=sw*.8;
+        p.inner.position.y=Math.abs(Math.cos(p.ph))*.035*p.a;
+      }
+      renderer.resetState();
+      if(ground) renderer.render(ringScene,camera);
+      renderer.state.buffers.depth.setMask(true); renderer.clearDepth();   // les personnages par-dessus les immeubles
+      renderer.render(scene,camera);
+      if(busy) map.triggerRepaint();
+    }});
 };
 })();

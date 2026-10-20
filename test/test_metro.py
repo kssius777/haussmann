@@ -71,10 +71,8 @@ for i in range(400):
 check("booster : une case Commune peut donner une part de station", got and got["card"] in SP and SP[got["card"]][1] == "m" and got["n"] == 1, got)
 lp = db.sql("select count(*) from cards where lk='p' and r='L'")[0][0]
 check("booster : les jardins et places Légendaires sont dans le tirage", lp >= 20, lp)
-# le dé : depuis une station, on repart
-db.sql("update profiles set land=%s, rolls=5, pend=null, pend_die=null where id=%s", s1, str(P))
-ro = db.rpc(P, "roll")
-check("depuis une station, le dé propose des destinations", ro and len(ro.get("options", [])) >= 1, ro and len(ro.get("options", [])))
+# une station est reliée à ses immeubles voisins (le plan des rues du jeu)
+check("chaque station est reliée à des immeubles voisins", db.sql("select count(*) from edges where a=%s", s1)[0][0] >= 3)
 # droits
 priv = db.sql("select has_function_privilege('authenticated', '_network(uuid)', 'execute'), has_function_privilege('authenticated', '_draw(uuid,char)', 'execute'), has_function_privilege('anon', '_rates(uuid)', 'execute')")[0]
 check("fonctions internes interdites aux joueurs", priv == (False, False, False), priv)

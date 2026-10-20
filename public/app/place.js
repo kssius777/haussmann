@@ -1,8 +1,14 @@
 "use strict";
 // =====================================================================
-//  Le personnage (pseudo au-dessus, bulles quand on parle) et le monde ouvert où il se promène (essai dans le 7e, plus bas).
-//  Le chat du Champ-de-Mars (20/10/2026) est devenu ce monde : mêmes bulles, mêmes salles, même temps réel.
-//  Entrée : tuile « Balade » en bas à gauche sur téléphone (miroir des boosters), 5e onglet sur ordinateur.
+//  Paris à pied : le jeu (20/10/2026, demande du propriétaire : « à partir de maintenant, ça devient l'endroit principal,
+//  implémente tout Paris ; la zone chat n'existe plus ; et le dé n'existe plus non plus »).
+//  · On touche une rue : son personnage y marche par les vraies rues (plan public/data/walk.json, fait par scripts/make_walk.py ;
+//    trajet calculé ici, compté par le serveur). 5 km offerts par jour, 20 000 € de salaire par km offert, ensuite on paie au km.
+//  · Un immeuble à portée (120 m ; 300 m pour un monument, un jardin, une place) : on l'achète, même en marchant. Le bouton du
+//    milieu devient « Acheter » et ouvre le plus proche à vendre. Trop loin : la case le dit, avec « Y aller ».
+//  · Devant les immeubles des autres, on leur paie un petit péage ; des « ? » à ramasser (cartes Chance) ; le métro sur toutes
+//    les lignes ; les gens autour (par carrés d'environ 1 km) et leurs bulles (on peut couper le chat dans le profil).
+//  Serveur : migration_monde_paris.sql. Les personnages en 3D : models.js (people3d).
 // =====================================================================
 
 // ---- le personnage ------------------------------------------------------------
@@ -85,23 +91,22 @@ function lookPick(btn, root) {
   const p = ST.state?.profile; if (!p) return;
   const [k, v] = btn.dataset.look.split(":"); const L = Object.assign({}, lookOf(ME, p.look), { [k]: +v });
   p.look = L; root.innerHTML = lookEditorHTML(L, p.party);
-  const me = PL.people.get(PL.me); if (me) { me.look = L; drawPerson(me); renderPlaceHead(); }
+  const me = meP(); if (me) { me.look = L; window.people3d?.look(me.id, spec3d(me)); renderDock(); }
   const pv = $("#p-detail .lkwrap"); if (pv && pv !== root) pv.innerHTML = lookEditorHTML(L, p.party);
   clearTimeout(lookSaveT); lookSaveT = setTimeout(() => rpc("set_look", { p_look: L }).catch(e => toast(e.message, "bad")), 500);
 }
 document.addEventListener("click", e => { const b = e.target.closest("[data-look]"); if (b) { const root = b.closest(".lkwrap"); if (root) lookPick(b, root); } });
 
-// =====================================================================
-//  Le monde ouvert, essai dans le 7e (20/10/2026, demande du propriétaire : « on peut se déplacer dans la map en cliquant…
-//  on cible le 7e, mets ça au niveau de l'onglet chat ») : il remplace le chat du Champ-de-Mars (mêmes bulles, mêmes salles).
-//  On touche une rue : le personnage y va par les rues (plan public/data/walk7.json, trajet calculé ici) ; quelques km offerts
-//  par jour, ensuite on paie au km. On touche un immeuble : sa case, « Y aller » ; arrivé devant, on peut l'acheter.
-//  Une station : on y va, puis « Prendre le métro » vers les autres stations de la zone. Serveur : migration_monde.sql.
-// =====================================================================
+// les couleurs du personnage en 3D (models.js)
+function spec3d(p) {
+  const L = lookOf(p.id, p.look);
+  return { g: L.g, skin: LOOK.skin[L.s] || LOOK.skin[0], hair: LOOK.hair[L.h] || LOOK.hair[0], cut: L.c, top: topColor(L, p.party), bot: LOOK.bot[L.b] || LOOK.bot[0], acc: L.a };
+}
+
+// ---- les distances ------------------------------------------------------------
 const KXP = 111320 * Math.cos(48.856 * Math.PI / 180), KYP = 110574;   // mètres par degré
-// le Champ-de-Mars : on y marche aussi sur la pelouse, en ligne droite (comme l'ancien chat)
-const LAWN = [[2.29193, 48.85769], [2.29199, 48.85778], [2.29554, 48.85983], [2.2969, 48.85904], [2.3035, 48.85413], [2.30247, 48.85023], [2.30138, 48.85096]];
-const worldCam = () => ({ zoom: innerWidth < 900 ? 16.5 : 16.9, pitch: 55, bearing: -28 });
+const mLL = (a, b) => Math.hypot((b[0] - a[0]) * KXP, (b[1] - a[1]) * KYP);
+const pathLen = pts => { const c = [0]; for (let i = 1; i < pts.length; i++) c.push(c[i - 1] + mLL(pts[i - 1], pts[i])); return c; };
 function inPolyLL(poly, x, y) {
   let ins = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     const [xi, yi] = poly[i], [xj, yj] = poly[j];
@@ -109,41 +114,59 @@ function inPolyLL(poly, x, y) {
   }
   return ins;
 }
-const onLawn = (lon, lat) => inPolyLL(LAWN, lon, lat);
+// les parcs et jardins (base.json) : on y marche tout droit, sur les pelouses et les allées
+let PARKS_P = null;
+function parkAt(lon, lat) {
+  if (!PARKS_P) PARKS_P = (BASE?.parks || []).map(rs => {
+    const r = decodeRing(rs[0]); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, a = 0;
+    r.forEach(([x, y], i) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); const q = r[(i + 1) % r.length]; a += (x * q[1] - q[0] * y); });
+    return { r, b: [x0, y0, x1, y1], a: Math.abs(a / 2) * KXP * KYP };
+  }).filter(p => p.a > 6000);
+  for (let i = 0; i < PARKS_P.length; i++) { const p = PARKS_P[i]; if (lon >= p.b[0] && lon <= p.b[2] && lat >= p.b[1] && lat <= p.b[3] && inPolyLL(p.r, lon, lat)) return i; }
+  return -1;
+}
 
-// ---- le plan pour marcher ---------------------------------------------------------
+// ---- le plan pour marcher (tout Paris) --------------------------------------------
+// tableaux compacts (peu de mémoire sur téléphone) : voisins de chaque point, grille de 60 m pour trouver la rue la plus proche
 const WD = { g: null, p: null };
 function loadWorld() {
   if (WD.g) return Promise.resolve(WD.g);
   return WD.p || (WD.p = (async () => {
-    const d = await getJSON(DATA + "walk7.json?v=" + DATA_V);
+    const d = await getJSON(DATA + "walk.json?v=" + DATA_V);
     const pts = decodeRing(d.n), N = pts.length, X = new Float64Array(N), Y = new Float64Array(N);
-    pts.forEach((p, i) => { X[i] = p[0] * KXP; Y[i] = p[1] * KYP; });
-    const adj = Array.from({ length: N }, () => []), C = 60, grid = new Map();
-    for (let k = 0; k < d.e.length; k += 2) {
-      const a = d.e[k], b = d.e[k + 1], w = Math.hypot(X[a] - X[b], Y[a] - Y[b]);
-      adj[a].push(b, w); adj[b].push(a, w);
-      const i0 = Math.floor(Math.min(X[a], X[b]) / C), i1 = Math.floor(Math.max(X[a], X[b]) / C), j0 = Math.floor(Math.min(Y[a], Y[b]) / C), j1 = Math.floor(Math.max(Y[a], Y[b]) / C);
-      for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const key = i * 100000 + j; let l = grid.get(key); if (!l) grid.set(key, l = []); l.push(a, b); }
-    }
-    // le métro : chaque station, ses lignes, ses voisines (pour le trajet dessiné)
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (let i = 0; i < N; i++) { const x = X[i] = pts[i][0] * KXP, y = Y[i] = pts[i][1] * KYP; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    const EA = Int32Array.from(d.e), E = EA.length >> 1;
+    const off = new Int32Array(N + 1); for (let k = 0; k < EA.length; k++) off[EA[k] + 1]++;
+    for (let i = 0; i < N; i++) off[i + 1] += off[i];
+    const nb = new Int32Array(2 * E), wt = new Float32Array(2 * E), fill = off.slice(0, N);
+    for (let e = 0; e < E; e++) { const a = EA[2 * e], b = EA[2 * e + 1], w = Math.hypot(X[a] - X[b], Y[a] - Y[b]); nb[fill[a]] = b; wt[fill[a]++] = w; nb[fill[b]] = a; wt[fill[b]++] = w; }
+    const C = 60, GW = Math.floor((x1 - x0) / C) + 1, GH = Math.floor((y1 - y0) / C) + 1, gc = new Int32Array(GW * GH + 1);
+    const cells = (e, f) => { const a = EA[2 * e], b = EA[2 * e + 1];
+      const i0 = Math.floor((Math.min(X[a], X[b]) - x0) / C), i1 = Math.floor((Math.max(X[a], X[b]) - x0) / C), j0 = Math.floor((Math.min(Y[a], Y[b]) - y0) / C), j1 = Math.floor((Math.max(Y[a], Y[b]) - y0) / C);
+      for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) f(j * GW + i); };
+    for (let e = 0; e < E; e++) cells(e, c => gc[c + 1]++);
+    for (let c = 0; c < GW * GH; c++) gc[c + 1] += gc[c];
+    const gs = new Int32Array(gc[GW * GH]), gf = gc.slice(0, GW * GH);
+    for (let e = 0; e < E; e++) cells(e, c => { gs[gf[c]++] = e; });
+    // le métro : chaque station, ses lignes, ses voisines (branche par branche)
     const st = new Map();
-    for (const [line, seq] of Object.entries(d.metro || {})) seq.forEach((g, i) => {
-      if (!st.has(g)) st.set(g, { lines: [], nb: [] });
-      const o = st.get(g); o.lines.push(line); if (i > 0) o.nb.push([seq[i - 1], line]); if (i < seq.length - 1) o.nb.push([seq[i + 1], line]);
+    for (const [line, branches] of Object.entries(d.metro || {})) for (const seq of branches) seq.forEach((g, i) => {
+      let o = st.get(g); if (!o) st.set(g, o = { lines: new Set(), nb: [] });
+      o.lines.add(line); if (i > 0) o.nb.push(seq[i - 1]); if (i < seq.length - 1) o.nb.push(seq[i + 1]);
     });
-    return (WD.g = { pts, X, Y, adj, grid, C, zone: d.zone, bounds: d.bounds, metro: d.metro || {}, st });
-  })());
+    return (WD.g = { N, X, Y, EA, off, nb, wt, C, x0, y0, GW, GH, gc, gs, zone: d.zone, metro: d.metro || {}, st });
+  })().catch(e => { WD.p = null; throw e; }));
 }
 // le point de rue le plus proche (projeté sur le tronçon), à moins de maxM mètres
 function snapW(G, lon, lat, maxM = 320) {
-  const x = lon * KXP, y = lat * KYP, ci = Math.floor(x / G.C), cj = Math.floor(y / G.C); let best = null;
-  for (let r = 0; r <= Math.ceil(maxM / G.C) + 1; r++) {
+  const x = lon * KXP, y = lat * KYP, ci = Math.floor((x - G.x0) / G.C), cj = Math.floor((y - G.y0) / G.C), R = Math.ceil(maxM / G.C) + 1; let best = null;
+  for (let r = 0; r <= R; r++) {
     for (let i = ci - r; i <= ci + r; i++) for (let j = cj - r; j <= cj + r; j++) {
-      if (Math.max(Math.abs(i - ci), Math.abs(j - cj)) !== r) continue;
-      const l = G.grid.get(i * 100000 + j); if (!l) continue;
-      for (let k = 0; k < l.length; k += 2) {
-        const a = l[k], b = l[k + 1], dx = G.X[b] - G.X[a], dy = G.Y[b] - G.Y[a], L2 = dx * dx + dy * dy;
+      if (Math.max(Math.abs(i - ci), Math.abs(j - cj)) !== r || i < 0 || j < 0 || i >= G.GW || j >= G.GH) continue;
+      const c = j * G.GW + i;
+      for (let k = G.gc[c]; k < G.gc[c + 1]; k++) {
+        const e = G.gs[k], a = G.EA[2 * e], b = G.EA[2 * e + 1], dx = G.X[b] - G.X[a], dy = G.Y[b] - G.Y[a], L2 = dx * dx + dy * dy;
         const t = L2 ? Math.max(0, Math.min(1, ((x - G.X[a]) * dx + (y - G.Y[a]) * dy) / L2)) : 0, qx = G.X[a] + t * dx, qy = G.Y[a] + t * dy, d = Math.hypot(x - qx, y - qy);
         if (!best || d < best.d) best = { a, b, x: qx, y: qy, d };
       }
@@ -152,41 +175,45 @@ function snapW(G, lon, lat, maxM = 320) {
   }
   return best && best.d <= maxM ? best : null;
 }
-// le plus court chemin dans les rues entre deux points de rue (Dijkstra)
+// le plus court chemin dans les rues (A*, la ligne droite comme estimation)
 function routeW(G, s, t) {
-  const N = G.pts.length, dist = new Float64Array(N).fill(Infinity), prev = new Int32Array(N).fill(-1), H = [];
-  const push = (d, n) => { H.push([d, n]); let i = H.length - 1; while (i > 0) { const q = (i - 1) >> 1; if (H[q][0] <= H[i][0]) break; [H[q], H[i]] = [H[i], H[q]]; i = q; } };
-  const pop = () => { const top = H[0], last = H.pop(); if (H.length) { H[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < H.length && H[l][0] < H[m][0]) m = l; if (r < H.length && H[r][0] < H[m][0]) m = r; if (m === i) break; [H[m], H[i]] = [H[i], H[m]]; i = m; } } return top; };
-  const d0 = (n, p) => Math.hypot(G.X[n] - p.x, G.Y[n] - p.y);
-  for (const n of [s.a, s.b]) { const d = d0(n, s); if (d < dist[n]) { dist[n] = d; prev[n] = -2; push(d, n); } }
-  const goal = new Map([[t.a, d0(t.a, t)], [t.b, d0(t.b, t)]]); let best = Infinity, bestN = -1;
-  while (H.length) {
-    const [d, n] = pop(); if (d > dist[n]) continue; if (d >= best) break;
-    if (goal.has(n) && d + goal.get(n) < best) { best = d + goal.get(n); bestN = n; }
-    const A = G.adj[n]; for (let k = 0; k < A.length; k += 2) { const m = A[k], nd = d + A[k + 1]; if (nd < dist[m]) { dist[m] = nd; prev[m] = n; push(nd, m); } }
+  const N = G.N; if (!G.dist) { G.dist = new Float64Array(N); G.prev = new Int32Array(N); G.mark = new Uint32Array(N); G.run = 0; }
+  const run = ++G.run, dist = G.dist, prev = G.prev, mark = G.mark, X = G.X, Y = G.Y;
+  const D = n => mark[n] === run ? dist[n] : Infinity, set = (n, d, p) => { mark[n] = run; dist[n] = d; prev[n] = p; };
+  const h = n => Math.hypot(X[n] - t.x, Y[n] - t.y), hf = [], hn = [];
+  const push = (f, n) => { let i = hf.length; hf.push(f); hn.push(n); while (i > 0) { const q = (i - 1) >> 1; if (hf[q] <= f) break; hf[i] = hf[q]; hn[i] = hn[q]; i = q; } hf[i] = f; hn[i] = n; };
+  const pop = () => { const n = hn[0], lf = hf.pop(), ln = hn.pop(), L = hf.length; if (L) { let i = 0; for (;;) { let m = 2 * i + 1; if (m >= L) break; if (m + 1 < L && hf[m + 1] < hf[m]) m++; if (hf[m] >= lf) break; hf[i] = hf[m]; hn[i] = hn[m]; i = m; } hf[i] = lf; hn[i] = ln; } return n; };
+  for (const n of [s.a, s.b]) { const d = Math.hypot(X[n] - s.x, Y[n] - s.y); if (d < D(n)) { set(n, d, -2); push(d + h(n), n); } }
+  const goal = new Map([[t.a, Math.hypot(X[t.a] - t.x, Y[t.a] - t.y)], [t.b, Math.hypot(X[t.b] - t.x, Y[t.b] - t.y)]]);
+  let best = Infinity, bestN = -1, it = 0;
+  while (hf.length && it++ < 500000) {
+    const f = hf[0], n = pop(), g = D(n);
+    if (f >= best) break;
+    if (f > g + h(n) + 1e-9) continue;   // une entrée périmée
+    if (goal.has(n) && g + goal.get(n) < best) { best = g + goal.get(n); bestN = n; }
+    for (let k = G.off[n]; k < G.off[n + 1]; k++) { const m = G.nb[k], nd = g + G.wt[k]; if (nd < D(m)) { set(m, nd, n); push(nd + h(m), m); } }
   }
-  const P = p => [p.x / KXP, p.y / KYP];
+  const P = (x, y) => [x / KXP, y / KYP];
   const same = (s.a === t.a && s.b === t.b) || (s.a === t.b && s.b === t.a), direct = same ? Math.hypot(s.x - t.x, s.y - t.y) : Infinity;
-  if (direct <= best) return { len: direct, pts: [P(s), P(t)] };
+  if (direct <= best) return { len: direct, pts: [P(s.x, s.y), P(t.x, t.y)] };
   if (bestN < 0) return null;
   const nodes = []; for (let n = bestN; n >= 0; n = prev[n]) nodes.push(n);
-  return { len: best, pts: [P(s), ...nodes.reverse().map(n => G.pts[n]), P(t)] };
+  return { len: best, pts: [P(s.x, s.y), ...nodes.reverse().map(n => P(X[n], Y[n])), P(t.x, t.y)] };
 }
-const mLL = (a, b) => Math.hypot((b[0] - a[0]) * KXP, (b[1] - a[1]) * KYP);
-// le trajet complet : de là où l'on est jusqu'au point touché (par les rues ; sur la pelouse du Champ-de-Mars, tout droit)
-function planW(G, from, to, toBuilding) {
-  if (onLawn(...from) && onLawn(...to)) return { len: mLL(from, to), pts: [from, to] };
-  const s = snapW(G, ...from, 600), t = snapW(G, ...to, toBuilding ? 320 : 120);
+// le trajet complet : de là où l'on est jusqu'au point touché (par les rues ; dans un même parc, tout droit)
+function planW(G, from, to, toBuilding, exact) {   // exact : jusqu'au point lui-même (un « ? »)
+  const pf = parkAt(...from), pt = parkAt(...to);
+  if (pf >= 0 && pf === pt && parkAt((from[0] + to[0]) / 2, (from[1] + to[1]) / 2) === pf) return { len: mLL(from, to), pts: fitPath([from, to]) };
+  const s = snapW(G, ...from, 600), t = snapW(G, ...to, toBuilding || exact ? 320 : 150);
   if (!s || !t) return null;
   const r = routeW(G, s, t); if (!r) return null;
   const pts = r.pts.slice(); let len = r.len;
   if (mLL(from, pts[0]) > 1.5) { len += mLL(from, pts[0]); pts.unshift(from); }
-  const end = [t.x / KXP, t.y / KYP];
-  if (!toBuilding && (t.d <= 35 || onLawn(...to))) { len += mLL(end, to); pts.push(to); }   // jusqu'au trottoir touché, ou sur la pelouse
-  return { len, pts: simplifyW(pts, 1.2).slice(0, 380) };
+  if (!toBuilding && (t.d <= 35 || pt >= 0 || exact)) { len += mLL(pts[pts.length - 1], to); pts.push(to); }   // jusqu'au trottoir touché, ou dans le parc
+  return { len, pts: fitPath(pts) };
 }
 function simplifyW(pts, tol) {   // Douglas-Peucker (mètres)
-  if (pts.length < 3) return pts;
+  if (pts.length < 3) return pts.map(p => [+p[0].toFixed(6), +p[1].toFixed(6)]);
   const keep = new Uint8Array(pts.length); keep[0] = keep[pts.length - 1] = 1;
   const st = [[0, pts.length - 1]];
   while (st.length) {
@@ -197,388 +224,623 @@ function simplifyW(pts, tol) {   // Douglas-Peucker (mètres)
   }
   return pts.filter((_, k) => keep[k]).map(p => [+p[0].toFixed(6), +p[1].toFixed(6)]);
 }
-const pathLen = pts => { const c = [0]; for (let i = 1; i < pts.length; i++) c.push(c[i - 1] + mLL(pts[i - 1], pts[i])); return c; };
+// le serveur prend 400 points au plus : un long trajet est un peu plus simplifié
+function fitPath(pts) { for (const tol of [1.2, 3, 6, 12, 25, 50, 100]) { const q = simplifyW(pts, tol); if (q.length <= 380) return q; } return simplifyW(pts, 200); }
 
 // ---- l'état -------------------------------------------------------------------
-const PL = { on: false, room: 0, me: null, admin: false, people: new Map(), last: 0, seen: new Set(), ch: null, rt: false,
-  poll: 0, ping: 0, list: 0, raf: 0, saved: null, feeding: false, cfg: null, w: null, target: null, mv: 0, G: null };
-const MAPI = ["dragPan", "scrollZoom", "boxZoom", "dragRotate", "keyboard", "doubleClickZoom", "touchZoomRotate", "touchPitch"];
-const MAP_FREE = new Set(["dragPan", "scrollZoom", "touchZoomRotate"]);   // dans le monde : glisser et zoomer, pas tourner ni pencher
-function lockMap(on, prev) {
-  if (on) {
-    const was = {}; for (const k of MAPI) { const h = map[k]; if (!h) continue; was[k] = h.isEnabled(); if (MAP_FREE.has(k)) h.enable(); else h.disable(); }
-    map.touchZoomRotate?.disableRotation?.(); return was;
-  }
-  map.touchZoomRotate?.enableRotation?.();
-  for (const k of MAPI) { const h = map[k]; if (!h) continue; if (!prev || prev[k]) h.enable(); else h.disable(); }
-}
-function placeLimits(on) {   // la zone de l'essai (posée une fois la caméra arrivée), puis les limites d'avant en sortant
-  if (on) { PL.saved.lim = { min: map.getMinZoom(), max: map.getMaxZoom(), b: map.getMaxBounds() }; map.setMaxBounds(PL.G.bounds); map.setMinZoom(14.6); map.setMaxZoom(18.6); return; }
-  const l = PL.saved?.lim; if (!l) return; map.setMaxBounds(l.b || null); map.setMinZoom(l.min); map.setMaxZoom(l.max); PL.saved.lim = null;
-}
+const W = { on: false, starting: false, tries: 0, me: null, admin: false, cfg: null, w: null, day: 0, taken: new Set(), chatOff: false, banned: false,
+  people: new Map(), cells: new Set(), cellKey: "", chans: new Map(), chSt: new Map(), authed: false, feedEvery: 0, feedT: 0, listT: 0,
+  last: 0, seen: new Set(), feeding: false, raf: 0, G: null, target: null, mv: 0, moving: false, queued: null, riding: false,
+  near: [], nearSet: new Set(), nearT: 0, q: [], qPend: new Set(), qWait: new Map(), qT: 0, first: true, stepT: 0, followT: 0 };
+const meP = () => W.people.get(W.me);
 const kmTxt = km => { const k = Math.round(km * 10) / 10; return k.toLocaleString("fr-FR", { minimumFractionDigits: k % 1 ? 1 : 0, maximumFractionDigits: 1 }) + " km"; };
 const distTxt = m => m < 950 ? Math.max(10, Math.round(m / 10) * 10) + " m" : kmTxt(m / 1000);
 // ce que coûterait un trajet de len mètres (0 tant qu'il reste des km offerts)
 function walkCost(len) {
-  const c = PL.cfg, w = PL.w; if (!c || !w) return 0;
+  const c = W.cfg, w = W.w; if (!c || !w) return 0;
   const f = km => Math.max(0, km - c.freeKm) * c.kmPrice;
   return Math.ceil(f(w.km + len / 1000) - f(w.km));
 }
+// à portée pour acheter : 120 m d'un immeuble ou d'une station, 300 m d'un monument, d'un jardin, d'une place (comme le serveur)
+const reachOf = g => { const c = card(g); return c && c.lk === "p" && !isStation(g) ? W.cfg?.reachBig || 300 : W.cfg?.reach || 120; };
+const cellOf = (lo, la) => 10000 + Math.floor((lo - 2.20) / 0.0137) * 100 + Math.floor((la - 48.80) / 0.009);   // comme _wcell()
+const ringOn = () => W.on && mode === "all" && !W.riding && cur() === "map";
 
-// ---- entrer, sortir -----------------------------------------------------------
-async function openPlace() {
-  if (PL.on || !map || !mapReady) return;
-  if (typeof moving !== "undefined" && moving) return toast("Attendez la fin du trajet", "bad");
-  if (tab !== "map") go("map");
-  if (panelKind) { justBought = null; setMovebar(""); }
-  if (typeof clearDest === "function" && document.body.classList.contains("picking")) clearDest();
-  PL.on = true; PL.people.clear(); PL.seen.clear(); PL.last = 0; PL.target = null;
-  document.body.classList.add("inplace", "inworld");
-  PL.saved = { ctl: lockMap(true), cam: { center: map.getCenter(), zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing() } };
-  window.pawn3d?.hide();
-  buildPlaceUI();
+// ---- démarrer : on entre dans Paris dès que la carte est prête ------------------------
+function initWorld() {
+  loadWorld().catch(() => { });   // le plan des rues arrive pendant que la carte se charge
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && W.on) { worldFeed(); refreshPeople(); startTick(); } });
+  addEventListener("resize", () => { if (W.on) layoutPeople(); });
+  document.addEventListener("click", e => {
+    const go = e.target.closest("[data-wgo]"); if (go) { const g = +go.dataset.wgo; justBought = null; setMovebar(""); return walkTo(centerOf(g), g, !!go.dataset.pay); }
+    const mt = e.target.closest("[data-wmetro]"); if (mt) return metroSheet(+mt.dataset.wmetro);
+  });
+  const vv = window.visualViewport;
+  if (vv) { const f = () => document.body.style.setProperty("--kb", Math.max(0, innerHeight - vv.height - vv.offsetTop) + "px"); vv.addEventListener("resize", f); vv.addEventListener("scroll", f); }
+  $("#b-main")?.addEventListener("click", mainAction);
+  $("#b-say")?.addEventListener("click", openSay);
+  $("#pawnoff")?.addEventListener("click", () => centerOnMe(true));
+  renderDock();
+}
+// la carte est chargée (map.js) : les personnages en 3D, leurs noms, puis on entre dans Paris
+function worldMapReady() {
+  if (window.THREE && window.addPeople) { try { addPeople(map); } catch (e) { console.warn("personnages 3D", e); } }
+  const box = document.createElement("div"); box.id = "wpl"; map.getContainer().appendChild(box);
+  box.addEventListener("click", e => { const b = e.target.closest(".wp"); if (!b) return; e.stopPropagation(); if (b.dataset.id === W.me) openLookSheet(); else openWho(b.dataset.id); });
+  map.on("render", layoutPeople); map.on("move", offMe);
+  map.on("moveend", () => { queueCells(); updateVisible(); });
+  worldStart();
+}
+async function worldStart() {
+  if (W.on || W.starting || !map || !mapReady) return; W.starting = true;
   try {
     const [G, j] = await Promise.all([loadWorld(), rpc("world_join")]);
-    if (!PL.on) { rpc("chat_leave").catch(() => { }); return; }
-    PL.G = G; PL.room = j.room; PL.me = j.me; PL.admin = !!j.admin; PL.last = j.last || 0; PL.cfg = j.cfg; PL.w = j.w;
-    const pos = j.pos || [j.w.lon, j.w.lat];
-    syncPeople(j.people);
-    const me = PL.people.get(PL.me); if (me) { me.lon = pos[0]; me.lat = pos[1]; me.path = null; }
-    map.flyTo(Object.assign(worldCam(), { center: pos, duration: 1100 }));
-    listen(); renderPlaceHead(); drawZone();
-    PL.ping = setInterval(placePing, 25000); PL.list = setInterval(placeList, 30000);
-    map.once("moveend", () => { if (PL.on) { placeLimits(true); placeLayout(); } });
-  } catch (e) { toast(e.message, "bad"); closePlace(true); }
+    W.G = G; W.on = true; W.tries = 0; applyJoin(j);
+    renderQ(); updateNear(true); updateVisible(); renderDock();
+    queueCells(true); clearInterval(W.listT); W.listT = setInterval(refreshPeople, 60000);
+    if (W.first) { W.first = false; centerOnMe(false); }
+  } catch (e) {
+    console.warn("monde", e); W.on = false;
+    if (/does not exist|Could not find the function/i.test(e.message || "")) toast("Le jeu est en cours de mise à jour : réessayez dans quelques minutes.", "bad");
+    setTimeout(worldStart, Math.min(30000, 2500 * ++W.tries));
+  } finally { W.starting = false; }
 }
-function closePlace(noLeave) {
-  if (!PL.on) return; PL.on = false;
-  if (!noLeave) rpc("chat_leave").catch(() => { });
-  stopListen(); clearInterval(PL.ping); clearInterval(PL.list); cancelAnimationFrame(PL.raf); PL.raf = 0;
-  for (const p of PL.people.values()) clearTimeout(p.bt);
-  $("#place")?.remove(); $("#plsheet")?.remove();
-  if (panelKind) { justBought = null; setMovebar(""); }
-  document.body.classList.remove("inplace", "inworld");
-  placeLimits(false); lockMap(false, PL.saved?.ctl); drawRoute(null); drawZone(true);
-  PL.people.clear(); PL.seen.clear(); PL.target = null;
-  // la montgolfière est là où l'on s'est arrêté pour la dernière fois (immeuble, station) : elle revient, et la carte va sur elle
-  refreshState().catch(() => { }).finally(async () => {
-    await placePawn(false); const g = pawnPos();
-    if (g != null) { const v = pawnView(); map.flyTo({ center: centerOf(g), zoom: v.zoom, pitch: v.pitch, bearing: 0, offset: v.offset, duration: 900 }); }
-    else if (PL.saved?.cam) map.flyTo(Object.assign({}, PL.saved.cam, { duration: 900 }));
-    renderWallet();
-  });
+function applyJoin(j) {
+  W.me = j.me; W.admin = !!j.admin; W.cfg = j.cfg; W.w = j.w; W.day = j.day; W.taken = new Set(j.taken || []); W.chatOff = !!j.chatOff; W.last = Math.max(W.last, j.last || 0);
+  const pr = ST.state?.profile || {}; if (ST.state?.profile) { pr.chat_off = W.chatOff; if ("land" in j) { pr.land = j.land; paintTargets(); } }
+  let me = meP(); if (!me) me = addPerson({ id: W.me, pseudo: pr.pseudo, party: pr.party, look: pr.look, lon: j.pos[0], lat: j.pos[1] });
+  me.vis = true;
+  if (j.trip?.path?.length >= 2) followTrip(me, j.trip.path, j.trip.dur, j.trip.el);
+  else { me.lon = +j.pos[0]; me.lat = +j.pos[1]; stopPerson(me); }
+  window.people3d?.ring(me.lon, me.lat, W.cfg.reach, ringOn());
 }
 async function rejoin() {
-  if (!PL.on) return;
-  try {
-    const j = await rpc("world_join");
-    const moved = j.room !== PL.room; PL.room = j.room; PL.last = Math.max(PL.last, j.last || 0); PL.w = j.w;
-    syncPeople(j.people); if (moved) listen(); renderPlaceHead();
-  } catch (e) { toast(e.message, "bad"); closePlace(true); }
+  if (W.moving || W.riding) return;
+  try { applyJoin(await rpc("world_join")); W.cellKey = ""; queueCells(true); renderQ(); renderDock(); } catch (e) { }
+}
+// la caméra sur son personnage : un peu sous le milieu de la zone libre (entre les barres du haut et le dock)
+function worldView() {
+  const c = map.getContainer().getBoundingClientRect(), mid = c.top + c.height / 2;
+  const rs = s => [...document.querySelectorAll(s)].map(e => e.getBoundingClientRect()).filter(r => r.height > 0 && r.width > 0);
+  const top = Math.max(c.top + 50, ...rs("#bar,#credbar,#filter,.maptop>*").filter(r => r.bottom < mid).map(r => r.bottom)) - c.top;
+  const bot = Math.min(c.bottom - 50, ...rs("#dicebar,#tabs").filter(r => r.top > mid).map(r => r.top)) - c.top;
+  return { zoom: innerWidth < 700 ? 16.4 : 16.6, pitch: 55, offset: [0, Math.round(top + (bot - top) * .62 - c.height / 2)] };
+}
+function centerOnMe(quick) {
+  const me = meP(); if (!me || !map) return; const v = worldView();
+  map.flyTo({ center: [me.lon, me.lat], zoom: quick && map.getZoom() >= 15.2 ? map.getZoom() : v.zoom, pitch: Math.max(map.getPitch(), 45), offset: v.offset, duration: quick ? 600 : 1200, essential: true });
 }
 
-// ---- recevoir : temps réel, sinon toutes les 2 s ----------------------------------
-function listen() {
-  stopListen();
-  PL.poll = setInterval(placeFeed, 2000);
-  if (LOCAL_MODE || !SB) return;
-  const room = PL.room;
-  (async () => {
-    try { const { data } = await SB.auth.getSession(); if (data.session) SB.realtime.setAuth(data.session.access_token); } catch (e) { }
-    if (!PL.on || PL.room !== room) return;
-    PL.ch = SB.channel("place:cdm:" + room, { config: { private: true } })
-      .on("broadcast", { event: "ev" }, ({ payload }) => placeEvent(payload))
-      .subscribe(st => {
-        if (!PL.on) return;
-        if (st === "SUBSCRIBED") { PL.rt = true; clearInterval(PL.poll); PL.poll = setInterval(placeFeed, 10000); }
-        else if (st === "CHANNEL_ERROR" || st === "TIMED_OUT" || st === "CLOSED") { PL.rt = false; clearInterval(PL.poll); PL.poll = setInterval(placeFeed, 2000); }
-      });
-  })();
-}
-function stopListen() { clearInterval(PL.poll); PL.poll = 0; if (PL.ch) { try { SB.removeChannel(PL.ch); } catch (e) { } PL.ch = null; } PL.rt = false; }
-async function placeFeed() {
-  if (!PL.on || PL.feeding) return; PL.feeding = true;
-  try { const f = await rpc("chat_feed", { p_since: PL.last }); if (f.gone) await rejoin(); else for (const e of f.ev) placeEvent(e); }
-  catch (e) { } finally { PL.feeding = false; }
-}
-async function placePing() { if (!PL.on) return; try { await rpc("chat_ping"); } catch (e) { if (/Revenez/.test(e.message)) rejoin(); } }
-async function placeList() { if (!PL.on) return; try { syncPeople(await rpc("chat_people")); } catch (e) { } }
-function placeEvent(e) {
-  if (!PL.on || !e || PL.seen.has(e.e)) return;
-  PL.seen.add(e.e); if (e.e > PL.last) PL.last = e.e;
-  if (PL.seen.size > 600) PL.seen = new Set([...PL.seen].slice(-300));
-  const id = e.u, d = e.d || {}, p = PL.people.get(id);
-  if (e.k === "join") upsertPerson(d);
-  else if (e.k === "move") { if (id === PL.me) return; if (!p) return placeList(); if (d.metro) hop(p, d.lon, d.lat); else walkAlong(p, d.path || [[p.lon, p.lat], [d.lon, d.lat]], d.dur); }
-  else if (e.k === "say") { if (id === PL.me) return; if (p) say(p, d.t); else placeList(); }
-  else if (e.k === "look") { if (p) { p.look = d.look; drawPerson(p); } }
-  else if (e.k === "leave") removePerson(id);
-  else if (e.k === "kick") {
-    if (id === PL.me) { toast(d.h ? "Vous avez été banni du chat pour " + d.h + " h" : "Vous avez été banni du chat", "bad"); closePlace(true); }
-    else removePerson(id);
+// ---- qui est autour : par carrés d'environ 1 km (temps réel, sinon relu toutes les 2,5 s) ------
+let cellQ = 0;
+function queueCells(now) { clearTimeout(cellQ); cellQ = setTimeout(updateCells, now ? 0 : 400); }
+function updateCells() {
+  if (!W.on || !map) return;
+  const out = new Set(), me = meP(); if (me) out.add(cellOf(me.lon, me.lat));
+  if (map.getZoom() >= 14.6 && mode === "all") {   // les carrés de ce qu'on regarde (au plus 750 m autour du centre)
+    const c = map.getCenter(), R = 750, b = map.getBounds();
+    const w = Math.max(b.getWest(), c.lng - R / KXP), e = Math.min(b.getEast(), c.lng + R / KXP), s = Math.max(b.getSouth(), c.lat - R / KYP), n = Math.min(b.getNorth(), c.lat + R / KYP);
+    for (let x = Math.floor((w - 2.20) / 0.0137); x <= Math.floor((e - 2.20) / 0.0137); x++)
+      for (let y = Math.floor((s - 48.80) / 0.009); y <= Math.floor((n - 48.80) / 0.009); y++) if (out.size < 16) out.add(10000 + x * 100 + y);
   }
+  const key = [...out].sort().join(","); if (key === W.cellKey) return;
+  W.cellKey = key; W.cells = out; listen(); refreshPeople();
+}
+async function listen() {
+  if (!LOCAL_MODE && SB) {
+    if (!W.authed) { W.authed = true; try { const { data } = await SB.auth.getSession(); if (data?.session) SB.realtime.setAuth(data.session.access_token); } catch (e) { } }
+    for (const [c, ch] of [...W.chans]) if (!W.cells.has(c)) { try { SB.removeChannel(ch); } catch (e) { } W.chans.delete(c); W.chSt.delete(c); }
+    for (const c of W.cells) if (!W.chans.has(c)) {
+      const ch = SB.channel("w:" + c, { config: { private: true } }).on("broadcast", { event: "ev" }, ({ payload }) => worldEvent(payload));
+      W.chans.set(c, ch); W.chSt.set(c, "");
+      ch.subscribe(st => { if (W.chans.get(c) !== ch) return; W.chSt.set(c, st); rtCheck(); });
+    }
+  }
+  rtCheck();
+}
+function rtCheck() {   // tous les carrés en temps réel : on relit lentement (filet de sécurité, et « toujours là ») ; sinon toutes les 2,5 s
+  const ok = !LOCAL_MODE && !!SB && W.cells.size > 0 && [...W.cells].every(c => W.chSt.get(c) === "SUBSCRIBED"), every = ok ? 20000 : 2500;
+  if (W.feedEvery !== every) { W.feedEvery = every; clearInterval(W.feedT); W.feedT = setInterval(worldFeed, every); }
+}
+async function worldFeed() {
+  if (!W.on || W.feeding || document.hidden || !W.cells.size) return; W.feeding = true;
+  try { const f = await rpc("world_feed", { p_cells: [...W.cells], p_since: W.last }); if (f.gone) await rejoin(); else for (const e of f.ev) worldEvent(e); }
+  catch (e) { } finally { W.feeding = false; }
+}
+let peopleQ = 0;
+function queuePeople() { clearTimeout(peopleQ); peopleQ = setTimeout(refreshPeople, 600); }
+async function refreshPeople() {
+  if (!W.on || !W.cells.size || document.hidden) return;
+  try { syncPeople(await rpc("world_people", { p_cells: [...W.cells] })); } catch (e) { }
+}
+function syncPeople(list) {
+  const ids = new Set();
+  for (const d of list || []) { if (!d?.id) continue; ids.add(d.id); if (d.id !== W.me) upsertPerson(d); }
+  for (const id of [...W.people.keys()]) if (id !== W.me && !ids.has(id)) removePerson(id);
+  updateVisible();
+}
+function worldEvent(e) {
+  if (!W.on || !e || W.seen.has(e.e)) return;
+  W.seen.add(e.e); if (e.e > W.last) W.last = e.e;
+  if (W.seen.size > 800) W.seen = new Set([...W.seen].slice(-400));
+  const id = e.u, d = e.d || {}; let p = W.people.get(id);
+  if (e.k === "join") { if (id !== W.me) { upsertPerson(d); updateVisible(); } }
+  else if (e.k === "move") {
+    if (id === W.me) return;
+    const key = `${d.lon},${d.lat},${d.dur}`;
+    if (!p && d.join) { p = upsertPerson(d.join); p.mvKey = key; p.mvAt = performance.now(); return updateVisible(); }
+    if (!p) return queuePeople();
+    if (p.mvKey === key && performance.now() - p.mvAt < 3000) return;   // le même trajet, reçu par deux carrés
+    p.mvKey = key; p.mvAt = performance.now();
+    if (d.metro) hop(p, d.lon, d.lat); else walkAlong(p, d.path || [[p.lon, p.lat], [d.lon, d.lat]], d.dur);
+  }
+  else if (e.k === "say") { if (id !== W.me && p && !W.chatOff) say(p, d.t); }
+  else if (e.k === "look") { if (p) { p.look = d.look; window.people3d?.look(p.id, spec3d(p)); } }
+  else if (e.k === "leave") removePerson(id);
+  else if (e.k === "kick" && id === W.me) { W.banned = true; renderDock(); closeSay(); toast(d.h ? `Vous êtes banni du chat pour ${d.h} h` : "Vous êtes banni du chat", "bad"); }
 }
 
 // ---- les gens -----------------------------------------------------------------
-function syncPeople(list) {
-  const ids = new Set((list || []).map(p => p.id));
-  for (const d of list || []) upsertPerson(d);
-  for (const id of [...PL.people.keys()]) if (!ids.has(id) && id !== PL.me) removePerson(id);
+function addPerson(d) {
+  const p = { id: d.id, pseudo: d.pseudo, party: d.party, look: d.look, lon: +d.lon, lat: +d.lat, path: null, cum: null, seg: 1, t0: 0, dur: 0, walk: false, head: Math.PI,
+    el: null, gone: false, vis: false, bt: 0, mvKey: "", mvAt: 0 };
+  W.people.set(p.id, p); window.people3d?.add(p.id, spec3d(p), p.id === W.me); drawLabel(p); return p;
 }
 function upsertPerson(d) {
-  if (!d?.id) return; let p = PL.people.get(d.id);
-  if (!p) { p = { id: d.id, pseudo: d.pseudo, party: d.party, look: d.look, lon: d.lon, lat: d.lat, el: null, face: 1, path: null }; PL.people.set(d.id, p); drawPerson(p); }
-  else {
-    p.pseudo = d.pseudo; p.party = d.party;
-    if (JSON.stringify(p.look || null) !== JSON.stringify(d.look || null)) { p.look = d.look; drawPerson(p); }
-    if (d.id !== PL.me && !p.path && mLL([p.lon, p.lat], [d.lon, d.lat]) > 2) walkAlong(p, [[p.lon, p.lat], [d.lon, d.lat]]);
-  }
-  renderPlaceHead(); placeLayout();
+  let p = W.people.get(d.id), trip = d.path && d.dur > 0 && (d.el || 0) < d.dur;
+  if (!p) { p = addPerson(d); if (trip) followTrip(p, d.path, d.dur, d.el || 0); else pose(p); return p; }
+  const relook = JSON.stringify(p.look || null) !== JSON.stringify(d.look || null) || p.party !== d.party;
+  p.pseudo = d.pseudo; p.party = d.party; p.look = d.look; if (relook) window.people3d?.look(p.id, spec3d(p));
+  drawLabel(p);
+  if (trip) { if (!p.path) followTrip(p, d.path, d.dur, d.el || 0); }
+  else if (!p.path && mLL([p.lon, p.lat], [+d.lon, +d.lat]) > 3) walkAlong(p, [[p.lon, p.lat], [+d.lon, +d.lat]]);
+  return p;
 }
-function removePerson(id) { const p = PL.people.get(id); if (!p) return; clearTimeout(p.bt); p.el?.remove(); PL.people.delete(id); renderPlaceHead(); }
-function drawPerson(p) {
-  const L = $("#plL"); if (!L) return; const me = p.id === PL.me, L0 = lookOf(p.id, p.look);
-  if (!p.el) { p.el = document.createElement("button"); p.el.className = "av" + (me ? " me" : ""); p.el.dataset.id = p.id; p.el.innerHTML = `<span class="avi"><span class="bub" hidden></span><span class="nm"></span>${me ? '<span class="ring"></span>' : ""}<span class="bd"></span></span>`; L.appendChild(p.el); }
-  p.el.querySelector(".nm").innerHTML = `<i style="background:${PARTIES[p.party]?.c || "#94A3B8"}"></i>${esc(me ? "Vous" : p.pseudo || "?")}`;
-  p.el.querySelector(".bd").innerHTML = avatarSVG(L0, p.party, 48);
-  p.el.setAttribute("aria-label", me ? "Mon personnage" : (p.pseudo || "Joueur"));
-  placeLayout();
+function removePerson(id) {
+  if (id === W.me) return; const p = W.people.get(id); if (!p) return;
+  clearTimeout(p.bt); p.el?.remove(); window.people3d?.remove(id); W.people.delete(id);
+}
+const pose = p => window.people3d?.pose(p.id, p.lon, p.lat, p.head, p.walk, p.vis && !p.gone);
+// qui on montre : soi toujours ; les autres quand on est assez près (au plus 40, les plus proches du centre)
+function updateVisible() {
+  if (!map || !W.on) return;
+  const z = map.getZoom(), c = map.getCenter(), ok = z >= 14.6 && mode === "all";
+  const keep = new Set(ok ? [...W.people.values()].filter(p => p.id !== W.me).map(p => [mLL([c.lng, c.lat], [p.lon, p.lat]), p.id]).sort((a, b) => a[0] - b[0]).slice(0, 40).map(x => x[1]) : []);
+  for (const p of W.people.values()) { const v = p.id === W.me || keep.has(p.id); if (v !== p.vis) { p.vis = v; pose(p); } }
+  layoutPeople();
 }
 // suivre un trajet (les rues) en dur secondes ; sans durée : à la vitesse du jeu
 function walkAlong(p, pts, dur) {
   if (!pts || pts.length < 2) return;
-  pts = pts.slice(); pts[0] = [p.lon, p.lat];   // on part d'où l'on est vraiment à l'écran
+  pts = pts.map(q => [+q[0], +q[1]]); pts[0] = [p.lon, p.lat];   // on part d'où il est vraiment à l'écran
   const cum = pathLen(pts), L = cum[cum.length - 1];
-  if (L < .5) { p.lon = pts[pts.length - 1][0]; p.lat = pts[pts.length - 1][1]; p.path = null; placeLayout(); return; }
-  const c = PL.cfg || { speed: 40, maxDur: 30 };
-  p.path = pts; p.cum = cum; p.t0 = performance.now(); p.dur = dur || Math.min(c.maxDur, Math.max(1, L / c.speed)); p.gone = false;
-  startTick();
+  if (L < .5) { const e = pts[pts.length - 1]; p.lon = e[0]; p.lat = e[1]; stopPerson(p); return; }
+  const c = W.cfg || { speed: 40, maxDur: 30 };
+  setTrip(p, pts, cum, dur || Math.min(c.maxDur, Math.max(1, L / c.speed)), 0);
 }
+function followTrip(p, path, dur, el) {   // un trajet déjà commencé depuis el secondes
+  const pts = path.map(q => [+q[0], +q[1]]), cum = pathLen(pts);
+  if (el >= dur || cum[cum.length - 1] < .5) { const e = pts[pts.length - 1]; p.lon = e[0]; p.lat = e[1]; stopPerson(p); return; }
+  setTrip(p, pts, cum, dur, el);
+}
+function setTrip(p, pts, cum, dur, el) { p.path = pts; p.cum = cum; p.seg = 1; p.dur = Math.max(.2, dur); p.t0 = performance.now() - el * 1000; p.walk = true; p.gone = false; startTick(); }
+function stopPerson(p) { p.path = null; p.walk = false; pose(p); }
 function hop(p, lon, lat) {   // le métro : on disparaît, on réapparaît là-bas
-  p.path = null; p.gone = true; placeLayout();
-  setTimeout(() => { p.lon = lon; p.lat = lat; p.gone = false; placeLayout(); }, 1600);
+  p.path = null; p.walk = false; p.gone = true; pose(p); layoutPeople();
+  setTimeout(() => { p.lon = lon; p.lat = lat; p.gone = false; pose(p); updateVisible(); }, 1600);
 }
-function startTick() { if (!PL.raf) PL.raf = requestAnimationFrame(placeTick); }
-function placeTick(ts) {
-  PL.raf = 0; if (!PL.on) return; let any = false;
-  for (const p of PL.people.values()) {
-    if (!p.path) { p.walk = false; continue; }
-    const f = Math.min(1, (ts - p.t0) / (p.dur * 1000)), L = p.cum[p.cum.length - 1], at = f * L;
-    let i = 1; while (i < p.path.length - 1 && p.cum[i] < at) i++;
+function startTick() { if (!W.raf) W.raf = requestAnimationFrame(worldTick); }
+function worldTick() {
+  W.raf = 0; if (document.hidden || cur() !== "map") return;   // reprend en revenant sur la carte (les positions dépendent de l'heure)
+  const now = performance.now(); let any = false;
+  for (const p of W.people.values()) {
+    if (!p.path) continue;
+    const f = Math.min(1, (now - p.t0) / (p.dur * 1000)), at = f * p.cum[p.cum.length - 1];
+    let i = p.seg; if (i < 1 || p.cum[i - 1] > at) i = 1; while (i < p.path.length - 1 && p.cum[i] < at) i++; p.seg = i;
     const a = p.path[i - 1], b = p.path[i], k = (at - p.cum[i - 1]) / ((p.cum[i] - p.cum[i - 1]) || 1);
     p.lon = a[0] + (b[0] - a[0]) * k; p.lat = a[1] + (b[1] - a[1]) * k;
-    const sa = map.project(a), sb = map.project(b); if (Math.abs(sb.x - sa.x) > 1) p.face = sb.x < sa.x ? -1 : 1;
-    p.walk = f < 1; any = true;
-    if (f >= 1) { p.path = null; p.walk = false; if (p.id === PL.me) arrived(); }
-    else if (p.id === PL.me && ts - (PL.rt0 || 0) > 220) { PL.rt0 = ts; drawRoute(p.path.slice(i), [p.lon, p.lat]); follow(p, ts); }
+    const dx = (b[0] - a[0]) * KXP, dy = (b[1] - a[1]) * KYP; if (dx * dx + dy * dy > .01) p.head = Math.atan2(dx, dy);
+    if (f >= 1) { p.path = null; p.walk = false; pose(p); if (p.id === W.me) arrived(); continue; }
+    p.walk = true; pose(p); any = true;
+    if (p.id === W.me) meStep(now, i);
   }
-  placeLayout();
-  if (any) PL.raf = requestAnimationFrame(placeTick);
+  if (any) W.raf = requestAnimationFrame(worldTick);
+}
+// pendant qu'on marche : le trajet qui reste, la caméra qui suit, ce qu'on peut acheter, les « ? » ramassés
+function meStep(now, i) {
+  const me = meP();
+  window.people3d?.ring(me.lon, me.lat, W.cfg.reach, ringOn());
+  updateNear(); checkChance();
+  if (now - W.stepT > 220) { W.stepT = now; drawRoute(me.path.slice(i), [me.lon, me.lat]); follow(me, now); offMe(); }
 }
 // la caméra suit son personnage quand il s'approche du bord (jamais pendant qu'on fait glisser la carte)
-function follow(p, ts) {
-  if (map.isMoving() || ts - (PL.ft || 0) < 1500) return;
-  const s = map.project([p.lon, p.lat]), W = innerWidth, H = innerHeight;
-  if (s.x > W * .15 && s.x < W * .85 && s.y > H * .28 && s.y < H * .78) return;
-  PL.ft = ts; const end = p.path?.[p.path.length - 1], mid = end ? [(p.lon + end[0]) / 2, (p.lat + end[1]) / 2] : [p.lon, p.lat];
-  map.easeTo({ center: mLL([p.lon, p.lat], mid) < 250 ? mid : [p.lon, p.lat], duration: 1100 });
+function follow(p, now) {
+  if (map.isMoving() || now - W.followT < 1500 || !p.path) return;
+  const s = map.project([p.lon, p.lat]), Wd = map.getContainer().clientWidth, H = map.getContainer().clientHeight;
+  if (s.x > Wd * .15 && s.x < Wd * .85 && s.y > H * .28 && s.y < H * .78) return;
+  W.followT = now; const end = p.path[p.path.length - 1], mid = [(p.lon + end[0]) / 2, (p.lat + end[1]) / 2];
+  map.easeTo({ center: mLL([p.lon, p.lat], mid) < 250 ? mid : [p.lon, p.lat], offset: worldView().offset, duration: 1100 });
 }
-// à l'écran : plus loin (plus haut) = plus petit ; hors de l'écran = caché
-function placeLayout() {
-  if (!PL.on || !map) return;
-  const H = innerHeight, W = innerWidth, z = map.getZoom();
-  const base = (W < 900 ? 1.3 : 1.55) * Math.max(.5, Math.min(1.5, Math.pow(2, (z - worldCam().zoom) * .65)));
-  for (const p of PL.people.values()) {
-    if (!p.el) continue; const s = map.project([p.lon, p.lat]);
-    const off = p.gone || s.x < -60 || s.x > W + 60 || s.y < -20 || s.y > H + 160;
-    p.el.style.display = off ? "none" : ""; if (off) continue;
-    const k = base * (.66 + .42 * Math.max(0, Math.min(1, s.y / H)));
-    p.el.style.transform = `translate(${s.x.toFixed(1)}px,${s.y.toFixed(1)}px)`;
-    p.el.style.setProperty("--k", k.toFixed(3)); p.el.style.setProperty("--f", p.face || 1);
-    p.el.style.zIndex = 10 + Math.round(s.y);
-    p.el.classList.toggle("walk", !!p.walk);
-    if (p.el.querySelector(".bub:not([hidden])")) clampBubble(p);
+
+// ---- les noms au-dessus des têtes, les bulles --------------------------------------
+function drawLabel(p) {
+  const box = $("#wpl"); if (!box) return;
+  if (!p.el) { p.el = document.createElement("button"); p.el.className = "wp" + (p.id === W.me ? " me" : ""); p.el.dataset.id = p.id; p.el.innerHTML = '<span class="bub" hidden></span><span class="nm"></span>'; p.el.style.display = "none"; box.appendChild(p.el); }
+  p.el.querySelector(".nm").innerHTML = p.id === W.me ? "Vous" : `<i style="background:${PARTIES[p.party]?.c || "#94A3B8"}"></i>${esc(p.pseudo || "?")}`;
+  p.el.setAttribute("aria-label", p.id === W.me ? "Mon personnage" : (p.pseudo || "Joueur"));
+}
+// après chaque image de la carte : le nom suit la tête (calculé comme la 3D), la zone à toucher couvre le personnage
+function layoutPeople() {
+  if (!W.on || !map) return;
+  const z = map.getZoom(), far = z < 13.6, cw = map.getContainer().clientWidth, ch = map.getContainer().clientHeight;
+  for (const p of W.people.values()) {
+    const el = p.el; if (!el) continue; const me = p.id === W.me;
+    let show = p.vis && !p.gone && (me || z >= 15), x = 0, y = 0, h = 0;
+    if (show) {
+      const s = !far ? window.people3d?.screen(p.id) : null;
+      if (s) { x = s.hx; y = s.hy; h = Math.max(10, s.fy - s.hy); }
+      else { const q = map.project([p.lon, p.lat]); x = q.x; y = q.y; h = 0; }
+      if (x < -80 || x > cw + 80 || y < -60 || y > ch + 80) show = false;
+    }
+    if (!show) { if (el.style.display !== "none") el.style.display = "none"; continue; }
+    if (el.style.display === "none") el.style.display = "";
+    el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px)`; el.style.setProperty("--h", h.toFixed(1) + "px");
+    const dot = !h; if (el.classList.contains("dot") !== dot) el.classList.toggle("dot", dot);
+    el.style.zIndex = 10 + Math.round(y + h);
+    if (p.bt) clampBubble(p);
+  }
+  declutterMe();
+}
+// un nom de lieu posé sur son personnage s'efface (on doit toujours se voir)
+let dmT = 0;
+function declutterMe() {
+  const now = performance.now(); if (now - dmT < 200) return; dmT = now;
+  const el = meP()?.el, show = el && el.style.display !== "none", r = show ? el.getBoundingClientRect() : null;
+  const box = r && { l: r.left - 6, r: r.right + 6, t: r.top - 24, b: r.bottom + 4 };   // le nom compris
+  for (const list of [monMarks, spotMarks, parkMarks]) for (const m of list) {
+    const e = m.el || m.mk?.getElement(); if (!e) continue;
+    let on = false; if (box && m.on) { const q = e.getBoundingClientRect(); on = q.width > 0 && q.left < box.r && q.right > box.l && q.top < box.b && q.bottom > box.t; }
+    if (e.classList.contains("behindme") !== on) e.classList.toggle("behindme", on);
   }
 }
 function say(p, t) {
   if (!p?.el || !t) return; const b = p.el.querySelector(".bub");
   b.textContent = t; b.hidden = false; b.classList.remove("out"); void b.offsetWidth; b.classList.add("pop");
-  clampBubble(p); clearTimeout(p.bt);
-  p.bt = setTimeout(() => { b.classList.add("out"); p.bt = setTimeout(() => { b.hidden = true; b.classList.remove("out", "pop"); }, 400); }, Math.min(9000, 3800 + t.length * 50));
+  clearTimeout(p.bt); clampBubble(p);
+  p.bt = setTimeout(() => { b.classList.add("out"); p.bt = setTimeout(() => { b.hidden = true; b.classList.remove("out", "pop"); p.bt = 0; }, 400); }, Math.min(9000, 3800 + t.length * 50));
 }
 function clampBubble(p) {
-  const b = p.el.querySelector(".bub"); b.style.setProperty("--dx", "0px");
+  const b = p.el.querySelector(".bub"); if (b.hidden) return; b.style.setProperty("--dx", "0px");
   const r = b.getBoundingClientRect(), m = 8; let dx = 0;
   if (r.left < m) dx = m - r.left; else if (r.right > innerWidth - m) dx = innerWidth - m - r.right;
-  if (dx) b.style.setProperty("--dx", dx / (parseFloat(p.el.style.getPropertyValue("--k")) || 1) + "px");
+  if (dx) b.style.setProperty("--dx", dx + "px");
+}
+// quand son personnage sort de l'écran : une flèche au bord indique où il est
+function offMe() {
+  const el = $("#pawnoff"), me = meP(); if (!el || !me || !W.on || !map) return;
+  if ((panelKind === "land" && innerWidth < 900) || me.gone || cur() !== "map" || mode !== "all") { el.hidden = true; return; }
+  const Wd = map.getContainer().clientWidth, H = map.getContainer().clientHeight, pt = map.project([me.lon, me.lat]);
+  const top = 110, bot = H - (($(".mapbottom")?.offsetHeight || 80) + 24), left = 30, right = Wd - 30 - (panelKind === "land" && innerWidth >= 900 ? 400 : 0);
+  if (pt.x > left && pt.x < right && pt.y > top && pt.y < bot) { el.hidden = true; return; }
+  const cx = Wd / 2, cy = (top + bot) / 2, dx = pt.x - cx, dy = pt.y - cy;
+  const k = Math.min((right - 50 - cx) / Math.abs(dx || 1e-6), (bot - 20 - cy) / Math.abs(dy || 1e-6));
+  el.hidden = false; el.style.left = (cx + dx * k) + "px"; el.style.top = (cy + dy * k) + "px";
+  el.querySelector("i").style.transform = `rotate(${Math.atan2(dy, dx) * 180 / Math.PI + 90}deg)`;
+  const c = map.getCenter(); el.querySelector("span").textContent = "Vous · " + fmtDist(mLL([c.lng, c.lat], [me.lon, me.lat]));
 }
 
-// ---- le trajet dessiné sur la carte, la zone de l'essai ----------------------------------------
-function drawRoute(pts, head) {
-  if (!map) return; const src = map.getSource("wroute");
-  if (!pts) { src?.setData(FC([])); return; }
-  const line = head ? [head, ...pts] : pts;
-  const data = FC([{ type: "Feature", properties: { k: "l" }, geometry: { type: "LineString", coordinates: line } }, { type: "Feature", properties: { k: "e" }, geometry: { type: "Point", coordinates: line[line.length - 1] } }]);
+// ---- le trajet dessiné sur la carte ------------------------------------------------
+function drawRoute(pts, head, metro) {
+  if (!map || !mapReady) return; const src = map.getSource("wroute");
+  if (!pts || pts.length < 1) { src?.setData(FC([])); return; }
+  const line = head ? [head, ...pts] : pts, k = metro ? "m" : "l";
+  const data = FC([{ type: "Feature", properties: { k }, geometry: { type: "LineString", coordinates: line.length > 1 ? line : [line[0], line[0]] } },
+    { type: "Feature", properties: { k: "e" }, geometry: { type: "Point", coordinates: line[line.length - 1] } }]);
   if (src) return src.setData(data);
   map.addSource("wroute", { type: "geojson", data });
-  map.addLayer({ id: "wroute-c", type: "line", source: "wroute", filter: ["==", ["get", "k"], "l"], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#fff", "line-width": 9, "line-opacity": .9 } });
-  map.addLayer({ id: "wroute", type: "line", source: "wroute", filter: ["==", ["get", "k"], "l"], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#2563EB", "line-width": 4.5, "line-dasharray": [1.1, 1.3] } });
-  map.addLayer({ id: "wroute-e", type: "circle", source: "wroute", filter: ["==", ["get", "k"], "e"], paint: { "circle-radius": 7, "circle-color": "#2563EB", "circle-stroke-color": "#fff", "circle-stroke-width": 3 } });
-}
-function drawZone(off) {   // le bord de la zone : un trait discret (au-delà, on ne marche pas encore)
-  if (!map) return; const src = map.getSource("wzone");
-  if (off) { src?.setData(FC([])); return; }
-  const z = PL.G?.zone; if (!z) return;
-  const data = FC([{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: z.concat([z[0]]) } }]);
-  if (src) return src.setData(data);
-  map.addSource("wzone", { type: "geojson", data });
-  map.addLayer({ id: "wzone", type: "line", source: "wzone", paint: { "line-color": "#2563EB", "line-width": 2.5, "line-opacity": .55, "line-dasharray": [2, 2] } }, map.getLayer("anchor-top") ? "anchor-top" : undefined);
+  const before = map.getLayer("anchor-top") ? "anchor-top" : undefined, isL = ["!=", ["get", "k"], "e"];
+  map.addLayer({ id: "wroute-c", type: "line", source: "wroute", filter: isL, layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#fff", "line-width": 9, "line-opacity": .9 } }, before);
+  map.addLayer({ id: "wroute", type: "line", source: "wroute", filter: isL, layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": ["match", ["get", "k"], "m", "#0EA5E9", "#2563EB"], "line-width": 4.5, "line-dasharray": [1.1, 1.3] } }, before);
+  map.addLayer({ id: "wroute-e", type: "circle", source: "wroute", filter: ["==", ["get", "k"], "e"], paint: { "circle-radius": 7, "circle-color": "#2563EB", "circle-stroke-color": "#fff", "circle-stroke-width": 3 } }, before);
 }
 
 // ---- marcher ------------------------------------------------------------------
-const meP = () => PL.people.get(PL.me);
-// toucher la carte (pas un immeuble) : on y va par les rues
-function placeClick(e) {
-  if (!PL.on || e.defaultPrevented) return;
-  if (map.queryRenderedFeatures(e.point).some(f => /^(bd|rf)\d|^mfill$/.test(f.layer.id))) return;   // un immeuble : worldTapCard s'en occupe
-  if (panelKind) { justBought = null; setMovebar(""); return; }   // une case ouverte : le toucher la ferme
-  const ll = [e.lngLat.lng, e.lngLat.lat];
-  walkTo(ll, null);
+// toucher la carte (pas un immeuble) : on y va par les rues (map.js appelle ceci)
+function worldMapClick(e) {
+  if (!W.on || mode !== "all" || W.riding || map.getZoom() < 14.2) return false;
+  const q = map.getLayer("wq-c") ? map.queryRenderedFeatures(e.point, { layers: ["wq-c"] }) : [];
+  const s = q.length ? spotOf(+q[0].properties.g) : null;   // un « ? » : on va jusqu'à lui
+  walkTo(s ? [s[3], s[4]] : [e.lngLat.lng, e.lngLat.lat], null, false, !!s);
+  return true;
 }
+const moneyDelta = x => { const p = ST.state?.profile; if (p && x) { p.cash = Math.max(0, p.cash + x); renderWallet(); } };
+const setLand = g => { const p = ST.state?.profile; if (p) { p.land = g; paintTargets(); } };
 // partir vers un point (target : l'immeuble ou la station visé, qu'on ouvre en arrivant)
-async function walkTo(ll, target, pay) {
-  const me = meP(); if (!me || !PL.G) return;
-  if (!inPolyLL(PL.G.zone, ll[0], ll[1])) return toast("Pour l'essai, on reste dans le 7e", "bad");
-  const plan = planW(PL.G, [me.lon, me.lat], ll, target != null);
+async function walkTo(ll, target, pay, exact) {
+  const me = meP(); if (!W.on || !me || !W.G || W.riding) return;
+  const c = W.cfg;
+  if (!(ll[0] > c.w && ll[0] < c.e && ll[1] > c.s && ll[1] < c.n) || (W.G.zone && !inPolyLL(W.G.zone, ll[0], ll[1]))) return toast("On reste dans Paris", "bad");
+  if (W.moving) { W.queued = [ll, target, pay, exact]; return; }   // un trajet part déjà : celui-ci suivra (le serveur veut un petit délai entre deux)
+  const plan = planW(W.G, [me.lon, me.lat], ll, target != null, exact);
   if (!plan) return toast("Pas de rue par là", "bad");
-  if (plan.len < 3 && target != null) { PL.target = target; return arrived(); }
+  if (plan.len > 14800) return toast("Trop loin d'un coup : prenez le métro", "bad");
+  if (plan.len < 3) { if (target != null) { W.target = target; arrived(); } return; }
   const cost = walkCost(plan.len);
-  if (cost > 0 && !pay) return askPay(plan.len, cost, () => walkTo(ll, target, true));
-  const h = $("#place .plhint"); if (h) { h.remove(); try { localStorage.setItem("hm_whint", "1"); } catch (er) { } }
-  PL.target = target; const mv = ++PL.mv, before = { lon: me.lon, lat: me.lat };
-  walkAlong(me, plan.pts); drawRoute(plan.pts);
+  if (cost > 0 && !pay) return askPay(plan.len, cost, () => walkTo(ll, target, true, exact));
+  hintDone();
+  const mv = ++W.mv, prev = { lon: me.lon, lat: me.lat, path: me.path, cum: me.cum, seg: me.seg, t0: me.t0, dur: me.dur, walk: me.walk, target: W.target, land: ST.state?.profile?.land ?? null };
+  W.moving = true; W.target = target;
+  walkAlong(me, plan.pts); drawRoute(plan.pts); setLand(null);
+  const end = plan.pts[plan.pts.length - 1];
   try {
-    const r = await rpc("world_move", { p_lon: plan.pts[plan.pts.length - 1][0], p_lat: plan.pts[plan.pts.length - 1][1], p_len: Math.round(plan.len), p_path: plan.pts, p_pay: !!pay });
-    if (mv !== PL.mv) return;
-    PL.w = r.w; renderPlaceHead();
-    if (me.path && Math.abs(me.dur - r.dur) > .3) { const f = (performance.now() - me.t0) / (me.dur * 1000); me.dur = r.dur; me.t0 = performance.now() - f * r.dur * 1000; }
-    if (r.cost > 0 || r.back > 0) refreshState().then(() => renderWallet?.()).catch(() => { });
+    const r = await rpc("world_move", { p_lon: end[0], p_lat: end[1], p_len: Math.round(plan.len), p_path: plan.pts, p_pay: !!pay });
+    if (mv === W.mv && me.path && Math.abs(me.dur - r.dur) > .05) { const f = Math.min(1, (performance.now() - me.t0) / (me.dur * 1000)); me.dur = r.dur; me.t0 = performance.now() - f * r.dur * 1000; }
+    W.w = r.w || W.w; renderDock();
+    moneyDelta((+r.back || 0) + (+r.salary || 0) - (+r.cost || 0) - (+r.toll?.toll || 0));
+    if (r.salary > 0) moneyPop(r.salary);
+    if (r.toll?.toll > 0) tollToast(r.toll);
   } catch (e) {
-    if (mv !== PL.mv) return;
-    const m = /PAYER:(\d+)/.exec(e.message || "");
-    me.path = null; me.lon = before.lon; me.lat = before.lat; drawRoute(null); PL.target = null; placeLayout();
-    if (m) return askPay(plan.len, +m[1], () => walkTo(ll, target, true));
-    if (/Revenez/.test(e.message)) return rejoin();
-    toast(e.message, "bad");
+    const m = e.message || "";
+    if (mv === W.mv) {   // le serveur n'a pas bougé : on revient où l'on en était
+      Object.assign(me, { lon: prev.lon, lat: prev.lat, path: prev.path, cum: prev.cum, seg: prev.seg, t0: prev.t0, dur: prev.dur, walk: prev.walk });
+      W.target = prev.target; setLand(prev.land); pose(me); if (me.path) startTick();
+      drawRoute(me.path ? me.path.slice(me.seg) : null, me.path ? [me.lon, me.lat] : null);
+    }
+    const pm = /PAYER:(\d+)/.exec(m);
+    if (pm) askPay(plan.len, +pm[1], () => walkTo(ll, target, true, exact));
+    else if (/Doucement/.test(m)) setTimeout(() => walkTo(ll, target, pay, exact), 350);
+    else if (/Revenez/.test(m)) { W.moving = false; rejoin(); }
+    else toast(m, "bad");
+  } finally {
+    W.moving = false;
+    if (W.queued) { const q = W.queued; W.queued = null; setTimeout(() => walkTo(...q), 300); }
   }
 }
-// arrivé : si l'on visait un immeuble ou une station, on s'y arrête (on peut l'acheter) et sa case s'ouvre
+// arrivé : on paie le péage du trajet ; si l'on visait un immeuble ou une station, on s'y arrête (achat possible) et sa case s'ouvre
 async function arrived() {
-  drawRoute(null); const g = PL.target; PL.target = null; if (g == null || !PL.on) return;
-  try { setState(await rpc("world_arrive", { p_card: g })); await ensureCards([g]); justBought = null; landCredit = null; showLand(null, g); }
-  catch (e) { toast(e.message, "bad"); }
+  const me = meP(), g = W.target, mv = W.mv; W.target = null;
+  drawRoute(null); offMe(); if (me) window.people3d?.ring(me.lon, me.lat, W.cfg.reach, ringOn());
+  updateNear(true); checkChance(true); queueCells();
+  try { const r = await rpc("world_stop"); W.w = r.w || W.w; if (r.toll?.toll > 0) { if (g == null) moneyDelta(-r.toll.toll); tollToast(r.toll); } renderDock(); } catch (e) { }
+  if (g != null) arriveAt(g, 0, mv);
 }
-// toucher un immeuble, un monument ou une station : sa case (vue), avec « Y aller » ; déjà devant : on peut l'acheter
+async function arriveAt(g, tries, mv) {
+  if (mv !== W.mv) return;   // on est reparti entre-temps
+  try {
+    const s = await rpc("world_arrive", { p_card: g }); if (mv !== W.mv) return;
+    setState(s); renderWallet(); await ensureCards([g]); justBought = null; landCredit = null; showLand(null, g);
+  } catch (e) { if (/Trop loin/.test(e.message) && tries < 3) return setTimeout(() => arriveAt(g, tries + 1, mv), 700); toast(e.message, "bad"); }
+}
+// toucher un immeuble, un monument ou une station : à portée, sa case pour l'acheter (même en marchant) ; trop loin, la case le dit
 async function worldTapCard(g) {
-  if (!PL.on || !PL.G) return; await ensureCards([g]);
-  const me = meP(); if (!me) return;
-  if (here(g) && !me.path) { try { setState(await rpc("world_arrive", { p_card: g })); } catch (e) { } }
+  await ensureCards([g]); if (!card(g)) return;
+  hideHint(); hintDone();
+  const me = meP();
+  if (W.on && me && landPos() !== g && mLL([me.lon, me.lat], centerOf(g)) <= reachOf(g) - 4) {
+    try { setState(await rpc("world_arrive", { p_card: g })); renderWallet(); } catch (e) { }
+  }
   justBought = null; landCredit = null; showLand(null, g);
 }
-// à portée de l'immeuble (comme le serveur le compte)
-function here(g) {
-  const c = card(g), me = meP(); if (!c || !me) return false;
-  const reach = c.lk === "p" && !isStation(g) ? PL.cfg?.reachBig || 250 : PL.cfg?.reach || 90;   // une station : comme un immeuble
-  return mLL([me.lon, me.lat], centerOf(g)) <= reach - 5;
-}
-// les boutons de la case dans le monde : « Y aller » (pas encore devant), « Prendre le métro » (devant une station)
-function worldLandBtns(g, view) {
-  if (!PL.on || !PL.G) return "";
+// les boutons de la case : trop loin (la distance, « Y aller ») ; à portée d'une station, « Prendre le métro »
+function worldLandBtns(g, view, free) {
+  if (!W.on || !W.G) return "";
   if (view) {
     const me = meP(); if (!me) return "";
-    const plan = planW(PL.G, [me.lon, me.lat], centerOf(g), true);
-    if (!plan || !inPolyLL(PL.G.zone, ...centerOf(g))) return `<div class="farbuy">Hors de la zone de l'essai (7e).</div>`;
-    const cost = walkCost(plan.len);
-    return `<button class="btn block buy wgo" data-wgo="${g}" data-pay="${cost > 0 ? 1 : ""}"><span>🚶 Y aller · ${distTxt(plan.len)}${cost > 0 ? ` · ${fmtE(cost)}` : ""}</span></button>`;
+    const d = mLL([me.lon, me.lat], centerOf(g)), plan = planW(W.G, [me.lon, me.lat], centerOf(g), true), len = plan ? plan.len : d, cost = walkCost(len);
+    return `${free > 0 && d > reachOf(g) - 4 ? `<div class="farbuy">Trop loin pour acheter · ${distTxt(d)}</div>` : ""}<button class="btn block buy wgo" data-wgo="${g}" data-pay="${cost > 0 ? 1 : ""}"><span>🚶 Y aller · ${distTxt(len)}${cost > 0 ? ` · ${fmtE(cost)}` : ""}</span></button>`;
   }
-  return PL.G.st.has(g) ? `<button class="btn block light" data-wmetro="${g}">🚇 Prendre le métro</button>` : "";
+  return W.G.st.has(g) ? `<button class="btn block light" data-wmetro="${g}">🚇 Prendre le métro</button>` : "";
+}
+function tollToast(t) { toast(`Péage · −${fmtE(t.toll)} (${t.n} immeuble${t.n > 1 ? "s" : ""})`, "bad"); }
+function moneyPop(n) {   // « +12 000 € » qui monte sous l'argent : le salaire de la marche
+  const m = $("#bar .money"); if (!m || !n) return; const r = m.getBoundingClientRect(); if (!r.width) return;
+  const el = document.createElement("div"); el.className = "mpop num"; el.textContent = "+" + fmtE(n);
+  el.style.left = (r.left + r.width / 2) + "px"; el.style.top = (r.bottom + 2) + "px"; document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1700);
 }
 function askPay(len, cost, go) {
   sheet(`<b class="plst">Plus de km offerts aujourd'hui</b><p class="plp">Ce trajet : ${distTxt(len)}</p><button class="btn block buy" data-wpay><span>Payer ${fmtE(cost)}</span></button>`,
     b => { if (b.closest("[data-wpay]")) { closeSheet(); go(); } });
 }
-// le métro : toutes les stations de la zone, un ticket
-function metroSheet(from) {
-  const G = PL.G, c = PL.cfg; if (!G) return;
-  const rows = Object.entries(G.metro).map(([line, seq]) => `<div class="mtl"><i class="lnb${LINE_DARK.has(line) ? " dk" : ""}" style="--lc:${LINE_C[line]};--ls:24px">${line}</i><div>${seq.map(g => {
-    const s = spotOf(g), nm = (s?.[5] || "").replace(/^Métro /, "");
-    return g === from ? `<span class="mts here">${esc(nm)}</span>` : `<button class="mts" data-wride="${g}">${esc(nm)}</button>`;
-  }).join("")}</div></div>`).join("");
-  sheet(`<b class="plst">Prendre le métro · ${fmtE(c?.ticket || 0)}</b><div class="mtls">${rows}</div>`, b => { const x = b.closest("[data-wride]"); if (x) { closeSheet(); ride(from, +x.dataset.wride); } });
+
+// ---- à portée : le bouton « Acheter », le vert sur la carte, l'anneau au sol ---------------------
+const NB = { grid: new Map(), done: new Set(), C: 100 };
+function indexArrs() {   // les centres des immeubles, rangés par carrés de 100 m (au fur et à mesure que les arrondissements arrivent)
+  for (let i = 0; i < 20; i++) {
+    if (NB.done.has(i) || !ARR[i]?.geo) continue; NB.done.add(i); const cen = centersOf(i);
+    for (let k = 0; k < cen.length / 2; k++) { const key = Math.floor(cen[2 * k] * KXP / NB.C) * 1e6 + Math.floor(cen[2 * k + 1] * KYP / NB.C); let l = NB.grid.get(key); if (!l) NB.grid.set(key, l = []); l.push(i * 1e5 + k); }
+  }
 }
-// le trajet en métro (de station en station, changements compris) : pour le dessin
-function metroPath(from, to) {
-  const G = PL.G, prev = new Map([[from, null]]), q = [from];
-  while (q.length) { const g = q.shift(); if (g === to) break; for (const [n] of G.st.get(g)?.nb || []) if (!prev.has(n)) { prev.set(n, g); q.push(n); } }
-  const out = []; for (let g = to; g != null; g = prev.get(g)) out.unshift(g); return out[0] === from ? out : [from, to];
+function nearby(lon, lat, R) {
+  indexArrs(); const out = [], x = lon * KXP, y = lat * KYP;
+  for (let i = Math.floor((x - R) / NB.C); i <= Math.floor((x + R) / NB.C); i++) for (let j = Math.floor((y - R) / NB.C); j <= Math.floor((y + R) / NB.C); j++)
+    for (const g of NB.grid.get(i * 1e6 + j) || []) { const cen = CEN[ai(g)], k = li(g), d = Math.hypot(cen[2 * k] * KXP - x, cen[2 * k + 1] * KYP - y); if (d <= R) out.push([d, g]); }
+  return out;
 }
-async function ride(from, to) {
-  const me = meP(); if (!me) return;
-  let r; try { r = await rpc("world_metro", { p_to: to }); } catch (e) { return toast(e.message, "bad"); }
-  setState(r.state); PL.w = r.w; renderPlaceHead(); renderWallet?.(); if (panelKind) { justBought = null; setMovebar(""); }
-  await ensureCards(metroPath(from, to));
-  const stops = metroPath(from, to), line = stops.map(g => spotOf(g) ? [spotOf(g)[3], spotOf(g)[4]] : centerOf(g));
-  drawRoute(line); me.path = null; me.gone = true; placeLayout(); sfx?.("dice");
-  const dest = line[line.length - 1];
-  map.flyTo({ center: dest, zoom: worldCam().zoom, duration: 1400 + 450 * stops.length, essential: true });
-  await sleep(1400 + 450 * stops.length);
-  me.lon = dest[0]; me.lat = dest[1]; me.gone = false; drawRoute(null); placeLayout();
-  toast(`Station ${(spotOf(to)?.[5] || "").replace(/^Métro /, "")}`, "good");
+function updateNear(force) {
+  const now = performance.now(); if (!W.on || (!force && now - W.nearT < 450)) return; W.nearT = now;
+  const me = meP(); if (!me || !W.cfg) return;
+  const list = [];
+  if (!W.riding && !me.gone) for (const [d, g] of nearby(me.lon, me.lat, W.cfg.reachBig)) if (d <= reachOf(g) - 4 && freeOf(g) > 0) list.push([d, g]);
+  list.sort((a, b) => a[0] - b[0]);
+  const next = new Set(list.map(x => x[1]));
+  if (mapReady) {
+    for (const g of W.nearSet) if (!next.has(g)) map.setFeatureState(Object.assign({ id: g }, BLD), { near: 0 });
+    for (const g of next) if (!W.nearSet.has(g)) map.setFeatureState(Object.assign({ id: g }, BLD), { near: 1 });
+  }
+  W.nearSet = next; W.near = list.map(x => x[1]);
+  renderDock();
+}
+// le bouton du milieu : « Acheter » quand un bien à vendre est à portée (le plus proche, puis le suivant), sinon « Moi » (revenir sur soi)
+function mainAction() {
+  if (!W.on) return;
+  if (W.near.length) {
+    const open = panelKind === "land" ? (landView ? sel : landPos()) : null;
+    return worldTapCard(W.near[(W.near.indexOf(open) + 1) % W.near.length]);
+  }
+  if (panelKind) { justBought = null; setMovebar(""); }
+  centerOnMe(true); showWalkHint();
+}
+const ICO_BUY = '<svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"><path d="M3.5 11.2L12 4l8.5 7.2" stroke-linecap="round"/><path d="M5.8 9.6V20h12.4V9.6" fill="rgba(255,255,255,.22)"/><path d="M10 20v-5.2h4V20"/></svg>';
+function renderDock() {
+  const b = $("#b-main"); if (!b) return;
+  const n = W.on ? W.near.length : 0, buy = n > 0, p = ST.state?.profile, me = meP();
+  if (me && p && (me.party !== p.party || me.pseudo !== p.pseudo)) { me.party = p.party; me.pseudo = p.pseudo; window.people3d?.look(me.id, spec3d(me)); }
+  const key = buy ? "buy" : "me:" + JSON.stringify(p?.look || null) + (p?.party || "");
+  if (b.dataset.k !== key) { b.dataset.k = key; $("#mainico").innerHTML = buy ? ICO_BUY : p ? avatarSVG(lookOf(ME, p.look), p.party, 120) : ""; b.classList.toggle("buy", buy); }
+  const lbl = buy ? "Acheter" : "Moi"; if ($("#mainlbl").textContent !== lbl) $("#mainlbl").textContent = lbl;
+  const nb = $("#nearn"); nb.hidden = n < 2; if (nb.textContent !== String(n)) nb.textContent = n;
+  const km = $("#kmleft"), w = W.w, c = W.cfg;
+  if (km && w && c) { const left = Math.max(0, Math.floor((c.freeKm - w.km) * 10 + 1e-6) / 10), t = left > 0 ? kmTxt(left) : fmtE(c.kmPrice) + "/km"; if (km.textContent !== t) km.textContent = t; km.classList.toggle("out", left <= 0); km.hidden = false; }
+  else if (km) km.hidden = true;
+  b.setAttribute("aria-label", buy ? `Acheter : ${n} bien${n > 1 ? "s" : ""} à vendre à portée` : "Revenir sur mon personnage");
+  const s = $("#b-say"); if (s) s.hidden = !W.on || W.chatOff || W.banned;
+}
+// petit rappel, les premières fois : « Touchez une rue pour marcher »
+function showWalkHint(force) {
+  let n = 0; try { n = +(localStorage.getItem("hm_whint") || 0); } catch (e) { }
+  if (!force && n >= 3) return;
+  try { localStorage.setItem("hm_whint", String(n + 1)); } catch (e) { }
+  let h = $("#whint"); if (!h) { h = document.createElement("div"); h.id = "whint"; h.textContent = "Touchez une rue pour marcher"; $("#p-map").appendChild(h); }
+  clearTimeout(h.t); h.hidden = false; h.t = setTimeout(() => { h.hidden = true; }, 3500);
+}
+function hintDone() { const h = $("#whint"); if (h) h.hidden = true; try { localStorage.setItem("hm_whint", "9"); } catch (e) { } hideHint(); }
+
+// ---- les « ? » : une carte Chance à ramasser (30 % des stations, jardins, places chaque jour, les mêmes pour tous) ------
+const chanceOn = g => ((g * 2654435761 + W.day * 97) % 4294967296) % 100 < (W.cfg?.chancePct ?? 30);   // comme _wchance_on()
+function renderQ() {
+  if (!map || !mapReady || !W.on) return;
+  W.q = (IDX.spots || []).filter(s => chanceOn(s[0]) && !W.taken.has(s[0])).map(s => ({ g: s[0], lon: s[3], lat: s[4] }));
+  const data = FC(W.q.map(q => ({ type: "Feature", properties: { g: q.g }, geometry: { type: "Point", coordinates: [q.lon, q.lat] } })));
+  const src = map.getSource("wq"); if (src) return src.setData(data);
+  map.addSource("wq", { type: "geojson", data });
+  const before = map.getLayer("people") ? "people" : undefined;
+  map.addLayer({ id: "wq-c", type: "circle", source: "wq", minzoom: 13.6, paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 13.6, 7, 16, 12, 18, 17], "circle-color": "#7C3AED", "circle-stroke-color": "#fff", "circle-stroke-width": 2.5, "circle-pitch-alignment": "viewport" } }, before);
+  map.addLayer({ id: "wq-t", type: "symbol", source: "wq", minzoom: 13.6, layout: { "text-field": "?", "text-font": ["Noto Sans Medium"], "text-size": ["interpolate", ["linear"], ["zoom"], 13.6, 11, 16, 17, 18, 23], "text-allow-overlap": true, "text-ignore-placement": true, "text-pitch-alignment": "viewport" }, paint: { "text-color": "#fff" } }, before);
+}
+function checkChance(force) {
+  const now = performance.now(); if (!force && now - W.qT < 250) return; W.qT = now;
+  const me = meP(); if (!W.on || !me || me.gone || !W.q.length) return;
+  const R = (W.cfg.chanceR || 40) - 6;
+  for (const q of W.q) {
+    if (W.qPend.has(q.g) || (W.qWait.get(q.g) || 0) > now || Math.abs(q.lat - me.lat) * KYP > R) continue;
+    if (mLL([me.lon, me.lat], [q.lon, q.lat]) <= R) pickChance(q.g, 0);
+  }
+}
+async function pickChance(g, tries) {
+  W.qPend.add(g);
+  try {
+    const r = await rpc("world_chance", { p_card: g });
+    W.taken.add(g); W.qPend.delete(g); renderQ();
+    if (r.state) setState(r.state); renderWallet(); showChance(r.chance);
+    if (r.chance?.extra || ["booster", "bonne", "cle"].includes(r.chance?.k)) Promise.all([refreshHold(), refreshMap()]).then(() => paintAll()).catch(() => { });
+  } catch (e) {
+    const m = e.message || "";
+    if (/Approchez/.test(m) && tries < 3) return setTimeout(() => pickChance(g, tries + 1), 700);
+    W.qPend.delete(g); W.qWait.set(g, performance.now() + 8000);
+    if (/Déjà/.test(m)) { W.taken.add(g); renderQ(); }
+    else if (/Pas de carte Chance/.test(m)) rejoin();   // un nouveau jour : les « ? » ont changé
+  }
+}
+function showChance(ch) {
+  if (!ch) return;
+  const [nm] = CHANCE[ch.k] || ["Carte Chance"], bad = BAD.has(ch.k), txt = chanceText(ch);
+  let el = $("#chpop"); if (!el) { el = document.createElement("button"); el.id = "chpop"; el.addEventListener("click", () => el.classList.remove("on")); document.body.appendChild(el); }
+  el.className = bad ? "bad" : "good";
+  el.innerHTML = `<i>?</i><span><small>Carte Chance</small><b>${esc(nm)}</b>${txt ? `<em>${esc(txt)}</em>` : ""}</span>`;
+  void el.offsetWidth; el.classList.add("on"); clearTimeout(el.t); el.t = setTimeout(() => el.classList.remove("on"), 4500);
+  sfx(bad ? "bad" : "coin"); if (!bad && window.confetti) confetti("#A855F7", 24);
 }
 
-// ---- l'écran ------------------------------------------------------------------
-function buildPlaceUI() {
-  $("#place")?.remove();
-  const el = document.createElement("div"); el.id = "place";
-  el.innerHTML = `<div id="plL"></div>
-    <header class="plh"><button class="plx" data-plx aria-label="Quitter le monde">${ICON.back}</button><div><b id="plt">7e arrondissement</b><small><i></i><span id="pln">…</span></small></div>
-      <span class="plkm" id="plkm" title="Km offerts aujourd'hui"></span><button class="plme" data-pllook aria-label="Mon personnage"></button></header>
-    ${(() => { try { return localStorage.getItem("hm_whint") ? "" : '<div class="plhint">Touchez une rue pour marcher</div>'; } catch (e) { return ""; } })()}
-    <button class="plloc" data-plloc aria-label="Revenir sur mon personnage"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
-    <form class="plin" id="plin" autocomplete="off"><input id="plq" maxlength="120" placeholder="Dire quelque chose…" enterkeyhint="send" aria-label="Message"><button aria-label="Envoyer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg></button></form>`;
-  document.body.appendChild(el);
-  el.addEventListener("click", e => {
-    if (e.target.closest("[data-plx]")) return closePlace();
-    if (e.target.closest("[data-pllook]")) return openLookSheet();
-    if (e.target.closest("[data-plloc]")) { const me = meP(); if (me) map.easeTo({ center: [me.lon, me.lat], duration: 600 }); return; }
-    const a = e.target.closest(".av"); if (a) { e.stopPropagation(); return a.dataset.id === PL.me ? openLookSheet() : openWho(a.dataset.id); }
+// ---- le métro : depuis une station, vers n'importe quelle station de Paris (un ticket) --------------
+const lineSort = (a, b) => parseFloat(a) - parseFloat(b) || a.localeCompare(b);
+const stName = g => (spotOf(g)?.[5] || "").replace(/^Métro /, "");
+const lineBadge = (l, s) => `<i class="lnb${LINE_DARK.has(l) ? " dk" : ""}" style="--lc:${LINE_C[l] || "#64748B"};--ls:${s}px">${l.replace("bis", "b")}</i>`;
+function metroSheet(from) {
+  const G = W.G; if (!G || !G.st.has(from)) return;
+  const mine = [...G.st.get(from).lines].sort(lineSort), others = Object.keys(G.metro).filter(l => !mine.includes(l)).sort(lineSort);
+  const rows = l => G.metro[l].map(seq => `<div class="mtl">${lineBadge(l, 24)}<div>${seq.map(g => g === from ? `<span class="mts here">${esc(stName(g))}</span>` : `<button class="mts" data-wride="${g}">${esc(stName(g))}</button>`).join("")}</div></div>`).join("");
+  sheet(`<b class="plst">🚇 Métro · ${fmtE(W.cfg?.ticket || 0)}</b><input class="mtq" id="mtq" placeholder="Aller à… (une station)" autocomplete="off" enterkeyhint="search" aria-label="Chercher une station">
+    <div class="mtres" id="mtres"></div><div class="mtls" id="mtls">${mine.map(rows).join("")}</div>
+    <div class="mtoth">${others.map(l => `<button data-wline="${l}" aria-label="Ligne ${l}">${lineBadge(l, 30)}</button>`).join("")}</div>`,
+    b => {
+      const x = b.closest("[data-wride]"); if (x) { closeSheet(); return ride(from, +x.dataset.wride); }
+      const l = b.closest("[data-wline]"); if (l) { const m = $("#mtls"); m.innerHTML = rows(l.dataset.wline); m.scrollIntoView({ block: "nearest" }); }
+    });
+  const q = $("#mtq"); q.addEventListener("input", () => {
+    const v = noAcc(q.value.trim()), out = $("#mtres"); if (v.length < 2) { out.innerHTML = ""; return; }
+    out.innerHTML = [...G.st.keys()].filter(g => g !== from && noAcc(stName(g)).includes(v)).slice(0, 8)
+      .map(g => `<button class="mts" data-wride="${g}">${esc(stName(g))}<span>${[...G.st.get(g).lines].sort(lineSort).map(l => lineBadge(l, 18)).join("")}</span></button>`).join("") || `<span class="plp">Aucune station</span>`;
   });
-  $("#plin").addEventListener("submit", e => { e.preventDefault(); sendSay(); });
-  const vv = window.visualViewport;
-  if (vv && !PL.vvOn) { PL.vvOn = true; const f = () => { const kb = Math.max(0, innerHeight - vv.height - vv.offsetTop); $("#place")?.style.setProperty("--kb", kb + "px"); }; vv.addEventListener("resize", f); vv.addEventListener("scroll", f); }
 }
-function renderPlaceHead() {
-  const n = $("#pln"); if (!n) return;
-  const k = PL.people.size; n.textContent = `${k} joueur${k > 1 ? "s" : ""} ici`;
-  const km = $("#plkm"), w = PL.w, c = PL.cfg;
-  if (km && w && c) { const left = Math.max(0, Math.floor((c.freeKm - w.km) * 10 + 1e-6) / 10); km.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="13" cy="4" r="2.2"/><path d="M9.5 21l2.2-6.4 2.8 2.6V21h2v-5l-2.6-2.6.8-3.4c1 1.3 2.6 2.1 4.3 2.1v-2c-1.4 0-2.6-.8-3.2-1.9l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L7 7.5V12h2V8.9l1.6-.6L8.3 21z"/></svg>${left > 0 ? kmTxt(left) : fmtE(c.kmPrice) + "/km"}`; km.classList.toggle("out", left <= 0); }
-  const b = $("#place .plme"), p = ST.state?.profile; if (b && p) b.innerHTML = avatarSVG(lookOf(ME, p.look), p.party, 34);
+function metroPath(from, to) {   // de station en station (changements compris) : pour le dessin
+  const G = W.G, prev = new Map([[from, null]]), q = [from];
+  while (q.length) { const g = q.shift(); if (g === to) break; for (const n of G.st.get(g)?.nb || []) if (!prev.has(n)) { prev.set(n, g); q.push(n); } }
+  const out = []; if (!prev.has(to)) return [from, to];
+  for (let g = to; g != null; g = prev.get(g)) out.unshift(g); return out;
 }
+async function ride(from, to) {
+  const me = meP(); if (!me || W.riding) return;
+  W.riding = true; moving = true;
+  let r; try { r = await rpc("world_metro", { p_to: to }); } catch (e) { W.riding = false; moving = false; return toast(e.message, "bad"); }
+  W.mv++; W.target = null;   // un trajet à pied en cours s'arrête là
+  setState(r.state); W.w = r.w || W.w; renderWallet(); renderDock(); if (r.toll?.toll > 0) tollToast(r.toll);
+  if (panelKind) { justBought = null; setMovebar(""); }
+  const stops = metroPath(from, to); await ensureCards(stops.concat([to]));
+  const line = stops.map(g => { const s = spotOf(g); return s ? [s[3], s[4]] : centerOf(g); });
+  stopPerson(me); me.gone = true; pose(me); layoutPeople(); window.people3d?.ring(0, 0, 0, false); drawRoute(line, null, true); sfx("dice");
+  const dest = centerOf(to), ms = Math.min(4200, 1400 + 220 * stops.length), v = worldView();
+  map.flyTo({ center: dest, zoom: v.zoom, pitch: v.pitch, offset: v.offset, duration: ms, essential: true });
+  await sleep(ms);
+  me.lon = dest[0]; me.lat = dest[1]; me.gone = false; pose(me); drawRoute(null);
+  W.riding = false; moving = false; window.people3d?.ring(me.lon, me.lat, W.cfg.reach, ringOn());
+  updateNear(true); checkChance(true); queueCells(true); layoutPeople();
+  justBought = null; landCredit = null; showLand(null, to);
+}
+
+// ---- parler, couper le chat --------------------------------------------------------
+function openSay() {
+  if (!W.on || W.chatOff || W.banned) return;
+  let f = $("#wsay");
+  if (!f) {
+    f = document.createElement("form"); f.id = "wsay"; f.autocomplete = "off"; f.hidden = true;
+    f.innerHTML = `<input id="wsq" maxlength="120" placeholder="Dire quelque chose…" enterkeyhint="send" aria-label="Message"><button class="go" aria-label="Envoyer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg></button><button type="button" class="x" aria-label="Fermer">×</button>`;
+    document.body.appendChild(f);
+    f.addEventListener("submit", e => { e.preventDefault(); sendSay(); });
+    f.querySelector(".x").addEventListener("click", closeSay);
+  }
+  f.hidden = false; document.body.classList.add("saying"); $("#wsq").focus();
+}
+function closeSay() { const f = $("#wsay"); if (f) f.hidden = true; document.body.classList.remove("saying"); $("#wsq")?.blur(); }
 async function sendSay() {
-  const q = $("#plq"), t = (q?.value || "").replace(/\s+/g, " ").trim(); if (!t) return;
+  const q = $("#wsq"), t = (q?.value || "").replace(/\s+/g, " ").trim(); if (!t) return closeSay();
   q.value = "";
-  try { await rpc("chat_say", { p_text: t }); say(meP(), t.slice(0, 120)); }
-  catch (e) { if (/Revenez/.test(e.message)) { rejoin(); q.value = t; return; } toast(e.message, "bad"); if (/Doucement/.test(e.message)) q.value = t; }
+  try { await rpc("world_say", { p_text: t }); say(meP(), t.slice(0, 120)); }
+  catch (e) {
+    const m = e.message || "";
+    if (/Revenez/.test(m)) { q.value = t; return rejoin(); }
+    if (/banni/i.test(m)) { W.banned = true; renderDock(); closeSay(); }
+    if (/Doucement/.test(m)) q.value = t;
+    toast(m, "bad");
+  }
 }
-// toucher quelqu'un : son nom et son parti ; l'admin peut le bannir
+// le profil : « ne plus voir les messages des joueurs » (on ne parle plus non plus)
+async function setChatOff(off) {
+  try { await rpc("set_chat_off", { p_off: !!off }); } catch (e) { return toast(e.message, "bad"); }
+  W.chatOff = !!off; if (ST.state?.profile) ST.state.profile.chat_off = W.chatOff;
+  if (off) { closeSay(); for (const p of W.people.values()) { clearTimeout(p.bt); p.bt = 0; const b = p.el?.querySelector(".bub"); if (b) b.hidden = true; } }
+  renderDock();
+}
+
+// ---- les fenêtres du monde (qui est-ce, mon personnage, payer des km) ---------------------
 function openWho(id) {
-  const p = PL.people.get(id); if (!p) return; const pr = PARTIES[p.party];
+  const p = W.people.get(id); if (!p) return; const pr = PARTIES[p.party];
   sheet(`<div class="plwho">${pr ? emblemSVG(p.party, 40) : ""}<div><b>${esc(p.pseudo || "?")}</b><span>${pr ? esc(pr.n) : "Sans parti"}</span></div></div>
-    ${PL.admin ? `<div class="plban"><button class="btn block light" data-ban="24">Bannir 24 h</button><button class="btn block danger" data-ban="0">Bannir à vie</button></div>` : ""}`,
+    ${W.admin ? `<div class="plban"><button class="btn block light" data-ban="24">Bannir du chat 24 h</button><button class="btn block danger" data-ban="0">Bannir du chat à vie</button></div>` : ""}`,
     async b => {
       const x = b.closest("[data-ban]"); if (!x) return;
       if (!x.dataset.sure) { x.dataset.sure = "1"; x.dataset.lbl = x.textContent; x.textContent = "Sûr ? Touchez encore"; setTimeout(() => { if (x.isConnected) { delete x.dataset.sure; x.textContent = x.dataset.lbl; } }, 3000); return; }
-      try { await rpc("chat_ban", { p_user: id, p_hours: x.dataset.ban === "0" ? null : 24 }); toast(`${p.pseudo} est banni${x.dataset.ban === "0" ? " à vie" : " 24 h"}`, "good"); removePerson(id); closeSheet(); }
+      try { await rpc("chat_ban", { p_user: id, p_hours: x.dataset.ban === "0" ? null : 24 }); toast(`${p.pseudo} est banni du chat${x.dataset.ban === "0" ? " à vie" : " 24 h"}`, "good"); closeSheet(); }
       catch (e) { toast(e.message, "bad"); }
     });
 }
@@ -594,18 +856,3 @@ function sheet(html, onClick) {
   document.body.appendChild(s);
 }
 function closeSheet() { $("#plsheet")?.remove(); }
-
-function initPlace() {
-  if (!map) return;
-  map.on("click", placeClick);
-  map.on("move", () => { if (PL.on) placeLayout(); });
-  addEventListener("resize", () => { if (PL.on) placeLayout(); });
-  document.addEventListener("visibilitychange", () => { if (!document.hidden && PL.on) placePing(); });
-  // la case dans le monde : « Y aller », « Prendre le métro »
-  document.addEventListener("click", e => {
-    if (!PL.on) return;
-    const go = e.target.closest("[data-wgo]");
-    if (go) { const g = +go.dataset.wgo, pay = !!go.dataset.pay; justBought = null; setMovebar(""); return walkTo(centerOf(g), g, pay); }
-    const mt = e.target.closest("[data-wmetro]"); if (mt) return metroSheet(+mt.dataset.wmetro);
-  });
-}
