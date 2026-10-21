@@ -55,6 +55,7 @@ t, ev = last_ev()
 CFG = db.sql("select _world_cfg()")[0][0]
 check("les gens autour voient le trajet et la durée (à la vitesse du jeu)", ev["k"] == "move" and ev["d"]["path"] == path and abs(ev["d"]["dur"] - min(CFG["maxDur"], max(1, plen / CFG["speed"]))) < 0.01, (ev["d"].get("dur"), CFG["speed"]))
 check("le personnage marche à 22 m/s, un trajet dure 60 s au plus (21/10/2026 : 40 « trop vite », 12 « trop lentement »)", CFG["speed"] == 22 and CFG["maxDur"] == 60, CFG)
+db.sql("update walkers set t0 = now() where user_id=%s", str(A))   # (le départ vient d'avoir lieu, même si la machine est lente)
 check("deux déplacements en moins d'un quart de seconde : le 2e attend", "Doucement" in (err(lambda: db.rpc(A, "world_move", p_lon=x0, p_lat=y0, p_len=10)) or ""))
 done(A)
 r = db.rpc(A, "world_move", p_lon=x0 + 0.001, p_lat=y0, p_len=1, p_path=[[x0 - 0.01, y0], [x0 + 0.001, y0]])
