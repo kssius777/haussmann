@@ -204,6 +204,16 @@ async def main():
         await W("[...document.querySelectorAll('#wpl .bub:not([hidden])')].some(b => b.textContent === 'Bienvenue !')", 10000)
         check("le message d'un autre joueur s'affiche dans une bulle au-dessus de lui", True)
         await pg.screenshot(path=T + "19_monde.png", timeout=120000)
+        # toucher un autre joueur : ce qu'il vend et ses biens ; un toucher ouvre la fiche (acheter l'annonce, proposer de racheter)
+        eg = db.sql("select id from cards where lk='l' and lots between 2 and 6 and id not in (select card from lots) limit 1")[0][0]
+        db.sql("insert into lots(card,k,owner) values (%s,0,%s),(%s,1,%s)", eg, ou, eg, ou); db.rpc(ou, "list_item", p_card=eg, p_k=0, p_n=1, p_price=777000)
+        await E("refreshMap().then(() => 1)")
+        await E(f"document.querySelector('#wpl .wp[data-id=\"{ou}\"]').click(); 1"); await W("document.querySelector('#plsheet .whs')", 10000)
+        check("toucher un autre joueur : ce qu'il vend et ses biens", await E(f"document.querySelector('#plsheet').innerText.includes('En vente') && document.querySelector('#plsheet').innerText.includes('Ses biens') && !!document.querySelector('#plsheet [data-wb=\"{eg}\"]')"))
+        await pg.screenshot(path=T + "19c_joueur.png", timeout=120000)
+        await pg.click(f"#plsheet [data-wb='{eg}']"); await W("document.querySelector('#p-detail [data-back]')", 10000)
+        check("… un toucher ouvre la fiche du bien (acheter l'annonce, proposer de racheter)", await E("!document.querySelector('#p-detail').hidden && !document.querySelector('#plsheet')"))
+        await pg.click("#p-detail [data-back]"); await pg.wait_for_timeout(700)
         # marcher : toucher une rue (un point de rue à l'écran, pas sous un immeuble ni sous un bouton)
         tap = await E("""(() => { const m = meP();
           for (let y = 160; y < innerHeight - 270; y += 19) for (let x = 24; x < innerWidth - 24; x += 19) {

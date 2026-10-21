@@ -409,7 +409,13 @@ function worldEvent(e) {
     p.mvKey = key; p.mvAt = performance.now();
     if (d.metro) hop(p, d.lon, d.lat); else walkAlong(p, d.path || [[p.lon, p.lat], [d.lon, d.lat]], d.dur);
   }
-  else if (e.k === "say") { if (id !== W.me && p && !W.chatOff) { say(p, d.t); logSay(p, d.t); } }
+  else if (e.k === "say") {
+    if (id !== W.me && p && !W.chatOff) {
+      say(p, d.t);
+      const me = meP();   // le fil : ceux qu'on voit, ou à moins de 250 m (dans une foule, il ne déborde pas)
+      if (p.vis || (me && mLL([me.lon, me.lat], [p.lon, p.lat]) < 250)) logSay(p, d.t);
+    }
+  }
   else if (e.k === "look") { if (p) { p.look = d.look; window.people3d?.look(p.id, spec3d(p)); } }
   else if (e.k === "leave") removePerson(id);
   else if (e.k === "kick" && id === W.me) { W.banned = true; renderDock(); closeSay(); toast(d.h ? `Vous êtes banni du chat pour ${d.h} h` : "Vous êtes banni du chat", "bad"); }
@@ -910,11 +916,22 @@ async function setChatOff(off) {
 }
 
 // ---- les fenêtres du monde (qui est-ce, mon personnage, payer des km) ---------------------
-function openWho(id) {
+// toucher quelqu'un : son nom, son parti, ce qu'il vend et ses plus beaux biens (21/10/2026, demande du propriétaire :
+// « s'ils veulent, ils peuvent faire une offre ou voir les offres de vente de ce joueur, sans trop de complexité ») ;
+// un toucher ouvre la fiche du bien, où l'on achète l'annonce ou propose de racheter
+async function openWho(id) {
   const p = W.people.get(id); if (!p) return; const pr = PARTIES[p.party];
+  const his = [...ST.own.entries()].filter(([, o]) => o.owners?.includes(id)).map(([g]) => g);
+  let sells = []; try { sells = ((await rpc("market")).listings || []).filter(l => l.seller === id); } catch (e) { }
+  await ensureCards([...new Set([...sells.map(l => l.card), ...his.slice(0, 80)])]).catch(() => { });
+  const best = his.filter(g => card(g)).sort((a, b) => card(b).v - card(a).v).slice(0, 5);
+  const row = (g, right) => card(g) ? `<button class="whr" data-wb="${g}"><span>${esc(title(card(g)))}</span><b>${right}</b></button>` : "";
   sheet(`<div class="plwho">${pr ? emblemSVG(p.party, 40) : ""}<div><b>${esc(p.pseudo || "?")}</b><span>${pr ? esc(pr.n) : "Sans parti"}</span></div></div>
+    ${sells.length ? `<div class="whs"><h4>En vente</h4>${sells.slice(0, 5).map(l => row(l.card, fmtE(l.price))).join("")}</div>` : ""}
+    ${best.length ? `<div class="whs"><h4>Ses biens</h4>${best.map(g => row(g, ord(IDX.arr[ai(g)].n))).join("")}</div>` : ""}
     ${W.admin ? `<div class="plban"><button class="btn block light" data-ban="24">Bannir du chat 24 h</button><button class="btn block danger" data-ban="0">Bannir du chat à vie</button></div>` : ""}`,
     async b => {
+      const w = b.closest("[data-wb]"); if (w) { closeSheet(); return push("b", +w.dataset.wb); }
       const x = b.closest("[data-ban]"); if (!x) return;
       if (!x.dataset.sure) { x.dataset.sure = "1"; x.dataset.lbl = x.textContent; x.textContent = "Sûr ? Touchez encore"; setTimeout(() => { if (x.isConnected) { delete x.dataset.sure; x.textContent = x.dataset.lbl; } }, 3000); return; }
       try { await rpc("chat_ban", { p_user: id, p_hours: x.dataset.ban === "0" ? null : 24 }); toast(`${p.pseudo} est banni du chat${x.dataset.ban === "0" ? " à vie" : " 24 h"}`, "good"); closeSheet(); }
