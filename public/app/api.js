@@ -171,15 +171,18 @@ function baseRent(h) {
 // La carte : ce qui a changé, toutes les 20 s, et tout de suite quand quelqu'un achète ou vend près de soi (évènement « map »
 // du monde, place.js → syncMapSoon) ; son argent et ses biens : toutes les 60 s. Rien quand l'onglet est caché.
 // (Avant le 21/10/2026 : postgres_changes sur lots, parts, listings, news, arr_state, voir migration_carte_delta.sql.)
-let rtT = null, mapSeen = null, syncT = 0;
+let rtT = null, mapSeen = null, syncT = 0, syncAt = 0;
 function startRealtime(onChange) {
   mapSeen = ch => onChange("map", ch);
   setInterval(() => { if (!document.hidden) syncMap(); }, LOCAL_MODE ? 8000 : 20000);
-  // (un peu de hasard : tous les joueurs ne relisent pas au même instant)
-  setInterval(() => { if (document.hidden) return; clearTimeout(rtT); rtT = setTimeout(() => onChange("poll"), Math.random() * 3000); }, LOCAL_MODE ? 8000 : 60000);
+  // (un peu de hasard : tous les joueurs ne relisent pas au même instant) ; en revenant sur l'onglet, tout de suite
+  const poll = ms => { clearTimeout(rtT); rtT = setTimeout(() => onChange("poll"), ms); };
+  setInterval(() => { if (!document.hidden) poll(Math.random() * 3000); }, LOCAL_MODE ? 8000 : 60000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(300); });
 }
-function syncMapSoon(ms) { clearTimeout(syncT); syncT = setTimeout(syncMap, ms || 0); }
-async function syncMap() { try { const ch = await refreshMap(); if (ch && mapSeen) mapSeen(ch); } catch (e) { } }
+// tout de suite, mais pas plus d'une fois toutes les 3 s (dans un coin plein de monde, les achats s'enchaînent)
+function syncMapSoon(ms) { clearTimeout(syncT); syncT = setTimeout(syncMap, Math.max(ms || 0, syncAt + 3000 - Date.now())); }
+async function syncMap() { syncAt = Date.now(); try { const ch = await refreshMap(); if (ch && mapSeen) mapSeen(ch); } catch (e) { } }
 
 const liftCost = m => Math.round(m.a * (1 + 0.005 * (Date.now() - new Date(m.t).getTime()) / 864e5));
 function packsReady() { const s = ST.state; if (!s?.profile) return 0; return (s.profile.welcome || 0) + (s.free_in <= 0 ? 1 : 0); }

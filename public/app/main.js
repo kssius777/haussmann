@@ -42,7 +42,7 @@ async function startGame(first) {
   $("#loading")?.remove();
   go("map"); renderWallet(); initPawnUI();
   rpc("is_admin").then(v => { ST.admin = v === true; }).catch(() => { });
-  refreshOffers(); setInterval(refreshOffers, 60000);
+  refreshOffers(); setInterval(() => { if (!document.hidden) refreshOffers(); }, 60000);   // (rien quand l'onglet est caché)
   try { initWorld(); } catch (e) { console.warn("monde", e); }   // Paris à pied (place.js) : on y entre dès que la carte est prête
   setTimeout(claimGift, 1500);
   try { if (first) { if (localStorage.getItem("hm_tut") == null) localStorage.setItem("hm_tut", "1"); } else if (localStorage.getItem("hm_tut") == null) localStorage.setItem("hm_tut", "99"); } catch (e) { }
@@ -53,8 +53,7 @@ async function startGame(first) {
     const c2 = $("#cash2"); if (c2 && cur() === "assets") c2.textContent = fmtE(liveCash());
     const f = $("#freein"); if (f) { const s = freeIn(); if (s <= 0 && cur() === "booster") renderBoosterPage(); else f.textContent = hm(s); }
   }, 1000);
-  setInterval(() => refreshState().catch(() => { }), 60000);
-  startRealtime(async (what, ch) => {   // ch : ce qui a changé sur la carte ({ full, cards, arr, sale }), voir refreshMap
+  startRealtime(async (what, ch) => {   // (son état, toutes les 60 s : par « poll », plus par un 2e minuteur qui tournait même onglet caché)   // ch : ce qui a changé sur la carte ({ full, cards, arr, sale }), voir refreshMap
     try {
       if (what === "poll") { const [, , c2] = await Promise.all([refreshState(), refreshHold(), refreshMap()]); ch = c2; }
       if (ch?.arr) updateArrFill();
