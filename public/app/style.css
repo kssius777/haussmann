@@ -31,6 +31,7 @@ input{font:inherit;color:inherit}
 #pages{position:fixed;left:0;right:0;top:calc(var(--bar-h) + env(safe-area-inset-top,0px));bottom:calc(var(--tab-h) + env(safe-area-inset-bottom,0px))}
 .page{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;background:var(--bg)}
 .page.enter{animation:pageIn .2s ease-out both}
+#p-map.enter{animation:none}   /* (jamais d'animation sur la carte : un « transform », même fini, rendait #map plus petit et refaisait sa toile, 21/10/2026) */
 @keyframes pageIn{from{transform:translateY(6px);opacity:.4}}
 .page.detail{z-index:6;background:var(--bg)}
 .page.detail.enter{animation:pushIn .24s cubic-bezier(.2,.8,.2,1) both}
@@ -66,7 +67,10 @@ input{font:inherit;color:inherit}
 #tabs .badge{position:absolute;top:2px;right:calc(50% - 22px);min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--danger);color:#fff;font-size:11px;line-height:18px}
 
 /* ---------- map ---------- */
-#map{position:absolute;inset:0}
+/* la carte garde toujours la même taille, tout l'écran (21/10/2026) : avant, changer d'onglet la cachait (display:none,
+   donc 0 × 0) et ouvrir une fiche la rétrécissait, et la toile WebGL était refaite à chaque fois (mémoire, saccades) */
+#map{position:fixed;inset:0}
+#p-map[hidden]{display:block!important;visibility:hidden;pointer-events:none}
 .maplibregl-canvas{outline:none}
 .maptop{position:absolute;top:10px;left:10px;right:10px;z-index:3;display:flex;gap:8px;align-items:flex-start;pointer-events:none}
 .maptop>*{pointer-events:auto}

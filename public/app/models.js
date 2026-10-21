@@ -235,7 +235,8 @@ window.addMonuments=function(map,models){
 };
 // un seul moteur three.js pour les deux calques (maquettes, personnages) : moins de mémoire sur téléphone
 let R0=null;
-function sharedRenderer(map,gl){ if(!R0){ R0=new T.WebGLRenderer({canvas:map.getCanvas(),context:gl,antialias:true}); R0.autoClear=false; } return R0; }
+function sharedRenderer(map,gl){ if(!R0){ R0=new T.WebGLRenderer({canvas:map.getCanvas(),context:gl,antialias:true}); R0.autoClear=false;
+  R0.debug.checkShaderErrors=false; } return R0; }   // (21/10/2026 : vérifier chaque shader bloquait le démarrage, getProgramInfoLog)
 
 // =====================================================================
 //  Les personnages en 3D (20/10/2026, demande du propriétaire : « le perso est un peu trop 2D, ça fait South Park »).

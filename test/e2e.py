@@ -239,7 +239,7 @@ async def main():
         # marcher : toucher une rue (un point de rue à l'écran, pas sous un immeuble ni sous un bouton)
         tap = await E("""(() => { const m = meP();
           for (let y = 160; y < innerHeight - 270; y += 19) for (let x = 24; x < innerWidth - 24; x += 19) {
-            const q = map.unproject([x, y]), d = mLL([m.lon, m.lat], [q.lng, q.lat]); if (d < 60 || d > 450) continue;
+            const q = map.unproject([x, y]), d = mLL([m.lon, m.lat], [q.lng, q.lat]); if (d < 200 || d > 450) continue;   // (assez loin : à 22 m/s, on le voit encore marcher quand on regarde la caméra)
             const s = snapW(W.G, q.lng, q.lat, 30); if (!s) continue; const ll = [s.x / KXP, s.y / KYP], p = map.project(ll);
             if (Math.hypot(p.x - x, p.y - y) > 14 || p.y < 150 || p.y > innerHeight - 260) continue;
             if (map.queryRenderedFeatures([p.x, p.y]).some(f => /^(bd|rf|mfill|wq-c)$/.test(f.layer.id))) continue;

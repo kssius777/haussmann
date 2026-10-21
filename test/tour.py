@@ -101,7 +101,7 @@ async def main():
         await pg.goto(f"http://localhost:{PORT}/?local"); await W("!document.querySelector('#onb').hidden")
         await pg.click(".lhero [data-l=email]"); await W("document.querySelector('#em')")
         await pg.fill("#em", em); await pg.fill("#pw", "secret12"); await pg.click("#authf button")
-        await W("document.querySelector('#ps')"); await pg.fill("#ps", "Tour" + em[4:8]); await pg.click("#pf button")
+        await W("document.querySelector('#ps')"); await pg.fill("#ps", "Tour" + em.split("@")[0][-5:]); await pg.click("#pf button")
         await W("document.querySelector('#plater')"); await pg.click("#plater"); await W("document.querySelector('.welcome')")
         me = await E("ME")
         await E("localStorage.setItem('hm_tut','99'); localStorage.setItem('hm_hint2','1'); 1")

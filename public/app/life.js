@@ -16,7 +16,7 @@ function lifeEnabled() {
 
 // ---- petites images dessinées une fois (vue de dessus) ----
 function lifeImages() {
-  const mk = (w, h, draw) => { const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d"); draw(g); return g.getImageData(0, 0, w, h); };
+  const mk = (w, h, draw) => { const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d", { willReadFrequently: true }); draw(g); return g.getImageData(0, 0, w, h); };   // (lu tout de suite : pas de canvas sur la carte graphique, 21/10/2026)
   const rr = (g, x, y, w, h, r) => { g.beginPath(); g.roundRect(x, y, w, h, r); g.fill(); };
   const add = (id, img) => { if (!map.hasImage(id)) map.addImage(id, img, { pixelRatio: 2 }); };
   ["#E5484D", "#2563EB", "#F5F5F4", "#1F2937", "#F59E0B", "#10B981", "#94A3B8"].forEach((col, i) => add("car" + i, mk(40, 20, g => {
@@ -52,10 +52,16 @@ function lifeImages() {
 }
 
 // ---- les parcs (pas de voitures dedans, des vélos) ----
-let LPARKS = null;
+let LPARKS = null, LPARKG = null;
+const PKX = .004, PKY = .0027, pkCell = (x, y) => Math.floor(x / PKX) * 100000 + Math.floor(y / PKY);
 function inPark(x, y) {
   if (!LPARKS) LPARKS = (BASE?.parks || []).map(rs => { const r = decodeRing(rs[0]); let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const [a, b] of r) { x0 = Math.min(x0, a); x1 = Math.max(x1, a); y0 = Math.min(y0, b); y1 = Math.max(y1, b); } return { r, bb: [x0, y0, x1, y1] }; });
-  for (const P of LPARKS) {
+  if (!LPARKG) {   // chaque parc dans les carrés que touche son rectangle
+    LPARKG = new Map();
+    for (const P of LPARKS) for (let gx = Math.floor(P.bb[0] / PKX); gx <= Math.floor(P.bb[2] / PKX); gx++) for (let gy = Math.floor(P.bb[1] / PKY); gy <= Math.floor(P.bb[3] / PKY); gy++) {
+      const k = gx * 100000 + gy; let l = LPARKG.get(k); if (!l) LPARKG.set(k, l = []); l.push(P); }
+  }
+  for (const P of LPARKG.get(pkCell(x, y)) || []) {
     if (x < P.bb[0] || x > P.bb[2] || y < P.bb[1] || y > P.bb[3]) continue;
     let ins = false; const r = P.r; for (let i = 0, j = r.length - 1; i < r.length; j = i++) if ((r[i][1] > y) !== (r[j][1] > y) && x < (r[j][0] - r[i][0]) * (y - r[i][1]) / (r[j][1] - r[i][1]) + r[i][0]) ins = !ins;
     if (ins) return true;
@@ -72,6 +78,7 @@ function lifeLines() {
   const b = map.getBounds(), W = b.getWest(), E = b.getEast(), S = b.getSouth(), N = b.getNorth(), out = { car: [], walk: [], bike: [] };
   for (let i = 0; i < 20; i++) {
     const A = ARR[i]; if (!A?.roads) continue;
+    const ab = IDX.arr[i].bbox; if (ab && (ab[2] < W || ab[0] > E || ab[3] < S || ab[1] > N)) continue;   // (pas à l'écran : rien à préparer)
     if (!A.lifeL) A.lifeL = A.roads.map(([k, f]) => {
       const p = decodeRing(f); let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; const cum = [0];
       for (let j = 0; j < p.length; j++) { const [x, y] = p[j]; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); if (j) cum.push(cum[j - 1] + Math.hypot((x - p[j - 1][0]) * M_LON, (y - p[j - 1][1]) * M_LAT)); }

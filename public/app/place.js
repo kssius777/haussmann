@@ -229,7 +229,7 @@ function fitPath(pts) { for (const tol of [1.2, 3, 6, 12, 25, 50, 100]) { const 
 
 // ---- l'état -------------------------------------------------------------------
 const W = { on: false, starting: false, tries: 0, me: null, admin: false, cfg: null, w: null, day: 0, taken: new Set(), chatOff: false, banned: false,
-  people: new Map(), cells: new Set(), cellKey: "", chans: new Map(), chSt: new Map(), authed: false, feedEvery: 0, feedT: 0, listT: 0,
+  people: new Map(), cells: new Set(), cellKey: "", chans: new Map(), chSt: new Map(), cg: new Map(), lay: 0, authed: false, feedEvery: 0, feedT: 0, listT: 0,
   last: 0, seen: new Set(), feeding: false, raf: 0, G: null, target: null, mv: 0, moving: false, queued: null, riding: false,
   near: [], nearSet: new Set(), nearT: 0, q: [], qPend: new Set(), qWait: new Map(), qT: 0, first: true, stepT: 0, followT: 0 };
 const meP = () => W.people.get(W.me);
@@ -277,7 +277,7 @@ function worldMapReady() {
   if (window.THREE && window.addPeople) { try { addPeople(map); } catch (e) { console.warn("personnages 3D", e); } }
   const box = document.createElement("div"); box.id = "wpl"; map.getContainer().appendChild(box);
   box.addEventListener("click", e => { const b = e.target.closest(".wp"); if (!b) return; e.stopPropagation(); if (b.dataset.id === W.me) openLookSheet(); else openWho(b.dataset.id); });
-  map.on("render", layoutPeople); map.on("move", offMe);
+  map.on("render", layoutPeople); map.on("move", throttle(offMe, 150));   // (la flèche : 7 fois par seconde suffisent, la caméra bouge à chaque image)
   // la caméra derrière le perso : faire glisser la carte la libère ; la tourner ou l'incliner garde ce cap jusqu'au prochain trajet
   map.on("dragstart", e => { if (e.originalEvent) camOff(true); });
   for (const ev of ["rotatestart", "pitchstart"]) map.on(ev, e => { if (e.originalEvent) CAM.userB = true; });
@@ -373,14 +373,23 @@ function updateCells() {
   const key = [...out].sort().join(","); if (key === W.cellKey) return;
   W.cellKey = key; W.cells = out; listen(); refreshPeople();
 }
+// les groupes (21/10/2026, migration_groupes.sql) : dans un carré bondé, on n'écoute que son groupe, « w:carré.groupe »
+// (groupe = sa couche % le nombre de groupes du carré, rendus par world_look et world_feed, ou annoncés par « regroup »)
+const chanOf = c => { const g = W.cg.get(c) || 1; return g > 1 ? `w:${c}.${(W.lay || 0) % g}` : `w:${c}`; };
+function setGroups(gm) {   // gm : { carré: nombre de groupes } pour les carrés bondés (les autres : 1)
+  if (!gm) return; let ch = false;
+  for (const c of W.cells) { const g = +(gm[c] || 1); if ((W.cg.get(c) || 1) !== g) { ch = true; if (g > 1) W.cg.set(c, g); else W.cg.delete(c); } }
+  if (ch) { listen(); queuePeople(); }
+}
 async function listen() {
   if (!LOCAL_MODE && SB) {
     if (!W.authed) { W.authed = true; try { const { data } = await SB.auth.getSession(); if (data?.session) SB.realtime.setAuth(data.session.access_token); } catch (e) { } }
-    for (const [c, ch] of [...W.chans]) if (!W.cells.has(c)) { try { SB.removeChannel(ch); } catch (e) { } W.chans.delete(c); W.chSt.delete(c); }
-    for (const c of W.cells) if (!W.chans.has(c)) {
-      const ch = SB.channel("w:" + c, { config: { private: true } }).on("broadcast", { event: "ev" }, ({ payload }) => worldEvent(payload));
-      W.chans.set(c, ch); W.chSt.set(c, "");
-      ch.subscribe(st => { if (W.chans.get(c) !== ch) return; W.chSt.set(c, st); rtCheck(); });
+    const want = new Set([...W.cells].map(chanOf));
+    for (const [n, ch] of [...W.chans]) if (!want.has(n)) { try { SB.removeChannel(ch)?.catch?.(() => { }); } catch (e) { } W.chans.delete(n); W.chSt.delete(n); }
+    for (const n of want) if (!W.chans.has(n)) {
+      const ch = SB.channel(n, { config: { private: true } }).on("broadcast", { event: "ev" }, ({ payload }) => worldEvent(payload));
+      W.chans.set(n, ch); W.chSt.set(n, "");
+      ch.subscribe(st => { if (W.chans.get(n) !== ch) return; W.chSt.set(n, st); rtCheck(); });
     }
   }
   rtCheck();
@@ -396,19 +405,25 @@ function quiet() {
 }
 function wake() { clearTimeout(quietT); if (!W.quiet) return; W.quiet = false; if (W.on) queueCells(true); }
 function rtCheck() {   // tous les carrés en temps réel : on relit lentement (filet de sécurité, et « toujours là ») ; sinon toutes les 2,5 s
-  const ok = !LOCAL_MODE && !!SB && W.cells.size > 0 && [...W.cells].every(c => W.chSt.get(c) === "SUBSCRIBED"), every = ok ? 20000 : 2500;
+  const ok = !LOCAL_MODE && !!SB && W.cells.size > 0 && [...W.cells].every(c => W.chSt.get(chanOf(c)) === "SUBSCRIBED"), every = ok ? 20000 : 2500;
   if (W.feedEvery !== every) { W.feedEvery = every; clearInterval(W.feedT); W.feedT = setInterval(worldFeed, every); }
 }
 async function worldFeed() {
   if (!W.on || W.feeding || document.hidden || !W.cells.size) return; W.feeding = true;
-  try { const f = await rpc("world_feed", { p_cells: [...W.cells], p_since: W.last }); if (f.gone) await rejoin(); else for (const e of f.ev) worldEvent(e); }
+  try { const f = await rpc("world_feed", { p_cells: [...W.cells], p_since: W.last }); if (f.gone) await rejoin(); else { setGroups(f.g); for (const e of f.ev) worldEvent(e); } }
   catch (e) { } finally { W.feeding = false; }
 }
 let peopleQ = 0;
 function queuePeople() { clearTimeout(peopleQ); peopleQ = setTimeout(refreshPeople, 600); }
 async function refreshPeople() {
   if (!W.on || !W.cells.size || document.hidden) return;
-  try { syncPeople(await rpc("world_people", { p_cells: [...W.cells] })); } catch (e) { }
+  try {
+    let r = null;
+    try { r = await rpc("world_look", { p_cells: [...W.cells] }); }
+    catch (e) { if (!/world_look|Could not find|does not exist/i.test(e.message || "")) throw e; r = { people: await rpc("world_people", { p_cells: [...W.cells] }) }; }   // (serveur d'avant)
+    if (r.lay != null && r.lay !== W.lay) { W.lay = r.lay; listen(); }
+    setGroups(r.g); syncPeople(r.people);
+  } catch (e) { }
 }
 function syncPeople(list) {
   const ids = new Set();
@@ -420,7 +435,8 @@ function worldEvent(e) {
   if (!W.on || !e || W.seen.has(e.e)) return;
   W.seen.add(e.e); if (e.e > W.last) W.last = e.e;
   if (W.seen.size > 800) W.seen = new Set([...W.seen].slice(-400));
-  if (e.k === "map") return syncMapSoon(300 + Math.random() * 1200);   // quelqu'un a acheté ou vendu près d'ici : la carte, tout de suite (api.js)
+  if (e.k === "map") return syncMapSoon(300 + Math.random() * 1200);
+  if (e.k === "regroup") { if (W.cells.has(e.c)) setGroups(Object.assign(Object.fromEntries([...W.cg]), { [e.c]: (e.d && e.d.g) || 1 })); return; }   // ce carré est plus ou moins bondé : on réécoute le bon groupe   // quelqu'un a acheté ou vendu près d'ici : la carte, tout de suite (api.js)
   const id = e.u, d = e.d || {}; let p = W.people.get(id);
   if (e.k === "join") { if (id !== W.me) { upsertPerson(d); updateVisible(); } }
   else if (e.k === "move") {
@@ -574,10 +590,11 @@ function clampBubble(p) {
 // quand son personnage sort de l'écran : une flèche au bord indique où il est
 function offMe() {
   const el = $("#pawnoff"), me = meP(); if (!el || !me || !W.on || !map) return;
-  if ((panelKind === "land" && innerWidth < 900) || me.gone || cur() !== "map" || mode !== "all") { el.hidden = true; return; }
+  const hide = () => { if (!el.hidden) el.hidden = true; };   // (n'écrire que si ça change : sinon tout le style de la page est recalculé)
+  if ((panelKind === "land" && innerWidth < 900) || me.gone || cur() !== "map" || mode !== "all") return hide();
   const Wd = map.getContainer().clientWidth, H = map.getContainer().clientHeight, pt = map.project([me.lon, me.lat]);
   const top = 110, bot = H - (($(".mapbottom")?.offsetHeight || 80) + 24), left = 30, right = Wd - 30 - (panelKind === "land" && innerWidth >= 900 ? 400 : 0);
-  if (pt.x > left && pt.x < right && pt.y > top && pt.y < bot) { el.hidden = true; return; }
+  if (pt.x > left && pt.x < right && pt.y > top && pt.y < bot) return hide();
   const cx = Wd / 2, cy = (top + bot) / 2, dx = pt.x - cx, dy = pt.y - cy;
   const k = Math.min((right - 50 - cx) / Math.abs(dx || 1e-6), (bot - 20 - cy) / Math.abs(dy || 1e-6));
   el.hidden = false; el.style.left = (cx + dx * k) + "px"; el.style.top = (cy + dy * k) + "px";

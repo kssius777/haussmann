@@ -16,7 +16,7 @@ cur.execute("""create schema if not exists realtime;
   $$ insert into realtime.sent(payload, event, topic, private) values (payload, event, topic, private) $$;
   truncate realtime.sent;""")
 for f in ["migration_admin.sql", "migration_chat.sql", "migration_chat_look.sql", "migration_metro.sql", "migration_lieux.sql",
-          "migration_monde.sql", "migration_monde_paris.sql", "migration_monde_paris.sql", "migration_vitesse.sql", "migration_temps_reel.sql", "migration_chat_minute.sql"]:
+          "migration_monde.sql", "migration_monde_paris.sql", "migration_monde_paris.sql", "migration_vitesse.sql", "migration_temps_reel.sql", "migration_chat_minute.sql", "migration_vitesse2.sql", "migration_groupes.sql", "migration_groupes.sql"]:
     cur.execute(open("supabase/" + f).read())   # la dernière 2 fois : rejouable
 c0.commit()
 db.sql("truncate place_people, chat_msg, chat_bans, walkers, world_people, chance_taken")
@@ -54,7 +54,7 @@ check("salaire de la marche : 20 000 € par km offert", r["salary"] == math.flo
 t, ev = last_ev()
 CFG = db.sql("select _world_cfg()")[0][0]
 check("les gens autour voient le trajet et la durée (à la vitesse du jeu)", ev["k"] == "move" and ev["d"]["path"] == path and abs(ev["d"]["dur"] - min(CFG["maxDur"], max(1, plen / CFG["speed"]))) < 0.01, (ev["d"].get("dur"), CFG["speed"]))
-check("le personnage marche à 12 m/s, un trajet dure 60 s au plus (21/10/2026 : « il avance trop vite »)", CFG["speed"] == 12 and CFG["maxDur"] == 60, CFG)
+check("le personnage marche à 22 m/s, un trajet dure 60 s au plus (21/10/2026 : 40 « trop vite », 12 « trop lentement »)", CFG["speed"] == 22 and CFG["maxDur"] == 60, CFG)
 check("deux déplacements en moins d'un quart de seconde : le 2e attend", "Doucement" in (err(lambda: db.rpc(A, "world_move", p_lon=x0, p_lat=y0, p_len=10)) or ""))
 done(A)
 r = db.rpc(A, "world_move", p_lon=x0 + 0.001, p_lat=y0, p_len=1, p_path=[[x0 - 0.01, y0], [x0 + 0.001, y0]])
@@ -193,13 +193,51 @@ ADM = player("Adm"); db.sql("insert into admins(id) values (%s) on conflict do n
 db.rpc(ADM, "chat_ban", p_user=str(B), p_hours=24)
 check("banni du chat : ne peut plus parler, mais reste dans Paris", "banni" in (err(lambda: db.rpc(B, "world_say", p_text="hello")) or "") and db.rpc(B, "world_ping") > 0)
 
+# les groupes (21/10/2026) : dans un carré bondé, chacun ne voit et ne reçoit que son groupe (~40 au plus)
+gx, gy = 2.3601, 48.8722   # un carré tranquille (canal Saint-Martin), loin des autres tests
+gcell = db.sql("select _wcell(%s, %s)", gx, gy)[0][0]
+db.sql("truncate realtime.sent")
+crowd = []
+for i in range(46):
+    u = player(f"Foule{i}"); db.rpc(u, "world_join"); put(u, gx + (i % 7) * 1e-5, gy + (i // 7) * 1e-5); crowd.append(u)
+check("41 personnes et plus dans un carré : il passe en 2 groupes", db.rpc(crowd[-1], "world_look", p_cells=[gcell]) and db.sql("select g from world_cells where cell=%s", gcell) == [(2,)], db.sql("select g from world_cells where cell=%s", gcell))
+lay = {str(u): db.sql("select _wlayer(%s)", str(u))[0][0] for u in crowd}
+a, b = next((u for u in crowd if lay[str(u)] % 2 == 0)), next((u for u in crowd if lay[str(u)] % 2 == 1))
+la, lb = db.rpc(a, "world_look", p_cells=[gcell]), db.rpc(b, "world_look", p_cells=[gcell])
+ids_a, ids_b = {p["id"] for p in la["people"]}, {p["id"] for p in lb["people"]}
+check("chacun ne voit que son groupe (les deux groupes ne se recoupent pas, et font le tour du carré)",
+      la["g"] == {str(gcell): 2} and not (ids_a & ids_b) and len(ids_a | ids_b) == 46 and all(lay[i] % 2 == lay[str(a)] % 2 for i in ids_a), (len(ids_a), len(ids_b)))
+db.sql("truncate realtime.sent"); db.rpc(a, "world_say", p_text="Bonjour le groupe")
+t, ev = last_ev()
+check("parler dans un carré bondé : seulement sur le canal de son groupe", t == f"w:{gcell}.{lay[str(a)] % 2}" and ev["k"] == "say", t)
+fb = db.rpc(b, "world_feed", p_cells=[gcell], p_since=0)
+fa = db.rpc(a, "world_feed", p_cells=[gcell], p_since=0)
+check("sans temps réel aussi : l'autre groupe ne reçoit pas le message", not any(e["k"] == "say" and e["d"].get("t") == "Bonjour le groupe" for e in fb["ev"])
+      and any(e["k"] == "say" and e["d"].get("t") == "Bonjour le groupe" for e in fa["ev"]) and fb["g"] == {str(gcell): 2})
+g4 = db.sql("select id from cards where lk='l' and cx is not null and id not in (select card from lots) order by abs(cx - %s) + abs(cy - %s) limit 1", int(gx * 1e5), int(gy * 1e5))[0][0]
+if db.sql("select _wcell(cx / 1e5, cy / 1e5) from cards where id=%s", g4)[0][0] == gcell:
+    db.sql("truncate realtime.sent"); db.sql("insert into lots(card,k,owner) values (%s,0,%s)", g4, str(a))
+    check("un achat près d'ici part à tous les groupes du carré", sorted(r[0] for r in db.sql("select topic from realtime.sent where payload->>'k'='map'")) == [f"w:{gcell}.0", f"w:{gcell}.1"])
+    db.sql("delete from lots where card=%s", g4)
+# la foule s'en va : on revient à un seul groupe (pas plus d'une fois toutes les 30 s), et « regroup » prévient les anciens canaux
+for u in crowd[4:]: db.rpc(u, "world_leave")
+db.sql("update world_cells set at = now() - interval '1 minute' where cell=%s", gcell); db.sql("truncate realtime.sent")
+db.rpc(crowd[0], "world_look", p_cells=[gcell])
+rg = db.sql("select topic, payload->'d'->>'g' from realtime.sent where payload->>'k'='regroup' order by topic")
+check("la foule partie : un seul groupe, « regroup » envoyé sur les 2 anciens canaux", db.sql("select g from world_cells where cell=%s", gcell) == []
+      and rg == [(f"w:{gcell}.0", "1"), (f"w:{gcell}.1", "1")], rg)
+db.sql("truncate realtime.sent"); db.rpc(crowd[1], "world_stop"); db.rpc(crowd[1], "world_say", p_text="Re")
+check("… et on reparle sur le canal du carré, comme avant", last_ev()[0] == f"w:{gcell}")
+for u in crowd[:4]: db.rpc(u, "world_leave")
+
 # plus de dé
 check("le dé n'existe plus", all("n'existe plus" in (err(lambda f=f, a=a: db.rpc(A, f, **a)) or "") for f, a in (("roll", {}), ("go_to", {"p_card": 400761}), ("buy_rolls", {}))))
 db.rpc(A, "world_leave")
 check("quitter : on n'est plus visible", not db.sql("select 1 from world_people where user_id=%s", str(A)))
 check("les fonctions internes sont interdites aux joueurs", not any(db.sql("select has_function_privilege('authenticated', %s, 'execute')", f)[0][0] for f in
-      ("_world_cfg()", "_wsettle(uuid)", "_wpos(walkers)", "_wemit(int,uuid,text,jsonb)", "_wcell(float8,float8)", "_wsal(float8,text)", "_wchance_on(int,int)")))
+      ("_world_cfg()", "_wsettle(uuid)", "_wpos(walkers)", "_wemit(int,uuid,text,jsonb)", "_wcell(float8,float8)", "_wsal(float8,text)", "_wchance_on(int,int)",
+       "_wlayer(uuid)", "_wg(int)", "_wsend(int,int,int,uuid,text,jsonb)", "_wregroup(int,uuid)")))
 check("un visiteur non connecté ne peut rien appeler", not any(db.sql("select has_function_privilege('anon', %s, 'execute')", f)[0][0] for f in
-      ("world_join()", "world_move(float8,float8,float8,jsonb,boolean)", "world_arrive(int)", "world_metro(int)", "world_chance(int)", "world_say(text)", "world_stop()", "set_chat_off(boolean)")))
+      ("world_join()", "world_move(float8,float8,float8,jsonb,boolean)", "world_arrive(int)", "world_metro(int)", "world_chance(int)", "world_say(text)", "world_stop()", "set_chat_off(boolean)", "world_look(int[])")))
 print(f"\n{sum(R)}/{len(R)} OK")
 sys.exit(0 if all(R) else 1)

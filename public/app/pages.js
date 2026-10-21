@@ -17,7 +17,7 @@ function go(t) {
   for (const x of TABS) { const el = $("#p-" + x); const on = x === t; if (on && el.hidden) { el.hidden = false; el.classList.remove("enter"); void el.offsetWidth; el.classList.add("enter"); } else el.hidden = !on; }
   $$("#tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === t));
   setMapFull();
-  if (t === "map") { if (map) { map.resize(); pumpGeo(); if (paintAll.pending) setTimeout(paintAll, 0); renderTags(); } startTick(); } else { hidePreview?.(); if (!moving && panelKind) { justBought = null; setMovebar(""); } }   // changer d'onglet ferme la case ouverte
+  if (t === "map") { if (map) { map.triggerRepaint(); pumpGeo(); if (paintAll.pending) setTimeout(paintAll, 0); renderTags(); } startTick(); } else { hidePreview?.(); if (!moving && panelKind) { justBought = null; setMovebar(""); } }   // changer d'onglet ferme la case ouverte
   renderTab(t);
 }
 // carte plein écran : sur l'onglet Carte (sans page ouverte par-dessus), la carte passe sous les barres, qui flottent dessus
@@ -25,7 +25,7 @@ function setMapFull() {
   const on = tab === "map" && $("#p-detail").hidden;
   if (document.body.classList.contains("mapfull") === on) return;
   document.body.classList.toggle("mapfull", on);
-  if (map) requestAnimationFrame(() => map.resize());
+  if (map) map.triggerRepaint();   // (la carte garde sa taille : plus besoin de map.resize, qui refaisait toute la toile)
 }
 function renderTab(t) {
   if (t === "booster") renderBoosterPage();

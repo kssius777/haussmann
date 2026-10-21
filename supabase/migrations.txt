@@ -35,3 +35,5 @@ migration_boutique.sql
 migration_temps_reel.sql
 migration_carte_delta.sql
 migration_chat_minute.sql
+migration_vitesse2.sql
+migration_groupes.sql
