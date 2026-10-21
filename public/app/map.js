@@ -30,8 +30,9 @@ function colorExprs(m) {
   const lit = (d, a, b) => ["case", ["==", ["%", ["id"], 5], 0], a, ["==", ["%", ["id"], 7], 1], b, d];   // la nuit, des fenêtres allumées
   if (m === "mine") return { roof: ["case", se, MC.sel, [">=", st, 3], MC.mine, MC.muteR], body: ["case", se, MC.selB, [">=", st, 3], MC.mineB, MC.mute] };
   if (m === "sale") return { roof: ["case", se, MC.sel, ["==", st, 4], MC.sale, MC.muteR], body: ["case", se, MC.selB, ["==", st, 4], MC.saleB, MC.mute] };
-  return { roof: ["case", ["==", tg, 2], "#A855F7", ["==", tg, 1], "#FACC15", se, MC.sel, [">=", st, 3], MC.mine, ["==", st, 4], MC.sale, ["==", nr, 1], "#4FCB7E", ["==", st, 2], MC.theirs, rarR(lit(MC.zinc, MC.lit, MC.lit))],
-           body: ["case", ["==", tg, 2], "#D8B4FE", ["==", tg, 1], "#FDE68A", se, MC.selB, [">=", st, 3], MC.mineB, ["==", st, 4], MC.saleB, ["==", nr, 1], "#E3F4E8", ["==", st, 2], MC.theirsB, rarB(lit(MC.stone, MC.litB, MC.lit2B))] };
+  // (avec la façade que la carte graphique dessine sur les murs : facade.js)
+  return { roof: facRoof(["case", ["==", tg, 2], "#A855F7", ["==", tg, 1], "#FACC15", se, MC.sel, [">=", st, 3], MC.mine, ["==", st, 4], MC.sale, ["==", nr, 1], "#4FCB7E", ["==", st, 2], MC.theirs, rarR(lit(MC.zinc, MC.lit, MC.lit))]),
+           body: facBody(["case", ["==", tg, 2], "#D8B4FE", ["==", tg, 1], "#FDE68A", se, MC.selB, [">=", st, 3], MC.mineB, ["==", st, 4], MC.saleB, ["==", nr, 1], "#E3F4E8", ["==", st, 2], MC.theirsB, rarB(lit(MC.stone, MC.litB, MC.lit2B))]) };
 }
 function partyFill() {
   return ["match", ["coalesce", ["feature-state", "p"], ""], ...PARTY_ORDER.flatMap(k => [k, PARTIES[k].c]), "#FFFFFF"];
@@ -102,14 +103,16 @@ function buildMap(base) {
         { id: "anchor-b", type: "background", layout: { visibility: "none" }, paint: {} },   // entre les deux : passants, voitures, trafic, sillages (life.js)
         { id: "arrline", type: "line", source: "arr", paint: { "line-color": GROUND.arrline, "line-width": ["interpolate", ["linear"], ["zoom"], 11, 1.6, 16, 3] } },
         { id: "evline", type: "line", source: "arr", filter: ["==", ["id"], ev ? ev.arr - 1 : -1], paint: { "line-color": "#F59E0B", "line-width": ["interpolate", ["linear"], ["zoom"], 11, 3, 16, 6], "line-dasharray": [2, 1.2] } },
-        { id: "bd", type: "fill-extrusion", ...BLD_SRC, minzoom: 13, paint: { "fill-extrusion-color": colorExprs(mode).body, "fill-extrusion-height": ["-", ["get", "h"], 1], "fill-extrusion-opacity": 1, "fill-extrusion-vertical-gradient": true } },
-        { id: "rf", type: "fill-extrusion", ...BLD_SRC, minzoom: 15.2, paint: { "fill-extrusion-color": colorExprs(mode).roof, "fill-extrusion-height": ["get", "h"], "fill-extrusion-base": ["-", ["get", "h"], 1], "fill-extrusion-opacity": 1 } },
+        // les murs de pierre, puis le toit : le dernier mètre, ou tout le dernier étage en zinc (haussmannien, ancien ; facade.js)
+        { id: "bd", type: "fill-extrusion", ...BLD_SRC, minzoom: 13, paint: { "fill-extrusion-color": colorExprs(mode).body, "fill-extrusion-height": ["-", ["get", "h"], facTop()], "fill-extrusion-opacity": 1, "fill-extrusion-vertical-gradient": true } },
+        { id: "rf", type: "fill-extrusion", ...BLD_SRC, minzoom: 15, paint: { "fill-extrusion-color": colorExprs(mode).roof, "fill-extrusion-height": ["get", "h"], "fill-extrusion-base": ["-", ["get", "h"], facTop()], "fill-extrusion-opacity": 1 } },
         { id: "anchor-top", type: "background", layout: { visibility: "none" }, paint: {} },
         // noms des rues, comme sur une carte classique (données de la Ville de Paris), quand on zoome
         { id: "snames", type: "symbol", source: "pv", "source-layer": "st", minzoom: 15.3, layout: { "symbol-placement": "line", "text-field": ["get", "n"], "text-font": ["Noto Sans Medium"], "text-size": ["interpolate", ["linear"], ["zoom"], 15.3, 10.5, 18, 14], "text-max-angle": 30, "symbol-spacing": 320, "text-padding": 4 },
           paint: { "text-color": GROUND.names, "text-halo-color": GROUND.namesHalo, "text-halo-width": 1.6 } }
       ] }
   });
+  if (typeof facInstall === "function") facInstall(map);   // les façades dessinées par la carte graphique (avant la première image)
   map.touchZoomRotate.enableRotation();
   // on ne peut pas dézoomer plus loin que « tout Paris remplit l'écran »
   const fitMin = () => { const c = map.cameraForBounds([[2.235, 48.818], [2.455, 48.900]], { padding: 8 }); if (c?.zoom) map.setMinZoom(Math.max(10.5, Math.min(12.6, c.zoom - .15))); };

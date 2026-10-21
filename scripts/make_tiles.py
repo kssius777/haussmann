@@ -2,7 +2,10 @@
 le navigateur ne charge plus les 78 000 immeubles de Paris d'un coup (52 sources GeoJSON gardées en mémoire par la carte,
 ~600 Mo dans son worker), seulement les tuiles à l'écran.
 Écrit public/data/t/{z}/{x}/{y}.pbf (zooms 11 à 15, au-delà la carte agrandit les tuiles du 15) avec les couches :
-  b      immeubles (id = n° de carte, h = hauteur, r = rareté) — sans les lieux (stations, jardins, places) ni ceux cachés sous une maquette
+  b      immeubles (id = n° de carte, h = hauteur, r = rareté) — sans les lieux (stations, jardins, places) ni ceux cachés sous une maquette ;
+         au zoom 15 seulement, f = la façade que la carte graphique dessine (facade.js) : style × 16 + variante (0-15),
+         style 1 haussmannien (1800-1914 ou date inconnue), 2 ancien (avant 1800), 3 moderne (après 1945 ou 38 m et plus),
+         4 entre-deux-guerres ; pas de f pour les monuments, églises et équipements sportifs (murs unis)
   roads  rues des arrondissements (k = 1 grande, 0 petite)           zooms 14-15
   major  grands axes (k = 2 ou 3)
   water  la Seine, les canaux, les lacs
@@ -21,6 +24,13 @@ H = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 D = os.path.join(H, "public", "data"); OUT = os.path.join(D, "t")
 I = json.load(open(os.path.join(D, "index.json"))); B = json.load(open(os.path.join(D, "base.json")))
 F = I["fields"]; IH, IU, IR = F.index("h"), F.index("u"), F.index("r")
+IY, ILK = F.index("y"), F.index("lk")
+def fac_code(g, row, h):
+    """La façade dessinée par la carte graphique (facade.js) : style × 16 + variante ; None = murs unis."""
+    if row[ILK] == "p" or row[IU] in ("rel", "spo", "agr"): return None
+    y = str(row[IY] or "").strip(); y = int(y) if y.lstrip("-").isdigit() else None
+    st = 3 if h >= 38 else 1 if y is None else 2 if y < 1800 else 1 if y < 1915 else 4 if y < 1945 else 3
+    return st * 16 + ((g * 2654435761) >> 9) % 16
 HIDE = set(I.get("hide") or [])
 R = 6378137.0; HALF = math.pi * R
 def merc(lon, lat): return (math.radians(lon) * R, R * math.log(math.tan(math.pi / 4 + math.radians(lat) / 2)))
@@ -33,7 +43,7 @@ def ring_ok(r): return len(r) >= 3
 
 # ---- les objets, en mètres « Mercator » ----
 t0 = time.time()
-bld, bld_props = [], []
+bld, bld_props, bld_fac = [], [], []
 for i, a in enumerate(I["arr"]):
     d = json.load(open(os.path.join(D, "a", a["c"] + ".json")))
     for k, (row, enc) in enumerate(zip(d["cards"], d["geo"])):
@@ -44,7 +54,7 @@ for i, a in enumerate(I["arr"]):
         polys = [p for p in polys if not p.is_empty]
         if not polys: continue
         geom = polys[0] if len(polys) == 1 else MultiPolygon([q for p in polys for q in (p.geoms if hasattr(p, "geoms") else [p])])
-        bld.append(geom); bld_props.append((g, max(4, row[IH] or 0), row[IR]))
+        h = max(4, row[IH] or 0); bld.append(geom); bld_props.append((g, h, row[IR])); bld_fac.append(fac_code(g, row, h))
 roads, roads_k = [], []
 for a in I["arr"]:
     for k, f in json.load(open(os.path.join(D, "a", a["c"] + ".json")))["roads"]:
@@ -126,6 +136,7 @@ for z in range(11, 16):
                         if not parts: continue
                         gg = parts[0] if len(parts) == 1 else shapely.union_all(parts)
                     f = {"geometry": gg, "properties": props[j]}
+                    if name == "b" and z == 15 and bld_fac[j] is not None: f["properties"] = dict(props[j], f=bld_fac[j])   # la façade, de près seulement
                     if name in IDS: f["id"] = IDS[name][j]
                     feats.append(f)
                 if feats: layers.append({"name": name, "features": feats})

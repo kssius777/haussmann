@@ -90,7 +90,7 @@ let lookSaveT = 0;
 function lookPick(btn, root) {
   const p = ST.state?.profile; if (!p) return;
   const [k, v] = btn.dataset.look.split(":"); const L = Object.assign({}, lookOf(ME, p.look), { [k]: +v });
-  p.look = L; root.innerHTML = lookEditorHTML(L, p.party);
+  p.look = L; ST.lookLocal = { L, at: Date.now() }; root.innerHTML = lookEditorHTML(L, p.party);
   const me = meP(); if (me) { me.look = L; window.people3d?.look(me.id, spec3d(me)); renderDock(); }
   const pv = $("#p-detail .lkwrap"); if (pv && pv !== root) pv.innerHTML = lookEditorHTML(L, p.party);
   clearTimeout(lookSaveT); lookSaveT = setTimeout(() => rpc("set_look", { p_look: L }).catch(e => toast(e.message, "bad")), 500);

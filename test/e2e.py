@@ -64,18 +64,27 @@ async def main():
         check("carte : maires affichés", await E("ST.mayors.filter(Boolean).length") > 0, await E("document.querySelector('#score').innerText.slice(0,120)"))
         await pg.click("[data-m=mine]"); await pg.wait_for_timeout(1800); await pg.screenshot(path=T + "06_map_mine.png", timeout=120000)
         await pg.click("[data-m=all]")
+        # le départ est tiré au hasard devant un grand lieu (21/10/2026) ; la suite du test a ses repères devant Notre-Dame
+        await W("W.on && !!meP()", 40000); uid = await E("ME"); p0 = await E("[meP().lon, meP().lat]"); SP = db.sql("select _wspawns()")[0][0]
+        check("départ : devant un des 29 grands lieux, tiré au hasard", min(abs(p0[0] - a) * 73240 + abs(p0[1] - b) * 110574 for a, b in SP) < 15, p0)
+        db.sql("update walkers set lon=2.3486, lat=48.85203, lon0=2.3486, lat0=48.85203, dur=0, path=null, settled=true where user_id=%s", uid)   # (l'ancien départ : 18 rue de la Bûcherie)
+        db.sql("update world_people set lon=2.3486, lat=48.85203, cell=_wcell(2.3486, 48.85203) where user_id=%s", uid)
+        await pg.reload(); await W("typeof W !== 'undefined' && W.on && !!meP() && mapReady", 120000)
         # Paris à pied (20/10/2026 : plus de dé) : son personnage en 3D, les km du jour, « Acheter » quand un bien à vendre est à portée
         await W("W.on && !!meP() && W.near.length > 0", 40000); await E("centerOnMe(false); 1"); await pg.wait_for_timeout(1500); await W("!map.isMoving() && map.areTilesLoaded()", 30000); await pg.wait_for_timeout(1000)
         await pg.screenshot(path=T + "05b_walker.png", timeout=120000)
         check("Paris à pied : son personnage sur la carte (« Vous »), 5 km offerts sous « Moi », plus de dé", await E("!document.querySelector('#b-roll') && !document.querySelector('.t-chat') && meP().el.style.display !== 'none' && meP().el.textContent.includes('Vous') && document.querySelector('#kmme').textContent.includes('5 km') && (!window.people3d || people3d.count() >= 1)"), await E("document.querySelector('#kmme').textContent"))
         check("la carte en tuiles : immeubles et ponts chargés", await E("map.querySourceFeatures('pv', {sourceLayer: 'b'}).length > 200 && map.querySourceFeatures('pv', {sourceLayer: 'bridges'}).length > 0"), await E("[map.querySourceFeatures('pv', {sourceLayer: 'b'}).length, map.querySourceFeatures('pv', {sourceLayer: 'bridges'}).length]"))
+        check("les façades : la carte graphique dessine fenêtres, balcons et étage en zinc (recette acceptée ; tuiles du zoom 15 avec f)",
+              await E("(FAC.ok === true || FAC.slow) && map.querySourceFeatures('pv', {sourceLayer: 'b'}).some(f => f.properties.f >= 16 && f.properties.f < 80)"), await E("[FAC.ok, FAC.slow]"))
         check("en bas : « Parler » au milieu, « Moi » à côté (plus de bouton « Acheter »)", await E("document.querySelector('#b-main').classList.contains('say') && document.querySelector('#mainlbl').textContent === 'Parler' && !document.querySelector('#b-me').hidden && !document.querySelector('#nearn')"))
         # un bien à vendre à portée (en vert) : on le touche, sa case s'ouvre, on peut l'acheter d'ici
         tb = await E("""(() => { const r = map.getContainer().getBoundingClientRect();
-          for (const g of W.near) { const q = map.project(centerOf(g)); if (q.x < 20 || q.x > r.width - 20 || q.y < 150 || q.y > r.height - 260) continue;
-            const f = map.queryRenderedFeatures([q.x, q.y], { layers: ['bd', 'rf'] }); if (!f.length || f[0].id !== g) continue;
-            const el = document.elementFromPoint(r.left + q.x, r.top + q.y); if (!el || el.tagName !== 'CANVAS') continue;
-            return { g, pt: [r.left + q.x, r.top + q.y] }; } return null; })()""")
+          for (const g of W.near) { const c = map.project(centerOf(g));   // un point de l'immeuble qu'on voit (son pied, ou plus haut sur ses murs et son toit)
+            for (let dy = 0; dy >= -60; dy -= 12) { const q = { x: c.x, y: c.y + dy }; if (q.x < 20 || q.x > r.width - 20 || q.y < 150 || q.y > r.height - 260) continue;
+              const f = map.queryRenderedFeatures([q.x, q.y], { layers: ['bd', 'rf'] }); if (!f.length || f[0].id !== g) continue;
+              const el = document.elementFromPoint(r.left + q.x, r.top + q.y); if (!el || el.tagName !== 'CANVAS') continue;
+              return { g, pt: [r.left + q.x, r.top + q.y] }; } } return null; })()""")
         await pg.mouse.click(tb["pt"][0], tb["pt"][1]); await W("document.querySelector('#movebar [data-lbuy]:not([disabled])')", 15000)
         ng = await E("+document.querySelector('[data-lbuy]').dataset.lbuy")
         check("toucher un immeuble vert (à portée) ouvre sa case : on peut l'acheter d'ici, sans marcher", ng == tb["g"] and await E(f"ST.state.profile.land === {ng} && !meP().path"), (tb, ng))

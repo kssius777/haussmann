@@ -109,7 +109,13 @@ async function rpc(fn, args = {}) {
   }
 }
 
-function setState(s) { if (s) { ST.state = s; ST.stAt = performance.now(); } return s; }
+function setState(s) {
+  if (s) {   // un changement de personnage tout juste fait (lookPick) : une réponse partie avant lui ne le défait pas
+    if (ST.lookLocal && Date.now() - ST.lookLocal.at < 8000 && s.profile) s.profile.look = ST.lookLocal.L;
+    ST.state = s; ST.stAt = performance.now();
+  }
+  return s;
+}
 const P = () => ST.state?.profile;
 function liveCash() {
   const s = ST.state; if (!s?.profile) return 0;
