@@ -243,7 +243,8 @@ function walkCost(len) {
 }
 // à portée pour acheter : 120 m d'un immeuble ou d'une station, 300 m d'un monument, d'un jardin, d'une place (comme le serveur)
 const reachOf = g => { const c = card(g); return c && c.lk === "p" && !isStation(g) ? W.cfg?.reachBig || 300 : W.cfg?.reach || 120; };
-const cellOf = (lo, la) => 10000 + Math.floor((lo - 2.20) / 0.0137) * 100 + Math.floor((la - 48.80) / 0.009);   // comme _wcell()
+const CELL_X = 0.00685, CELL_Y = 0.0045;   // des carrés d'environ 500 m (21/10/2026 : on écoute moins loin, chaque message coûte à chaque réception)
+const cellOf = (lo, la) => 10000 + Math.floor((lo - 2.20) / CELL_X) * 100 + Math.floor((la - 48.80) / CELL_Y);   // comme _wcell()
 const ringOn = () => W.on && mode === "all" && !W.riding && cur() === "map";
 
 // ---- démarrer : on entre dans Paris dès que la carte est prête ------------------------
@@ -360,11 +361,11 @@ function queueCells(now) { clearTimeout(cellQ); cellQ = setTimeout(updateCells, 
 function updateCells() {
   if (!W.on || !map) return;
   const out = new Set(), me = meP(); if (me) out.add(cellOf(me.lon, me.lat));
-  if (map.getZoom() >= 14.6 && mode === "all") {   // les carrés de ce qu'on regarde (au plus 750 m autour du centre)
-    const c = map.getCenter(), R = 750, b = map.getBounds();
+  if (map.getZoom() >= 14.6 && mode === "all") {   // les carrés de ce qu'on regarde : à 350 m au plus du point visé (9 au plus)
+    const c = map.getCenter(), R = 350, b = map.getBounds();
     const w = Math.max(b.getWest(), c.lng - R / KXP), e = Math.min(b.getEast(), c.lng + R / KXP), s = Math.max(b.getSouth(), c.lat - R / KYP), n = Math.min(b.getNorth(), c.lat + R / KYP);
-    for (let x = Math.floor((w - 2.20) / 0.0137); x <= Math.floor((e - 2.20) / 0.0137); x++)
-      for (let y = Math.floor((s - 48.80) / 0.009); y <= Math.floor((n - 48.80) / 0.009); y++) if (out.size < 16) out.add(10000 + x * 100 + y);
+    for (let x = Math.floor((w - 2.20) / CELL_X); x <= Math.floor((e - 2.20) / CELL_X); x++)
+      for (let y = Math.floor((s - 48.80) / CELL_Y); y <= Math.floor((n - 48.80) / CELL_Y); y++) if (out.size < 9) out.add(10000 + x * 100 + y);
   }
   const key = [...out].sort().join(","); if (key === W.cellKey) return;
   W.cellKey = key; W.cells = out; listen(); refreshPeople();

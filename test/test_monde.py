@@ -16,7 +16,7 @@ cur.execute("""create schema if not exists realtime;
   $$ insert into realtime.sent(payload, event, topic, private) values (payload, event, topic, private) $$;
   truncate realtime.sent;""")
 for f in ["migration_admin.sql", "migration_chat.sql", "migration_chat_look.sql", "migration_metro.sql", "migration_lieux.sql",
-          "migration_monde.sql", "migration_monde_paris.sql", "migration_monde_paris.sql", "migration_vitesse.sql"]:
+          "migration_monde.sql", "migration_monde_paris.sql", "migration_monde_paris.sql", "migration_vitesse.sql", "migration_temps_reel.sql"]:
     cur.execute(open("supabase/" + f).read())   # la dernière 2 fois : rejouable
 c0.commit()
 db.sql("truncate place_people, chat_msg, chat_bans, walkers, world_people, chance_taken")
@@ -38,7 +38,7 @@ j = db.rpc(A, "world_join"); nd = cardxy(400761)
 check("entrer la première fois : devant son immeuble de départ (Notre-Dame), 5 km offerts", M(j["pos"], nd) < 30 and j["w"]["left"] == 5 and j["w"]["km"] == 0, (j["pos"], j["w"]))
 cell = db.sql("select _wcell(%s, %s)", j["pos"][0], j["pos"][1])[0][0]
 t, ev = last_ev()
-check("l'arrivée part en temps réel sur le canal privé du carré (≈ 1 km)", t == f"w:{cell}" and ev["k"] == "join", (t, ev["k"]))
+check("l'arrivée part en temps réel sur le canal privé du carré (≈ 500 m)", t == f"w:{cell}" and ev["k"] == "join", (t, ev["k"]))
 check("le jour et les « ? » déjà ramassés sont donnés au site", j["day"] == db.sql("select _wday()")[0][0] and j["taken"] == [])
 jb = db.rpc(B, "world_join")
 check("on voit les gens des carrés qu'on regarde, pas les autres", len(db.rpc(A, "world_people", p_cells=[cell])) == 2 and db.rpc(A, "world_people", p_cells=[cell + 500]) == [])
@@ -178,6 +178,9 @@ db.rpc(A, "world_say", p_text="  Salut   Paris ")
 t, ev = last_ev(); mycell = db.sql("select cell from world_people where user_id=%s", str(A))[0][0]
 check("parler : on l'entend sur le canal de son carré, message signé par le serveur", t == f"w:{mycell}" and ev["k"] == "say" and ev["d"]["t"] == "Salut Paris" and ev["u"] == str(A))
 check("un message par seconde au plus", "Doucement" in (err(lambda: db.rpc(A, "world_say", p_text="encore")) or ""))
+for i in range(4): db.sql("update world_people set said_at = null where user_id=%s", str(A)); db.rpc(A, "world_say", p_text=f"message {i + 2}")
+db.sql("update world_people set said_at = null where user_id=%s", str(A)); e6 = err(lambda: db.rpc(A, "world_say", p_text="un de trop"))
+check("5 messages par minute au plus : un chat de rue, pas une messagerie (21/10/2026)", "5 messages par minute" in (e6 or "") and "encore" in (e6 or ""), e6)
 fd = db.rpc(B, "world_feed", p_cells=[mycell], p_since=0)
 check("sans temps réel, world_feed rend les évènements des carrés", any(e["k"] == "say" and e["d"]["t"] == "Salut Paris" for e in fd["ev"]))
 check("couper le chat : enregistré dans le profil", db.rpc(A, "set_chat_off", p_off=True) is True and db.rpc(A, "state")["profile"]["chat_off"] is True)

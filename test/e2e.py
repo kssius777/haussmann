@@ -230,9 +230,15 @@ async def main():
             return { ll, pt: [p.x, p.y] }; } return null; })()""")
         await pg.mouse.click(tap["pt"][0], tap["pt"][1]); await pg.wait_for_timeout(600)
         check("toucher une rue fait marcher son personnage par les rues (trajet dessiné)", await E("!!meP().path && !!map.getSource('wroute')"), tap)
-        await pg.wait_for_timeout(2600)
-        cam = await E("(() => { const t = lookAhead(meP(), 70), m = meP(), p = map.project([m.lon, m.lat]); return { on: CAM.on, z: +map.getZoom().toFixed(1), pitch: +map.getPitch().toFixed(0), d: t == null ? 0 : Math.abs(((t - map.getBearing() + 540) % 360) - 180), y: Math.round(p.y / innerHeight * 100), walking: !!m.path }; })()")
-        check("open world : la caméra proche et inclinée, derrière son personnage qui marche (bas de l'écran)", cam["on"] and cam["walking"] and cam["z"] >= 16.5 and cam["pitch"] >= 55 and cam["d"] < 45 and 50 <= cam["y"] <= 80, cam)
+        await pg.wait_for_timeout(2000)
+        # la caméra tourne en douceur (75°/s au plus) : dans ce navigateur de test lent (peu d'images par seconde), un demi-tour
+        # prend plusieurs secondes ; on regarde plusieurs fois tant qu'il marche
+        camok = lambda c: c["on"] and c["walking"] and c["z"] >= 16.5 and c["pitch"] >= 55 and c["d"] < 45 and 50 <= c["y"] <= 80
+        for _ in range(12):
+            cam = await E("(() => { const t = lookAhead(meP(), 70), m = meP(), p = map.project([m.lon, m.lat]); return { on: CAM.on, z: +map.getZoom().toFixed(1), pitch: +map.getPitch().toFixed(0), d: t == null ? 0 : Math.abs(((t - map.getBearing() + 540) % 360) - 180), y: Math.round(p.y / innerHeight * 100), walking: !!m.path }; })()")
+            if camok(cam) or not cam["walking"]: break
+            await pg.wait_for_timeout(400)
+        check("open world : la caméra proche et inclinée, derrière son personnage qui marche (bas de l'écran)", camok(cam), cam)
         await pg.screenshot(path=T + "19b_walk.png", timeout=120000)
         await W("!meP().path", 95000); await pg.wait_for_timeout(800)
         wk = db.sql("select km, lon, lat from walkers where user_id=%s", me)[0]; tgt = tap["ll"]
