@@ -2309,6 +2309,14 @@ body.picking .smark{display:none}
 body.saying .mapbottom{visibility:hidden}
 @media (max-width:899px){body.saying #tabs{visibility:hidden}}
 @media (min-width:900px){#wsay{left:50%;right:auto;width:560px;margin-left:-280px;bottom:24px}}
+/* le fil des messages, au-dessus de la barre pour parler (21/10/2026) ; la pastille rose sur « Parler » : ce qu'on n'a pas lu */
+#wlog{position:fixed;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 70px + var(--kb,0px));z-index:65;max-height:min(34vh,260px);overflow-y:auto;display:flex;flex-direction:column;gap:5px;padding:9px 12px;border-radius:16px;background:rgba(255,255,255,.96);box-shadow:0 6px 20px rgba(15,23,42,.16)}
+#wlog[hidden]{display:none}
+#wlog p{margin:0;font:500 14px/1.35 var(--f);color:#0B0C10;overflow-wrap:anywhere}
+#wlog p b{font-weight:800;margin-right:6px}
+@media (min-width:900px){#wlog{left:50%;right:auto;width:560px;margin-left:-280px;bottom:84px;box-sizing:border-box}}
+#saynb{position:absolute;top:-3px;right:-3px;min-width:24px;height:24px;padding:0 6px;box-sizing:border-box;border-radius:12px;background:#E11D48;color:#fff;font:800 12.5px/20px var(--f);font-style:normal;text-align:center;border:2px solid #fff;box-shadow:0 2px 8px rgba(15,23,42,.25)}
+#saynb[hidden]{display:none}
 /* la carte Chance ramassée */
 #chpop{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 118px);transform:translate(-50%,-14px);opacity:0;pointer-events:none;z-index:80;display:flex;align-items:center;gap:12px;width:min(calc(100vw - 24px),380px);padding:12px 14px;border-radius:18px;background:#fff;box-shadow:0 12px 34px rgba(15,23,42,.25);text-align:left;transition:opacity .25s,transform .25s}
 #chpop.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}

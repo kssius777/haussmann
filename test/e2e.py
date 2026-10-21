@@ -205,14 +205,19 @@ async def main():
         check("le message d'un autre joueur s'affiche dans une bulle au-dessus de lui", True)
         await pg.screenshot(path=T + "19_monde.png", timeout=120000)
         # marcher : toucher une rue (un point de rue à l'écran, pas sous un immeuble ni sous un bouton)
-        tap = await E("""(() => { const m = meP(); for (const [dx, dy] of [[.001,.0012],[-.001,.0012],[.0012,-.0004],[-.0012,-.0004],[.0006,.0016],[-.0006,.0016],[.0015,.0006],[-.0015,.0006],[.002,.001],[-.002,.001]]) {
-          const s = snapW(W.G, m.lon + dx, m.lat + dy, 200); if (!s) continue; const ll = [s.x / KXP, s.y / KYP], p = map.project(ll);
-          if (p.x < 20 || p.x > innerWidth - 20 || p.y < 150 || p.y > innerHeight - 260) continue;
-          if (map.queryRenderedFeatures([p.x, p.y]).some(f => /^(bd|rf|mfill|wq-c)$/.test(f.layer.id))) continue;
-          const el = document.elementFromPoint(p.x, p.y); if (!el || el.tagName !== 'CANVAS') continue;
-          return { ll, pt: [p.x, p.y] }; } return null; })()""")
+        tap = await E("""(() => { const m = meP();
+          for (let y = 160; y < innerHeight - 270; y += 19) for (let x = 24; x < innerWidth - 24; x += 19) {
+            const q = map.unproject([x, y]), d = mLL([m.lon, m.lat], [q.lng, q.lat]); if (d < 60 || d > 450) continue;
+            const s = snapW(W.G, q.lng, q.lat, 30); if (!s) continue; const ll = [s.x / KXP, s.y / KYP], p = map.project(ll);
+            if (Math.hypot(p.x - x, p.y - y) > 14 || p.y < 150 || p.y > innerHeight - 260) continue;
+            if (map.queryRenderedFeatures([p.x, p.y]).some(f => /^(bd|rf|mfill|wq-c)$/.test(f.layer.id))) continue;
+            const el = document.elementFromPoint(p.x, p.y); if (!el || el.tagName !== 'CANVAS') continue;
+            return { ll, pt: [p.x, p.y] }; } return null; })()""")
         await pg.mouse.click(tap["pt"][0], tap["pt"][1]); await pg.wait_for_timeout(600)
         check("toucher une rue fait marcher son personnage par les rues (trajet dessiné)", await E("!!meP().path && !!map.getSource('wroute')"), tap)
+        await pg.wait_for_timeout(1400)
+        cam = await E("(() => { const t = lookAhead(meP(), 70); return { on: CAM.on, z: +map.getZoom().toFixed(1), pitch: +map.getPitch().toFixed(0), d: t == null ? 0 : Math.abs(((t - map.getBearing() + 540) % 360) - 180) }; })()")
+        check("open world : la caméra proche et inclinée, derrière son personnage qui marche", cam["on"] and cam["z"] >= 16.5 and cam["pitch"] >= 55 and cam["d"] < 60, cam)
         await pg.screenshot(path=T + "19b_walk.png", timeout=120000)
         await W("!meP().path", 40000); await pg.wait_for_timeout(800)
         wk = db.sql("select km, lon, lat from walkers where user_id=%s", me)[0]; tgt = tap["ll"]
@@ -241,8 +246,15 @@ async def main():
         await W("!meP().path", 60000); await pg.wait_for_timeout(500)
         check("… et le serveur compte ces km", await E(f"W.w.km > {km0} + 0.15"), (km0, await E("W.w.km")))
         await E("centerOnMe(false); 1"); await pg.wait_for_timeout(1500); await W("!map.isMoving()", 20000)
+        gp = await E("(() => { for (let y = 250; y < 520; y += 20) for (let x = 40; x < 360; x += 20) { const el = document.elementFromPoint(x, y); if (el && el.tagName === 'CANVAS') return [x, y]; } return [200, 360]; })()")
+        await pg.mouse.move(gp[0], gp[1]); await pg.mouse.down(); await pg.mouse.move(gp[0] + 40, gp[1] + 60, steps=8); await pg.mouse.up(); await pg.wait_for_timeout(500)
+        free = await E("CAM.on"); await pg.click("#b-me"); await pg.wait_for_timeout(1300); await W("!map.isMoving()", 20000)
+        check("faire glisser la carte libère la caméra ; « Moi » la remet derrière lui", free is False and await E("CAM.on && document.querySelector('#pawnoff').hidden"))
+        # le fil des messages : la pastille sur « Parler » compte le message d'Ella, on le relit en ouvrant
+        check("un message reçu : une pastille sur « Parler »", await E("!document.querySelector('#saynb').hidden && document.querySelector('#saynb').textContent === '1'"), await E("document.querySelector('#saynb').textContent"))
         # parler : le bouton du milieu
         await pg.click("#b-main"); await W("!document.querySelector('#wsay').hidden")
+        check("« Parler » ouvre le fil des messages : on relit ce qu'Ella a dit", await E("!document.querySelector('#wlog').hidden && document.querySelector('#wlog').innerText.includes('Bienvenue !') && document.querySelector('#saynb').hidden"))
         await pg.fill("#wsq", "Salut !"); await pg.press("#wsq", "Enter")
         await W("[...document.querySelectorAll('#wpl .wp.me .bub:not([hidden])')].some(b => b.textContent === 'Salut !')", 10000)
         check("« Parler » (le bouton du milieu) : son message dans sa bulle, signé par le serveur", db.sql("select data->>'t', user_id::text from chat_msg where kind='say' order by id desc limit 1")[0] == ("Salut !", me))
@@ -319,13 +331,15 @@ async def main():
         await pg.set_viewport_size({"width": 1280, "height": 800}); await pg.wait_for_timeout(800)
         await E("setMovebar(''); centerOnMe(false); 1"); await pg.wait_for_timeout(1500); await W("!map.isMoving()", 20000); await W("!meP().path", 30000)
         await E("updateNear(true); worldTapCard(W.near[0] ?? nearby(meP().lon, meP().lat, 110)[0][1]); 1"); await W("!document.querySelector('#movebar').hidden", 10000); await pg.wait_for_timeout(400)
-        dt = await E("""(() => { const m = meP(); for (const [dx, dy] of [[.0012,.001],[-.0012,.001],[.0016,-.0004],[-.0016,-.0004],[.0008,.0016],[-.0008,.0016],[.002,.0008],[-.002,.0008]]) {
-          const s = snapW(W.G, m.lon + dx, m.lat + dy, 200); if (!s) continue; const p = map.project([s.x / KXP, s.y / KYP]);
-          if (p.x < 30 || p.x > innerWidth - 30 || p.y < 160 || p.y > innerHeight - 200) continue;
-          if (map.queryRenderedFeatures([p.x, p.y]).some(f => /^(bd|rf|mfill|wq-c)$/.test(f.layer.id))) continue;
-          const el = document.elementFromPoint(p.x, p.y); if (!el || el.tagName !== 'CANVAS') continue;
-          return [p.x, p.y]; } return null; })()""")
-        await pg.mouse.click(dt[0], dt[1]); await pg.wait_for_timeout(600)
+        dt = await E("""(() => { const m = meP();
+          for (let y = 160; y < innerHeight - 270; y += 19) for (let x = 24; x < innerWidth - 24; x += 19) {
+            const q = map.unproject([x, y]), d = mLL([m.lon, m.lat], [q.lng, q.lat]); if (d < 60 || d > 450) continue;
+            const s = snapW(W.G, q.lng, q.lat, 30); if (!s) continue; const ll = [s.x / KXP, s.y / KYP], p = map.project(ll);
+            if (Math.hypot(p.x - x, p.y - y) > 14 || p.y < 150 || p.y > innerHeight - 260) continue;
+            if (map.queryRenderedFeatures([p.x, p.y]).some(f => /^(bd|rf|mfill|wq-c)$/.test(f.layer.id))) continue;
+            const el = document.elementFromPoint(p.x, p.y); if (!el || el.tagName !== 'CANVAS') continue;
+            return { ll, pt: [p.x, p.y] }; } return null; })()""")
+        await pg.mouse.click(dt["pt"][0], dt["pt"][1]); await pg.wait_for_timeout(600)
         check("ordinateur : un clic sur la carte ferme la case et fait avancer", await E("document.querySelector('#movebar').hidden && !!meP().path"), dt)
         await pg.screenshot(path=T + "23_desktop_walk.png", timeout=120000)
         check("aucune erreur JavaScript", not errs, errs[:5])

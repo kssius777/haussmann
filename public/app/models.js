@@ -305,7 +305,7 @@ window.addPeople=function(map){
   const lon0=2.3488, lat0=48.8534, origin=maplibregl.MercatorCoordinate.fromLngLat([lon0,lat0],0), s=origin.meterInMercatorCoordinateUnits();
   const kx=111320*Math.cos(lat0*Math.PI/180), ky=110574;
   const scene=new T.Scene(), ringScene=new T.Scene(), camera=new T.Camera();   // ringScene : ce qui est au sol, caché par les immeubles (l'anneau, les voitures)
-  scene.add(new T.HemisphereLight(0xffffff,0xcfc2a8,.78)); const sun=new T.DirectionalLight(0xffffff,.42); sun.position.set(-.5,1,.65); scene.add(sun);
+  scene.add(new T.HemisphereLight(0xffffff,0xb9ad98,.6)); const sun=new T.DirectionalLight(0xffffff,.66); sun.position.set(-.5,1,.65); scene.add(sun);   // plus de relief (21/10/2026)
   const MAT=new T.MeshLambertMaterial({vertexColors:true,side:T.DoubleSide});
   const SHG=new T.CircleGeometry(.36,20); SHG.rotateX(-Math.PI/2);
   const SH=new T.MeshBasicMaterial({color:0x0F172A,transparent:true,opacity:.2,depthWrite:false}), SHME=new T.MeshBasicMaterial({color:0x2563EB,transparent:true,opacity:.35,depthWrite:false});

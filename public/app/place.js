@@ -274,6 +274,9 @@ function worldMapReady() {
   const box = document.createElement("div"); box.id = "wpl"; map.getContainer().appendChild(box);
   box.addEventListener("click", e => { const b = e.target.closest(".wp"); if (!b) return; e.stopPropagation(); if (b.dataset.id === W.me) openLookSheet(); else openWho(b.dataset.id); });
   map.on("render", layoutPeople); map.on("move", offMe);
+  // la caméra derrière le perso : faire glisser la carte la libère ; la tourner ou l'incliner garde ce cap jusqu'au prochain trajet
+  map.on("dragstart", e => { if (e.originalEvent) camOff(); });
+  for (const ev of ["rotatestart", "pitchstart"]) map.on(ev, e => { if (e.originalEvent) CAM.userB = true; });
   map.on("moveend", () => { queueCells(); updateVisible(); });
   worldStart();
 }
@@ -304,17 +307,43 @@ async function rejoin() {
   if (W.moving || W.riding) return;
   try { applyJoin(await rpc("world_join")); W.cellKey = ""; queueCells(true); renderQ(); renderDock(); } catch (e) { }
 }
-// la caméra sur son personnage : un peu sous le milieu de la zone libre (entre les barres du haut et le dock)
+// la caméra « derrière le perso » (21/10/2026, choix du propriétaire : « voir la map comme un monde open world ») : proche, basse,
+// son personnage dans le bas de la zone libre (entre les barres du haut et le dock), on voit la rue devant lui
+const camZoom = () => innerWidth < 700 ? 17.2 : 17.4;
+const camPitch = z => z >= 16.8 ? 62 : z >= 15.5 ? 58 : z >= 14.5 ? 52 : 45;   // (plus incliné, on voit plus loin : plus de mémoire sur téléphone)
 function worldView() {
   const c = map.getContainer().getBoundingClientRect(), mid = c.top + c.height / 2;
   const rs = s => [...document.querySelectorAll(s)].map(e => e.getBoundingClientRect()).filter(r => r.height > 0 && r.width > 0);
   const top = Math.max(c.top + 50, ...rs("#bar,#credbar,#filter,.maptop>*").filter(r => r.bottom < mid).map(r => r.bottom)) - c.top;
   const bot = Math.min(c.bottom - 50, ...rs("#dicebar,#tabs").filter(r => r.top > mid).map(r => r.top)) - c.top;
-  return { zoom: innerWidth < 700 ? 16.4 : 16.6, pitch: 55, offset: [0, Math.round(top + (bot - top) * .62 - c.height / 2)] };
+  return { zoom: camZoom(), pitch: camPitch(camZoom()), offset: [0, Math.round(top + (bot - top) * .7 - c.height / 2)] };
 }
 function centerOnMe(quick) {
   const me = meP(); if (!me || !map) return; const v = worldView();
-  map.flyTo({ center: [me.lon, me.lat], zoom: quick && map.getZoom() >= 15.2 ? map.getZoom() : v.zoom, pitch: Math.max(map.getPitch(), 45), offset: v.offset, duration: quick ? 600 : 1200, essential: true });
+  CAM.on = true; CAM.userB = false;
+  const z = quick && map.getZoom() >= 15.2 ? map.getZoom() : v.zoom;
+  map.flyTo({ center: [me.lon, me.lat], zoom: z, pitch: camPitch(z), offset: v.offset, duration: quick ? 600 : 1200, essential: true });
+}
+// Elle suit son personnage ; quand il marche, elle se met derrière lui en regardant un peu plus loin sur le trajet (les virages
+// se prennent en douceur). Faire glisser la carte la libère (on regarde ailleurs) ; tourner la carte garde le cap choisi ;
+// « Moi », la flèche ou un nouveau trajet la remettent derrière lui. Dézoomé (< 15,5), elle suit sans tourner.
+const CAM = { on: true, userB: false, t: 0, anim: 0 };
+function camOff() { CAM.on = false; }
+function lookAhead(me, d) {   // le cap (degrés) vers le point d mètres plus loin sur le trajet ; null s'il est trop près
+  if (!me.path || !me.cum) return null;
+  const L = me.cum[me.cum.length - 1], f = Math.min(1, (performance.now() - me.t0) / (me.dur * 1000)), at = Math.min(L, f * L + d);
+  let i = 1; while (i < me.path.length - 1 && me.cum[i] < at) i++;
+  const a = me.path[i - 1], b = me.path[i], k = (at - me.cum[i - 1]) / ((me.cum[i] - me.cum[i - 1]) || 1);
+  const dx = (a[0] + (b[0] - a[0]) * k - me.lon) * KXP, dy = (a[1] + (b[1] - a[1]) * k - me.lat) * KYP;
+  return dx * dx + dy * dy < 144 ? null : Math.atan2(dx, dy) * 180 / Math.PI;
+}
+function camStep(me, now, last) {
+  if (!CAM.on || !map || cur() !== "map" || (!last && now - CAM.t < 280)) return;
+  if (map.isMoving() && now > CAM.anim) return;   // quelqu'un d'autre bouge la carte (un zoom à la molette, en pinçant) : on le laisse finir
+  const z = map.getZoom(); let b = map.getBearing();
+  if (!CAM.userB && z >= 15.5) { const t = lookAhead(me, 70); if (t != null) { const d = ((t - b + 540) % 360) - 180; if (Math.abs(d) > 4) b += Math.max(-40, Math.min(40, d)); } }
+  const ms = last ? 450 : 300; CAM.t = now; CAM.anim = now + ms;
+  map.easeTo({ center: [me.lon, me.lat], bearing: b, offset: worldView().offset, duration: ms, easing: t => t, essential: true });
 }
 
 // ---- qui est autour : par carrés d'environ 1 km (temps réel, sinon relu toutes les 2,5 s) ------
@@ -380,7 +409,7 @@ function worldEvent(e) {
     p.mvKey = key; p.mvAt = performance.now();
     if (d.metro) hop(p, d.lon, d.lat); else walkAlong(p, d.path || [[p.lon, p.lat], [d.lon, d.lat]], d.dur);
   }
-  else if (e.k === "say") { if (id !== W.me && p && !W.chatOff) say(p, d.t); }
+  else if (e.k === "say") { if (id !== W.me && p && !W.chatOff) { say(p, d.t); logSay(p, d.t); } }
   else if (e.k === "look") { if (p) { p.look = d.look; window.people3d?.look(p.id, spec3d(p)); } }
   else if (e.k === "leave") removePerson(id);
   else if (e.k === "kick" && id === W.me) { W.banned = true; renderDock(); closeSay(); toast(d.h ? `Vous êtes banni du chat pour ${d.h} h` : "Vous êtes banni du chat", "bad"); }
@@ -456,16 +485,8 @@ function worldTick() {
 function meStep(now, i) {
   const me = meP();
   window.people3d?.ring(me.lon, me.lat, W.cfg.reach, ringOn());
-  updateNear(); checkChance();
-  if (now - W.stepT > 220) { W.stepT = now; drawRoute(me.path.slice(i), [me.lon, me.lat]); follow(me, now); offMe(); }
-}
-// la caméra suit son personnage quand il s'approche du bord (jamais pendant qu'on fait glisser la carte)
-function follow(p, now) {
-  if (map.isMoving() || now - W.followT < 1500 || !p.path) return;
-  const s = map.project([p.lon, p.lat]), Wd = map.getContainer().clientWidth, H = map.getContainer().clientHeight;
-  if (s.x > Wd * .15 && s.x < Wd * .85 && s.y > H * .28 && s.y < H * .78) return;
-  W.followT = now; const end = p.path[p.path.length - 1], mid = [(p.lon + end[0]) / 2, (p.lat + end[1]) / 2];
-  map.easeTo({ center: mLL([p.lon, p.lat], mid) < 250 ? mid : [p.lon, p.lat], offset: worldView().offset, duration: 1100 });
+  updateNear(); checkChance(); camStep(me, now);
+  if (now - W.stepT > 220) { W.stepT = now; drawRoute(me.path.slice(i), [me.lon, me.lat]); offMe(); }
 }
 
 // ---- les noms au-dessus des têtes, les bulles --------------------------------------
@@ -590,7 +611,7 @@ async function walkTo(ll, target, pay, exact) {
   if (cost > 0 && !pay) return askPay(plan.len, cost, () => walkTo(ll, target, true, exact));
   hintDone();
   const mv = ++W.mv, prev = { lon: me.lon, lat: me.lat, path: me.path, cum: me.cum, seg: me.seg, t0: me.t0, dur: me.dur, walk: me.walk, target: W.target, land: ST.state?.profile?.land ?? null };
-  W.moving = true; W.target = target;
+  W.moving = true; W.target = target; CAM.on = true; CAM.userB = false; CAM.t = 0;   // la caméra repart derrière lui
   walkAlong(me, plan.pts); drawRoute(plan.pts); setLand(null);
   const end = plan.pts[plan.pts.length - 1];
   try {
@@ -620,7 +641,7 @@ async function walkTo(ll, target, pay, exact) {
 // arrivé : on paie le péage du trajet ; si l'on visait un immeuble ou une station, on s'y arrête (achat possible) et sa case s'ouvre
 async function arrived() {
   const me = meP(), g = W.target, mv = W.mv; W.target = null;
-  drawRoute(null); offMe(); if (me) window.people3d?.ring(me.lon, me.lat, W.cfg.reach, ringOn());
+  drawRoute(null); offMe(); if (me) { window.people3d?.ring(me.lon, me.lat, W.cfg.reach, ringOn()); camStep(me, performance.now(), true); }
   updateNear(true); checkChance(true); queueCells();
   try { const r = await rpc("world_stop"); W.w = r.w || W.w; if (r.toll?.toll > 0) { if (g == null) moneyDelta(-r.toll.toll); tollToast(r.toll); } renderDock(); } catch (e) { }
   if (g != null) arriveAt(g, 0, mv);
@@ -718,6 +739,7 @@ function renderDock() {
   const lbl = talk ? "Parler" : "Moi"; if ($("#mainlbl").textContent !== lbl) $("#mainlbl").textContent = lbl;
   b.setAttribute("aria-label", talk ? "Parler aux joueurs autour" : "Revenir sur mon personnage");
   const m = $("#b-me"); if (m) m.hidden = !talk;   // chat coupé : « Moi » est au milieu
+  sayBadge();
   // les km offerts qui restent aujourd'hui : sous « Moi » (à côté, ou au milieu quand le chat est coupé)
   const w = W.w, c = W.cfg, left = w && c ? Math.max(0, Math.floor((c.freeKm - w.km) * 10 + 1e-6) / 10) : null;
   for (const [el, on] of [[$("#kmme"), talk], [$("#kmleft"), !talk]]) {
@@ -842,12 +864,35 @@ function openSay() {
     f.querySelector("#wsq").addEventListener("keydown", e => { if (e.key === "Escape") { e.preventDefault(); closeSay(); } });
   }
   f.hidden = false; document.body.classList.add("saying"); $("#wsq").focus();
+  W.unread = 0; renderLog();
 }
-function closeSay() { const f = $("#wsay"); if (f) f.hidden = true; document.body.classList.remove("saying"); $("#wsq")?.blur(); }
+function closeSay() { const f = $("#wsay"); if (f) f.hidden = true; document.body.classList.remove("saying"); $("#wsq")?.blur(); renderLog(); }
+// le fil des messages (21/10/2026, choix du propriétaire) : ce que les gens autour ont dit, à relire en ouvrant « Parler » ;
+// une pastille sur « Parler » compte ce qu'on n'a pas encore lu
+function logSay(p, t) {
+  if (!p || !t) return;
+  (W.log = W.log || []).push({ id: p.id, who: p.id === W.me ? "Vous" : p.pseudo || "?", party: p.party, t: String(t).slice(0, 120) });
+  if (W.log.length > 40) W.log.splice(0, W.log.length - 40);
+  if (p.id !== W.me && $("#wsay")?.hidden !== false) W.unread = (W.unread || 0) + 1;
+  renderLog();
+}
+function sayBadge() {
+  const open = $("#wsay")?.hidden === false, n = W.unread || 0, nb = $("#saynb");
+  if (nb) { nb.hidden = !n || open || !canSay(); nb.textContent = n > 9 ? "9+" : n; }
+  return open;
+}
+function renderLog() {
+  const open = sayBadge();
+  let el = $("#wlog"); const items = (W.log || []).slice(-8);
+  if (!open || !items.length) { if (el) el.hidden = true; return; }
+  if (!el) { el = document.createElement("div"); el.id = "wlog"; el.setAttribute("aria-live", "polite"); document.body.appendChild(el); }
+  el.innerHTML = items.map(m => `<p${m.id === W.me ? ' class="me"' : ""}><b style="color:${m.id === W.me ? "var(--act)" : PARTIES[m.party]?.c || "#475569"}">${esc(m.who)}</b>${esc(m.t)}</p>`).join("");
+  el.hidden = false; el.scrollTop = el.scrollHeight;
+}
 async function sendSay() {
   const q = $("#wsq"), t = (q?.value || "").replace(/\s+/g, " ").trim(); if (!t) return closeSay();
   q.value = "";
-  try { await rpc("world_say", { p_text: t }); say(meP(), t.slice(0, 120)); }
+  try { await rpc("world_say", { p_text: t }); say(meP(), t.slice(0, 120)); logSay(meP(), t); }
   catch (e) {
     const m = e.message || "";
     if (/Revenez/.test(m)) { q.value = t; return rejoin(); }

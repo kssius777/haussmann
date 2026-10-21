@@ -692,7 +692,7 @@ async function arrPage(i) {
     <button class="btn block light ar-map" data-arrmap="${i}">Voir sur la carte</button>
   </div></div>`;
 }
-document.addEventListener("click", e => { const b = e.target.closest("[data-arrmap]"); if (!b) return; const a = IDX.arr[+b.dataset.arrmap]; go("map"); setTimeout(() => map?.flyTo({ center: a.center, zoom: 14.4, pitch: 50, duration: 1200 }), 60); });
+document.addEventListener("click", e => { const b = e.target.closest("[data-arrmap]"); if (!b) return; const a = IDX.arr[+b.dataset.arrmap]; go("map"); camOff(); setTimeout(() => map?.flyTo({ center: a.center, zoom: 14.4, pitch: 50, duration: 1200 }), 60); });
 
 // ---------------- BOUTIQUE, PROFIL ----------------
 // ---------------- MON ARGENT : historique ----------------

@@ -273,7 +273,7 @@ function renderTags() {
     for (const [a, gp] of Object.entries(grp)) {
       const A = IDX.arr[a]; const el = document.createElement("button"); el.className = "pricetag grp num" + (mode === "mine" ? " mine" : "");
       el.innerHTML = `<b>${gp.n}</b>${mode === "mine" ? fmtE(gp.v) : "à vendre"}`;
-      el.addEventListener("click", ev => { ev.stopPropagation(); map.flyTo({ center: A.center, zoom: 14.8, pitch: 50, duration: 1100 }); });
+      el.addEventListener("click", ev => { ev.stopPropagation(); camOff(); map.flyTo({ center: A.center, zoom: 14.8, pitch: 50, duration: 1100 }); });
       tagMarks.push(new maplibregl.Marker({ element: el }).setLngLat(A.center).addTo(map));
     }
     return;
@@ -305,7 +305,7 @@ async function loadAllProgressive() {
   await Promise.all([worker(), worker(), worker()]);
 }
 function centerOf(g) { const c = card(g); const A = ARR[ai(g)]; const r = decodeRing(A.geo[li(g)][0]); let x = 0, y = 0; r.forEach(p => { x += p[0]; y += p[1]; }); return [x / r.length, y / r.length]; }
-function flyTo(g) { if (!map || !mapReady) return; const m = IDX.models.find(x => x.g === g); map.flyTo({ center: m ? [m.lon, m.lat] : centerOf(g), zoom: m ? Math.max(15.6, 16.8 - m.h / 150) : 17, pitch: 58, duration: 1300 }); }
+function flyTo(g) { if (!map || !mapReady) return; camOff(); const m = IDX.models.find(x => x.g === g); map.flyTo({ center: m ? [m.lon, m.lat] : centerOf(g), zoom: m ? Math.max(15.6, 16.8 - m.h / 150) : 17, pitch: 58, duration: 1300 }); }
 function showOnMap(g) { go("map"); setTimeout(() => { flyTo(g); previewBuilding(g); }, 80); }
 
 // aperçu d'un immeuble : le même panneau que la case (à droite sur ordinateur, en bas sur téléphone)
@@ -340,7 +340,7 @@ function initMapUI() {
     // et une rangée de cartes s'ouvre en bas ; toucher une carte emmène à l'immeuble
     hidePreview(); showStrip(b.dataset.m);
   });
-  $("#t-home").addEventListener("click", () => map.flyTo({ center: [2.3420, 48.8580], zoom: 11.9, pitch: 30, bearing: 0, duration: 1200 }));
+  $("#t-home").addEventListener("click", () => camOff() || map.flyTo({ center: [2.3420, 48.8580], zoom: 11.9, pitch: 30, bearing: 0, duration: 1200 }));
   $("#t-north").addEventListener("click", () => map.easeTo({ bearing: 0, duration: 600 }));
   // sur téléphone, les filtres sont rangés derrière un bouton
   $("#t-filter").addEventListener("click", e => { e.stopPropagation(); $("#filter").classList.toggle("open"); });
@@ -395,7 +395,7 @@ function showStrip(kind) {
   stripCount(items); renderMarks();
   // vue d'ensemble de Paris : on reste dézoomé, même s'il n'y a qu'un bien
   { const pts = items.map(x => centerOf(x.g)), lo = pts.map(p => p[0]), la = pts.map(p => p[1]);
-    map.fitBounds([[Math.min(...lo, 2.27), Math.min(...la, 48.83)], [Math.max(...lo, 2.41), Math.max(...la, 48.89)]], { padding: { top: 70, bottom: 130, left: 20, right: 20 }, maxZoom: 13, pitch: 0, bearing: 0, duration: 900 }); }
+    camOff(); map.fitBounds([[Math.min(...lo, 2.27), Math.min(...la, 48.83)], [Math.max(...lo, 2.41), Math.max(...la, 48.89)]], { padding: { top: 70, bottom: 130, left: 20, right: 20 }, maxZoom: 13, pitch: 0, bearing: 0, duration: 900 }); }
   el.innerHTML = `<div class="sh"><b>${kind === "mine" ? `Mes biens · ${items.length}` : `À vendre · ${items.length}`}</b><span>Touchez une carte pour y aller</span><button class="x" data-sclose aria-label="Fermer">×</button></div>
     <div class="sr">${items.slice(0, 60).map(x => `<button data-sg="${x.g}">${cardHTML(x.c, { w: "96px", item: x.item })}<small>${ord(x.c.arr)} arr.</small></button>`).join("")}</div>`;
 }
