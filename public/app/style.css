@@ -1525,8 +1525,7 @@ body.picksel .dicebar{display:none!important}
 }
 /* téléphone : case ouverte = la page descend jusqu'en bas (plus de bande grise), la case prend toute la hauteur */
 @media (max-width:699px){
-  body.landopen:not(:has(#p-detail:not([hidden]))) #pages,body.picking:not(:has(#p-detail:not([hidden]))) #pages{bottom:0}
-  body.picking:not(:has(#p-detail:not([hidden]))) #tabs{transform:translateY(110%)}
+  body.landopen:not(:has(#p-detail:not([hidden]))) #pages{bottom:0}
   body.landopen #movebar.k-land{top:calc(var(--bar-h) + 40px);bottom:calc(env(safe-area-inset-bottom,0px) + 10px);max-height:none;display:flex;flex-direction:column;padding:12px 14px 14px;overflow:auto}
   body.landopen #movebar.k-land .land{flex:1;display:flex;flex-direction:column;align-items:stretch;gap:10px}
   body.landopen .land .lc{--cw:clamp(130px,calc((100dvh - var(--bar-h) - 245px) / 1.45),min(74vw,290px));width:var(--cw);align-self:center}
@@ -1545,7 +1544,7 @@ body.picksel .dicebar{display:none!important}
   #filter{display:flex!important;flex-direction:row;top:10px;left:10px;right:auto;border-radius:999px;padding:3px;gap:2px;transform:none}
   #filter button{height:32px;padding:0 10px;font-size:12.5px;justify-content:center}
   #filter button span{display:none}
-  body.picking #filter,body.landopen #filter{display:none!important}
+  body.landopen #filter{display:none!important}
   #partyleg{top:56px}
 }
 /* téléphone : moins de défilement */
@@ -1917,7 +1916,7 @@ body.mapfull #bar,body.mapfull #credbar,body.mapfull #tabs{backdrop-filter:none!
   body.mapfull #b-pack{position:absolute;right:0;bottom:84px;margin:0}
   body.mapfull .mapside{bottom:calc(env(safe-area-inset-bottom,0px) + 170px);grid-auto-flow:column}   /* la boussole à gauche de « tout Paris » : elle cachait la loupe */
   /* case ouverte ou choix de la destination : les onglets s'effacent, comme avant */
-  body.mapfull.landopen #tabs,body.mapfull.picking #tabs,body.mapfull.picksel #tabs{transform:translateY(calc(100% + 30px))}
+  body.mapfull.landopen #tabs{transform:translateY(calc(100% + 30px))}
 }
 @media (min-width:900px){
   body.mapfull{--bar-h:68px}
@@ -2271,37 +2270,48 @@ body.picking .smark{display:none}
 .mts.here{background:var(--act);color:#fff}
 
 /* =====================================================================
-   Paris à pied (20/10/2026) : le bouton du milieu (« Parler » depuis le 21/10/2026, « Moi » à côté), les noms au-dessus des personnages en 3D et leurs bulles, la barre pour parler, la carte Chance ramassée,
-   le salaire qui monte sous l'argent, le métro.
+   Paris (20/10/2026) et le dé (21/10/2026) : le dé au milieu du dock, « Parler » à côté, les flèches des destinations autour de
+   son personnage, les noms au-dessus des personnages en 3D et leurs bulles, la barre pour parler, le salaire qui monte sous l'argent, le métro.
    ===================================================================== */
 #b-main.dmain{width:84px!important;height:84px!important;border-radius:50%!important;padding:0;display:block;overflow:visible;perspective:none;
   background:radial-gradient(circle at 35% 30%,#4F86FF,var(--act) 70%)!important;border:3px solid #fff!important;box-shadow:0 6px 0 var(--actD),0 14px 30px rgba(37,99,235,.38)!important;animation:none!important}
 #b-main:active{transform:translateY(3px)}
-#b-main .mi{position:absolute;inset:0;border-radius:50%;overflow:hidden;display:block}
-#b-main .mi .pp{position:absolute;left:50%;top:8px;transform:translateX(-50%);width:auto;height:118px}
-#b-main>b{display:none!important}
-#b-main>small{bottom:-9px!important;background:var(--act)!important;color:#fff!important;border:2px solid #fff!important;font:800 12px/1.25 var(--f)!important;padding:3px 10px!important;border-radius:999px}
-#b-main>small[hidden],#b-main.say>small{display:none!important}
-#b-main>small.out{background:#EA580C!important}
-/* « Parler » au milieu (21/10/2026) : la bulle blanche, l'étiquette en dessous */
-#b-main.say .mi{display:grid;place-items:center}
-#b-main.say .mi svg{width:40px;height:40px;margin-top:-2px}
-#b-main.say>b{display:block!important;position:absolute;bottom:-9px;left:50%;transform:translateX(-50%);margin:0;white-space:nowrap;padding:3px 11px;border-radius:999px;background:#0B0C10;color:#fff;border:2px solid #fff;font:800 12.5px/1.2 var(--f)}
-@media (min-width:900px){#b-main.dmain{width:92px!important;height:92px!important}#b-main .mi .pp{height:128px;top:9px}#b-main.say .mi svg{width:44px;height:44px}}
-/* « Moi » à côté : sa tête, et les km offerts qui restent aujourd'hui (orange quand il n'y en a plus) */
-#b-me[hidden]{display:none!important}
-#b-me .ic{position:relative;width:30px!important;height:30px!important;border-radius:50%;overflow:hidden;background:#E8EFFE;display:block!important}
-#b-me .ic .pp{position:absolute;left:50%;top:3px;transform:translateX(-50%);height:46px;width:auto}
-#b-me>small{color:var(--act)!important;font-weight:800!important}
-#b-me>small.out{color:#EA580C!important}
-@media (max-width:899px){body.mapfull #b-me{display:grid;position:absolute;left:0;bottom:84px;margin:0}}
+#b-main .mi{position:absolute;inset:0;border-radius:50%;display:grid;place-items:center}
+#b-main .mi .dsvg{width:50px!important;height:50px!important;margin:-6px 0 0!important;filter:drop-shadow(0 3px 3px rgba(10,30,90,.35))!important;animation:none!important;transition:transform .15s}
+#b-main:active .mi .dsvg{transform:scale(.92)}
+#b-main.rolling .mi .dsvg{animation:dieRoll .16s linear infinite!important}
+@keyframes dieRoll{0%{transform:rotate(-14deg) translateY(-2px)}50%{transform:rotate(12deg) translateY(1px)}100%{transform:rotate(-14deg) translateY(-2px)}}
+#b-main>small{bottom:-9px!important;min-width:26px;text-align:center;background:#0B0C10!important;color:#fff!important;border:2px solid #fff!important;font:800 12.5px/1.25 var(--f)!important;padding:3px 10px!important;border-radius:999px}
+#b-main>small:empty{display:none}
+#b-main.empty{background:radial-gradient(circle at 35% 30%,#A5B4CF,#6B7FA6 70%)!important;box-shadow:0 6px 0 #4B5B7E,0 14px 30px rgba(40,60,100,.3)!important}
+#b-main.empty .mi .dsvg{opacity:.75}
+#b-main.empty>small{background:#EA580C!important}
+#b-main.busy{filter:saturate(.7) brightness(1.05)}
+@media (min-width:900px){#b-main.dmain{width:92px!important;height:92px!important}#b-main .mi .dsvg{width:56px!important;height:56px!important}}
+/* « Parler » à côté du dé ; la pastille rose : les messages pas encore lus */
+#b-say[hidden]{display:none!important}
+#b-say{position:relative}
+#b-say .ic{display:grid!important;place-items:center}
+#b-say>small{color:var(--ink2)!important;font-weight:700!important}
+@media (max-width:899px){body.mapfull #b-say{display:grid;position:absolute;left:0;bottom:84px;margin:0}}
 @media (min-width:900px){
-  #b-me.dside{width:92px!important;height:92px!important;padding:0!important;display:grid;place-items:center;align-content:center;position:relative;border-radius:22px}
-  #b-me .ic{width:54px!important;height:54px!important;margin-top:-8px}
-  #b-me .ic .pp{height:84px;top:5px}
-  #b-me>small{position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);padding:3px 10px;border-radius:999px;background:var(--act);color:#fff!important;border:2px solid #fff;font:700 12px/1.35 var(--f)!important;white-space:nowrap}
-  #b-me>small.out{background:#EA580C;color:#fff!important}
+  #b-say.dside{width:92px!important;height:92px!important;padding:0!important;display:grid;place-items:center;align-content:center;border-radius:22px}
+  #b-say .ic svg{width:46px;height:46px;margin-top:-8px}
+  #b-say>small{position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);padding:3px 11px;border-radius:999px;background:#0B0C10;color:#fff!important;border:2px solid #fff;font:700 12px/1.35 var(--f)!important;white-space:nowrap}
 }
+/* les flèches des destinations du dé, autour de son personnage (rose : loyer · vert : libre · bleu : chez soi · violet : « ? ») */
+#dchips{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:4}
+#dchips[hidden]{display:none}
+.dchip{position:absolute;left:0;top:0;padding:0;border:0;background:none;pointer-events:auto;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.dchip .dcp{display:flex;align-items:center;gap:4px;height:30px;padding:0 10px 0 6px;box-sizing:border-box;border-radius:999px;border:2px solid #fff;color:#fff;font:800 13px/1 var(--f);white-space:nowrap;
+  box-shadow:0 4px 12px rgba(15,23,42,.28);animation:dchipIn .3s cubic-bezier(.2,1.5,.4,1) both;animation-delay:calc(var(--i) * 60ms)}
+.dchip svg{flex:none;transition:transform .1s linear}
+.dchip b{font-weight:800}
+.dchip::after{content:"";position:absolute;inset:-9px -5px}   /* (une zone à toucher plus grande que la flèche) */
+.dchip.d-pay .dcp{background:#E2557A}.dchip.d-free .dcp{background:#16A34A}.dchip.d-mine .dcp{background:var(--act)}.dchip.d-q .dcp{background:#7C3AED}.dchip.d-none .dcp{background:#64748B}
+.dchip:active .dcp{filter:brightness(.92)}
+@keyframes dchipIn{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:none}}
+body.picking .wp.me .nm{display:none}
 /* les noms au-dessus des têtes (la zone à toucher couvre le personnage), les bulles */
 #wpl{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:3}
 .wp{position:absolute;left:0;top:0;width:calc(var(--h,0px) * .5 + 14px);height:var(--h,0px);margin-left:calc((var(--h,0px) * .5 + 14px) / -2);padding:0;border:0;background:none;pointer-events:auto;cursor:pointer;-webkit-tap-highlight-color:transparent}
@@ -2316,41 +2326,29 @@ body.picking .smark{display:none}
 .wp .bub.pop{animation:wpPop .25s cubic-bezier(.2,1.5,.4,1);transform-origin:50% 100%}
 @keyframes wpPop{from{opacity:0;transform:translateX(calc(-50% + var(--dx))) scale(.6)}to{opacity:1;transform:translateX(calc(-50% + var(--dx))) scale(1)}}
 .wp .bub.out{opacity:0;transition:opacity .35s}
-/* la barre pour parler */
-#wsay{position:fixed;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px + var(--kb,0px));z-index:65;display:flex;gap:8px;align-items:center}
+/* la barre pour parler (21/10/2026, « l'onglet du chat prend une ampleur démesurée ») : une seule petite barre, « envoyer » dedans ;
+   sur téléphone elle se pose sur le clavier, sur ordinateur au-dessus du dock (qui reste là) */
+#wsay{position:fixed;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 10px + var(--kb,0px));z-index:65;display:flex;align-items:center;gap:6px;height:46px;padding:0 4px 0 16px;box-sizing:border-box;border-radius:999px;background:#fff;box-shadow:0 6px 22px rgba(15,23,42,.22)}
 #wsay[hidden]{display:none}
-#wsay input{flex:1;min-width:0;height:48px;border-radius:999px;border:0;background:#fff;box-shadow:0 6px 20px rgba(15,23,42,.2);padding:0 18px;font:500 16px/1 var(--f);color:#0B0C10}
-#wsay input:focus{outline:2px solid var(--act)}
-#wsay .go{flex:none;width:48px;height:48px;border-radius:50%;background:var(--act);display:grid;place-items:center;box-shadow:0 6px 16px rgba(37,99,235,.4)}
-#wsay .x{flex:none;width:40px;height:40px;border-radius:50%;background:#fff;box-shadow:0 4px 12px rgba(15,23,42,.18);font-size:22px;line-height:1;color:#334155}
-body.saying .mapbottom{visibility:hidden}
-@media (max-width:899px){body.saying #tabs{visibility:hidden}}
-@media (min-width:900px){#wsay{left:50%;right:auto;width:560px;margin-left:-280px;bottom:24px}}
-/* le fil des messages, au-dessus de la barre pour parler (21/10/2026) ; la pastille rose sur « Parler » : ce qu'on n'a pas lu */
-#wlog{position:fixed;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 70px + var(--kb,0px));z-index:65;max-height:min(34vh,260px);overflow-y:auto;display:flex;flex-direction:column;gap:5px;padding:9px 12px;border-radius:16px;background:rgba(255,255,255,.96);box-shadow:0 6px 20px rgba(15,23,42,.16)}
+#wsay input{flex:1;min-width:0;height:100%;border:0;background:none;padding:0;font:500 16px/1 var(--f);color:#0B0C10;outline:none}
+#wsay:focus-within{box-shadow:0 0 0 2px var(--act),0 6px 22px rgba(15,23,42,.22)}
+#wsay .go{flex:none;width:38px;height:38px;border-radius:50%;background:var(--act);display:grid;place-items:center}
+#wsay.wait .go{background:#CBD5E1}
+@media (max-width:899px){body.saying .mapbottom{visibility:hidden}body.saying #tabs{visibility:hidden}}
+@media (min-width:900px){#wsay{left:50%;right:auto;width:440px;margin-left:-220px;bottom:136px}}
+/* le fil des messages, juste au-dessus (21/10/2026) : seulement s'il y a des messages des autres ; la pastille rose sur « Parler » */
+#wlog{position:fixed;left:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 64px + var(--kb,0px));z-index:65;max-width:min(calc(100% - 20px),420px);max-height:min(26vh,180px);overflow-y:auto;display:flex;flex-direction:column;gap:3px;padding:8px 12px;box-sizing:border-box;border-radius:14px;background:rgba(15,20,45,.82);color:#fff}
 #wlog[hidden]{display:none}
-#wlog p{margin:0;font:500 14px/1.35 var(--f);color:#0B0C10;overflow-wrap:anywhere}
-#wlog p b{font-weight:800;margin-right:6px}
-@media (min-width:900px){#wlog{left:50%;right:auto;width:560px;margin-left:-280px;bottom:84px;box-sizing:border-box}}
+#wlog p{margin:0;font:500 13.5px/1.35 var(--f);color:rgba(255,255,255,.92);overflow-wrap:anywhere}
+#wlog p b{font-weight:700;margin-right:6px;color:#fff}
+#wlog p b i{display:inline-block;width:7px;height:7px;border-radius:50%;margin:0 5px 1px 0;vertical-align:middle}
+#wlog p.me b{color:#93C5FD}
+@media (min-width:900px){#wlog{left:50%;margin-left:-220px;max-width:440px;bottom:190px}}
 #saynb{position:absolute;top:-3px;right:-3px;min-width:24px;height:24px;padding:0 6px;box-sizing:border-box;border-radius:12px;background:#E11D48;color:#fff;font:800 12.5px/20px var(--f);font-style:normal;text-align:center;border:2px solid #fff;box-shadow:0 2px 8px rgba(15,23,42,.25)}
 #saynb[hidden]{display:none}
-/* la carte Chance ramassée */
-#chpop{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 118px);transform:translate(-50%,-14px);opacity:0;pointer-events:none;z-index:80;display:flex;align-items:center;gap:12px;width:min(calc(100vw - 24px),380px);padding:12px 14px;border-radius:18px;background:#fff;box-shadow:0 12px 34px rgba(15,23,42,.25);text-align:left;transition:opacity .25s,transform .25s}
-#chpop.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}
-#chpop>i{flex:none;width:42px;height:42px;border-radius:50%;background:#7C3AED;color:#fff;display:grid;place-items:center;font:900 22px/1 var(--f);font-style:normal;box-shadow:0 0 0 4px #EDE9FE}
-#chpop>span{display:grid;gap:1px;min-width:0}
-#chpop small{font:700 11px/1.2 var(--f);color:#7C3AED}
-#chpop b{font:800 15px/1.25 var(--f);color:#0B0C10}
-#chpop em{font:700 13.5px/1.3 var(--f);font-style:normal;color:#15803D}
-#chpop.bad em{color:#B91C1C}
-#chpop.bad>i{background:#DC2626;box-shadow:0 0 0 4px #FEE2E2}
-/* le salaire de la marche, qui monte sous l'argent */
+/* le salaire du lancer, qui monte sous l'argent */
 .mpop{position:fixed;z-index:90;transform:translate(-50%,0);padding:3px 9px;border-radius:999px;background:#16A34A;color:#fff;font:800 12.5px/1.2 var(--f);pointer-events:none;box-shadow:0 4px 12px rgba(22,163,74,.35);animation:mpop 1.6s ease-out forwards}
 @keyframes mpop{0%{opacity:0;transform:translate(-50%,10px) scale(.9)}15%{opacity:1;transform:translate(-50%,0) scale(1)}75%{opacity:1}100%{opacity:0;transform:translate(-50%,-10px)}}
-/* « Touchez une rue pour marcher » */
-#whint{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 196px);transform:translateX(-50%);z-index:25;padding:8px 15px;border-radius:999px;background:rgba(11,12,16,.82);color:#fff;font:600 13.5px/1.2 var(--f);white-space:nowrap;pointer-events:none}
-#whint[hidden]{display:none}
-@media (min-width:900px){#whint{bottom:150px}}
 /* le métro */
 .mtq{width:100%;height:44px;border-radius:12px;border:1px solid var(--line);padding:0 14px;font:500 15px/1 var(--f);margin:0 0 10px;background:#F8FAFC;color:#0B0C10}
 .mtres{display:grid;gap:6px;margin-bottom:12px}
@@ -2368,3 +2366,25 @@ body.saying .mapbottom{visibility:hidden}
 .box.charge.lv-orange b::before{background:#F59E0B}
 .box.charge.lv-rouge b::before{background:#DC2626}
 .box.charge span{font-size:13px;color:var(--muted)}
+
+/* l'écran de chargement (21/10/2026, demande du propriétaire : « ça fait un peu cheap avec le blanc et Proprio ») : les toits de
+   Paris à l'heure dorée (un dessin en SVG dans index.html, rien à télécharger), la plaque au-dessus, une fine barre qui avance */
+#loading{display:block;overflow:hidden;background:linear-gradient(180deg,#14225A 0%,#2A3D8C 34%,#6A59A5 61%,#E29A87 83%,#F6C99C 100%)}
+#loading .ld-city{position:absolute;left:0;right:0;bottom:0;width:100%;height:46%;display:block}
+#loading .ld-mid{position:absolute;left:16px;right:16px;top:29%;display:grid;justify-items:center;gap:14px}
+#loading .plaque-mini.big{font-size:30px!important;padding:10px 26px 12px!important;box-shadow:0 16px 44px rgba(6,10,40,.5)!important}
+#loading .plaque-mini.big::before{font-size:13.5px}
+#loading #loadmsg{margin:4px 0 0;color:rgba(255,255,255,.9);font-weight:600;font-size:15px;text-align:center}
+#loading .ld-bar{display:block;width:132px;height:3px;border-radius:2px;background:rgba(255,255,255,.2);overflow:hidden;position:relative}
+#loading .ld-bar::after{content:"";position:absolute;top:0;bottom:0;left:0;width:40%;border-radius:2px;background:#FFCB72;animation:ldbar 1.3s ease-in-out infinite}
+@keyframes ldbar{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
+#loading .loadabout{color:rgba(255,255,255,.72)}
+#loading .loadlinks,#loading .loadlinks a{color:rgba(255,255,255,.6)}
+@media (min-width:900px){#loading .ld-mid{top:27%}#loading .plaque-mini.big{font-size:38px!important}#loading .plaque-mini.big::before{font-size:16px}}
+@media (prefers-reduced-motion:reduce){#loading .ld-bar::after{animation:none;width:100%;opacity:.5}}
+
+/* « Le dé revient » (une fois, pour ceux qui ont connu la marche) : une petite bulle qui montre le dé */
+#maphint{width:auto!important;max-width:calc(100% - 32px);white-space:nowrap!important;padding:8px 14px!important;font-size:14px!important;line-height:1.2!important;border-radius:999px!important;bottom:calc(env(safe-area-inset-bottom,0px) + 112px)!important}
+#maphint::after{content:"";position:absolute;left:50%;bottom:-6px;margin-left:-6px;border:6px solid transparent;border-top-color:var(--ink);border-bottom:0}
+@media (min-width:900px){#maphint{bottom:126px!important}}
+body.saying #maphint{display:none}

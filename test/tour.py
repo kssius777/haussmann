@@ -1,6 +1,6 @@
-"""Un tour de Paris au format téléphone (400 × 820, écran ×2), comme un vrai joueur : marcher dans plusieurs quartiers,
+"""Un tour de Paris au format téléphone (400 × 820, écran ×2), comme un vrai joueur : lancer le dé dans plusieurs quartiers,
 dézoomer et aller loin, prendre le métro, ouvrir des cases, des fiches, des boosters, changer d'onglet, survoler les
-20 arrondissements ; pendant ce temps trois autres joueurs marchent, parlent et achètent autour de lui.
+20 arrondissements ; pendant ce temps trois autres joueurs lancent le dé, parlent et achètent autour de lui.
 À chaque étape : la mémoire (tas JS de la page et des workers de la carte, après ramasse-miettes), les éléments de la page,
 les écouteurs, les minuteurs en cours, la mémoire des processus Chromium, les images par seconde, les longues tâches ;
 et toutes les erreurs. Puis on refait le même tour : ce qui grossit encore la 2e fois est une fuite.
@@ -49,7 +49,7 @@ def rss():
 M = lambda a, b: math.hypot((a[0] - b[0]) * 73240, (a[1] - b[1]) * 110574)
 
 async def main():
-    # trois autres joueurs, riches (ils marchent beaucoup), autour du point de départ
+    # trois autres joueurs, riches, autour du point de départ
     bots = []
     for name in ["Zoé", "Malik", "Inès"]:
         u = str(uuid.uuid4()); db.sql("insert into auth.users(id) values (%s)", u)
@@ -104,13 +104,13 @@ async def main():
         await W("document.querySelector('#ps')"); await pg.fill("#ps", "Tour" + em.split("@")[0][-5:]); await pg.click("#pf button")
         await W("document.querySelector('#plater')"); await pg.click("#plater"); await W("document.querySelector('.welcome')")
         me = await E("ME")
-        await E("localStorage.setItem('hm_tut','99'); localStorage.setItem('hm_hint2','1'); 1")
+        await E("localStorage.setItem('hm_tut','99'); localStorage.setItem('hm_hint3','1'); 1")
         db.sql("update profiles set cash = 50000000 where id=%s", me)
         await pg.reload(); await W("typeof W !== 'undefined' && W.on && !!meP()", 180000); await pg.wait_for_timeout(8000)
         t0 = time.time()
         stop = asyncio.Event()
 
-        # ---- les autres joueurs : ils marchent autour de lui, parlent (1 message par minute), achètent ----
+        # ---- les autres joueurs : ils lancent le dé et courent autour de lui, parlent (1 message par minute), achètent ----
         async def life_of_bots():
             k, said, bought = 0, {b: 0 for b in bots}, 0
             while not stop.is_set():
@@ -118,14 +118,17 @@ async def main():
                     me_pos = await asyncio.to_thread(lambda: db.sql("select lon, lat from walkers where user_id=%s", me)[0])
                     b = bots[k % len(bots)]; k += 1
                     bp = await asyncio.to_thread(lambda: db.sql("select lon, lat from walkers where user_id=%s", b)[0])
-                    if M(bp, me_pos) > 400:   # trop loin : il revient près de lui (comme s'il était arrivé à pied)
+                    if M(bp, me_pos) > 400:   # trop loin : il revient près de lui (comme s'il était arrivé au dé)
                         x, y = me_pos[0] + random.uniform(-.0012, .0012), me_pos[1] + random.uniform(-.0008, .0008)
                         await asyncio.to_thread(lambda: (db.sql("update walkers set lon=%s, lat=%s, lon0=%s, lat0=%s, dur=0, path=null, settled=true, t0=now()-interval '1 minute' where user_id=%s", x, y, x, y, b),
                                                          db.sql("update world_people set lon=%s, lat=%s, cell=_wcell(%s,%s), seen=now() where user_id=%s", x, y, x, y, b)))
                         bp = (x, y)
-                    tx, ty = me_pos[0] + random.uniform(-.002, .002), me_pos[1] + random.uniform(-.0013, .0013)
-                    ln = M(bp, (tx, ty)) * 1.15 + 1
-                    await asyncio.to_thread(lambda: (db.rpc(b, "world_stop"), db.rpc(b, "world_move", p_lon=tx, p_lat=ty, p_len=ln, p_path=[[bp[0], bp[1]], [tx, ty]], p_pay=True)))
+                    def go():   # un lancer, une destination au hasard (tout droit : le serveur fait le trajet)
+                        db.sql("update profiles set rolls = 99 where id=%s", b)
+                        db.sql("update walkers set t0 = now() - interval '1 minute' where user_id=%s", b)   # (sa course d'avant est finie)
+                        o = db.rpc(b, "roll")["options"]
+                        if o: db.rpc(b, "dice_go", p_card=random.choice(o)["card"])
+                    await asyncio.to_thread(go)
                     if time.time() - said[b] > 62:
                         said[b] = time.time()
                         await asyncio.to_thread(lambda: db.rpc(b, "world_say", p_text=random.choice(["Salut !", "Qui vend dans le 5e ?", "Belle vue d'ici", "J'achète !", "On se retrouve à Châtelet ?", "Bonne journée"])))
@@ -142,31 +145,27 @@ async def main():
         bot_task = asyncio.create_task(life_of_bots())
 
         # ---- ce que fait le joueur ----
-        async def walk(far=False):
+        async def walk(far=False):   # un lancer de dé (dézoomé avant : far), une flèche au hasard, la course, sa case
+            db.sql("update profiles set rolls = 99 where id=%s", me); await E("refreshState().then(() => { renderDock(); return 1; })")
             if far:
-                await E("map.jumpTo({ center: [meP().lon, meP().lat], zoom: 13.3, pitch: 40 }); 1"); await pg.wait_for_timeout(1500)
-            pt = await E("""((far) => { const r = map.getContainer().getBoundingClientRect(), m = meP(), c = map.project([m.lon, m.lat]);
-              const cand = [];
-              for (let y = 170; y < r.height - 280; y += 23) for (let x = 24; x < r.width - 24; x += 23) {
-                const q = map.unproject([x, y]), d = mLL([m.lon, m.lat], [q.lng, q.lat]); if (d < (far ? 700 : 80) || d > (far ? 2600 : 420)) continue;
-                const el = document.elementFromPoint(r.left + x, r.top + y); if (!el || el.tagName !== 'CANVAS') continue;
-                cand.push([r.left + x, r.top + y]); }
-              return cand.length ? cand[Math.floor(Math.random() * cand.length)] : null; })(""" + ("true" if far else "false") + ")")
-            if not pt: return False
-            await pg.mouse.click(pt[0], pt[1]); await pg.wait_for_timeout(700)
-            if await E("!!document.querySelector('#plsheet [data-wpay]')"):   # plus de km offerts : il paie (il est riche)
-                await pg.click("#plsheet [data-wpay]"); await pg.wait_for_timeout(700)
-            try: await W("!meP().path", 80000)
-            except Exception: errs_all.append("marche : pas arrivé en 80 s")
-            await E("setMovebar(''); 1"); await pg.wait_for_timeout(600)
-            if far: await pg.click("#b-me"); await pg.wait_for_timeout(1500)
+                await E("camOff(true); map.jumpTo({ center: [meP().lon, meP().lat], zoom: 13.3, pitch: 40 }); 1"); await pg.wait_for_timeout(1500)
+            await pg.click("#b-main")
+            try: await W("W.opts.length > 0", 30000)
+            except Exception: errs_all.append("dé : pas de destinations en 30 s"); return False
+            await pg.wait_for_timeout(900)
+            n = await E("document.querySelectorAll('.dchip').length")
+            await pg.click(f".dchip >> nth={random.randrange(n)}")
+            try: await W("!W.run && !meP().path", 80000)
+            except Exception: errs_all.append("dé : pas arrivé en 80 s")
+            await E("justBought = null; setMovebar(''); 1"); await pg.wait_for_timeout(600)
             return True
+        bld = """(() => [...new Set(map.queryRenderedFeatures({ layers: ['bd'] }).map(f => f.id).filter(g => g != null && card(g)))].slice(0, 80))()"""
         async def cases(n):
-            gs = await E("(() => { const m = meP(); return nearby(m.lon, m.lat, 500).slice(0, 40).map(x => x[1]); })()")
+            gs = await E(bld)
             for g in random.sample(gs, min(n, len(gs))):
                 await E(f"setMovebar(''); worldTapCard({g}); 1"); await pg.wait_for_timeout(1200); await E("setMovebar(''); 1"); await pg.wait_for_timeout(300)
         async def fiches(n):
-            gs = await E("(() => { const m = meP(); return nearby(m.lon, m.lat, 600).slice(0, 60).map(x => x[1]); })()")
+            gs = await E(bld)
             for g in random.sample(gs, min(n, len(gs))):
                 await E(f"push('b', {g}); 1"); await W("document.querySelector('#p-detail [data-back]')", 20000); await pg.wait_for_timeout(900)
                 await pg.click("#p-detail [data-back]"); await pg.wait_for_timeout(500)
@@ -183,11 +182,13 @@ async def main():
         async def onglets():
             for t in ["assets", "market", "paris", "map"]:
                 await pg.click(f"#tabs [data-tab={t}]"); await pg.wait_for_timeout(1800)
-        async def metro():
+        async def metro():   # tombé sur la station la plus proche (posé là par la base, comme après un lancer), puis le métro
             st = await E("(() => { const m = meP(); let best = null; for (const [g] of W.G.st) { const s = spotOf(g); if (!s) continue; const d = mLL([m.lon, m.lat], [s[3], s[4]]); if (!best || d < best[1]) best = [g, d]; } return best[0]; })()")
-            await E(f"setMovebar(''); worldTapCard({st}); 1"); await W("document.querySelector('#movebar [data-wgo], #movebar [data-wmetro]')", 15000)
-            if await E("!!document.querySelector('#movebar [data-wgo]')"):
-                await pg.click("#movebar [data-wgo]"); await W("document.querySelector('#movebar [data-wmetro]')", 95000)
+            sx, sy = db.sql("select cx / 1e5, cy / 1e5 from cards where id=%s", st)[0]
+            db.sql("update walkers set lon=%s, lat=%s, lon0=%s, lat0=%s, dur=0, path=null, settled=true, t0=now()-interval '1 minute' where user_id=%s", sx, sy, sx, sy, me)
+            db.sql("update profiles set land=%s, pend=null where id=%s", st, me)
+            await E("rejoin().then(() => refreshState()).then(() => { setMovebar(''); showLand(); return 1; })")
+            await W("document.querySelector('#movebar [data-wmetro]')", 15000)
             await pg.click("#movebar [data-wmetro]"); await W("document.querySelector('#plsheet .mtls')", 5000)
             q, dest = random.choice([("nation", None), ("pigalle", None), ("trocad", None), ("bastille", None), ("montparnasse", None)])
             await pg.fill("#mtq", q); await W("document.querySelector('#mtres [data-wride]')", 5000)
@@ -195,14 +196,14 @@ async def main():
         async def survol(k=20):
             for i in range(k):
                 await E(f"camOff(); map.jumpTo({{ center: IDX.arr[{i}].center, zoom: 16.4, pitch: 58, bearing: {(i * 37) % 360} }}); 1"); await pg.wait_for_timeout(3500)
-            await pg.click("#b-me"); await pg.wait_for_timeout(2500)
+            await E("centerOnMe(true); 1"); await pg.wait_for_timeout(2500)
 
         async def tour(n):
             await measure(f"{n} · départ", t0)
             for i in range(5): await walk()
-            await measure(f"{n} · 5 marches", t0)
+            await measure(f"{n} · 5 lancers de dé", t0)
             for i in range(2): await walk(far=True)
-            await measure(f"{n} · 2 longues marches (dézoomé)", t0)
+            await measure(f"{n} · 2 lancers dézoomé", t0)
             await metro(); await measure(f"{n} · métro", t0)
             await cases(8); await fiches(5); await measure(f"{n} · 8 cases, 5 fiches", t0)
             await boosters(2); await measure(f"{n} · 2 boosters", t0)

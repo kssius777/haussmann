@@ -1,11 +1,11 @@
 "use strict";
 // =====================================================================
 //  La case d'un immeuble (le panneau du bas sur téléphone, à droite sur ordinateur) : ce qu'il y a, et l'achat.
-//  Depuis le 20/10/2026 (plus de dé), on achète à la banque l'immeuble à portée de son personnage (place.js : world_arrive).
+//  On achète à la banque l'immeuble sur lequel le dé l'a fait tomber (21/10/2026 : le dé revient, place.js).
 // =====================================================================
-let moving = false, panelKind = "", lastLanding = null, landPainted = null;   // moving : pendant un trajet en métro
-const landPos = () => ST.state?.profile?.land ?? null;   // l'immeuble à portée qu'on a ouvert : celui qu'on peut acheter
-// vrai si on ne peut pas acheter cet immeuble à la banque (pas à portée)
+let moving = false, panelKind = "", lastLanding = null, landPainted = null;   // moving : pendant une course (le dé) ou un trajet en métro
+const landPos = () => ST.state?.profile?.land ?? null;   // l'immeuble où le dé l'a fait tomber : celui qu'on peut acheter
+// vrai si on ne peut pas acheter cet immeuble à la banque (on n'y est pas tombé)
 const notLanded = g => landPos() !== g;
 const fmtDist = d => d >= 1000 ? (d / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " km" : Math.round(d / 10) * 10 + " m";
 const FC = f => ({ type: "FeatureCollection", features: f });
@@ -16,7 +16,7 @@ function paintTargets() {
   if (landPainted != null && landPainted !== g) map.setFeatureState(Object.assign({ id: landPainted }, BLD), { tgt: 0 });
   if (g != null) { map.setFeatureState(Object.assign({ id: g }, BLD), { tgt: 1 }); landPainted = g; }
 }
-function onBuildingTap(g, ll, e) { if (!moving) worldTapAt(g, ll, e); }   // à portée : on peut l'acheter ; trop loin : on y va (place.js)
+function onBuildingTap(g) { if (!moving) worldTapAt(g); }   // une destination du dé : on y va ; sinon sa case (place.js)
 
 // centres des immeubles (pour les maquettes des cartes)
 const CEN = [];
@@ -99,11 +99,11 @@ function showLand(L, gv) {
     }
     landCreditNow = cr;
   }
-  if (view) {   // pas à portée : la distance et « Y aller » (place.js), la fiche
+  if (view) {   // on n'y est pas tombé : la fiche (on n'achète à la banque que là où le dé l'a fait tomber)
     const listed = ST.sale.has(g);
-    btns = `${worldLandBtns(g, true, free)}<button class="btn block ${listed ? "buy" : "light"}" data-lopen="${g}"><span>${listed ? "En vente au Marché · voir l'offre" : isP ? "Voir la fiche" : "Voir la fiche de l'immeuble"}</span></button>`;
+    btns = `<button class="btn block ${listed ? "buy" : "light"}" data-lopen="${g}"><span>${listed ? "En vente au Marché · voir l'offre" : isP ? "Voir la fiche" : "Voir la fiche de l'immeuble"}</span></button>`;
   }
-  if (!view) btns += worldLandBtns(g, false);   // à portée d'une station : le métro
+  if (!view) btns += worldLandBtns(g, false);   // tombé sur une station : le métro
   // racheter à un autre joueur : faire une offre (pas pendant l'écran « Acheté ! »)
   if (!jb && others > 0 && !isP && !ST.sale.has(g)) btns += `<button class="btn block light" data-lofr="${g}">🤝 Proposer de racheter ${owners.length === 1 ? "au propriétaire" : "à un propriétaire"}</button>`;
   if (jb) {   // juste acheté : ce qui a été payé, ce que ça rapporte ; s'il reste des logements libres, on peut continuer à acheter ici
@@ -164,7 +164,7 @@ function initPawnUI() {
     const lb = e.target.closest("[data-lbuy],[data-lbuild]"); if (lb) {
       if (lb.classList.contains("slide") && !lb.dataset.ok && e.detail !== 0) return;   // un simple toucher ne suffit pas : il faut pousser jusqu'au bout (au clavier, Entrée suffit)
       const g = +(lb.dataset.lbuy || lb.dataset.lbuild), whole = !!lb.dataset.lbuild, credit = landCreditNow; lb.disabled = true; lb.textContent = "Achat…";
-      if (await act(whole ? "buy_building" : "bank_buy", Object.assign(whole ? { p_card: g } : { p_card: g, p_k: null }, credit ? { p_credit: true } : {}), null)) { justBought = { g, whole, credit: !!credit }; sfx("buy"); if (window.confetti) confetti("#2563EB", 30); updateNear(true); }
+      if (await act(whole ? "buy_building" : "bank_buy", Object.assign(whole ? { p_card: g } : { p_card: g, p_k: null }, credit ? { p_credit: true } : {}), null)) { justBought = { g, whole, credit: !!credit }; sfx("buy"); if (window.confetti) confetti("#2563EB", 30); }
       return showLand();
     }
     const lf = e.target.closest("[data-lofr]"); if (lf) { offerNext = +lf.dataset.lofr; sel = null; return push("b", offerNext); }

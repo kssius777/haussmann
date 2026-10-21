@@ -1,14 +1,15 @@
 "use strict";
 // =====================================================================
-//  Paris à pied : le jeu (20/10/2026, demande du propriétaire : « à partir de maintenant, ça devient l'endroit principal,
-//  implémente tout Paris ; la zone chat n'existe plus ; et le dé n'existe plus non plus »).
-//  · On touche une rue : son personnage y marche par les vraies rues (plan public/data/walk.json, fait par scripts/make_walk.py ;
-//    trajet calculé ici, compté par le serveur). 5 km offerts par jour, 20 000 € de salaire par km offert, ensuite on paie au km.
-//  · Un immeuble à portée (120 m ; 300 m pour un monument, un jardin, une place) : on l'achète, même en marchant. Le bouton du
-//    milieu devient « Acheter » et ouvre le plus proche à vendre. Trop loin : la case le dit, avec « Y aller ».
-//  · Devant les immeubles des autres, on leur paie un petit péage ; des « ? » à ramasser (cartes Chance) ; le métro sur toutes
-//    les lignes ; les gens autour (par carrés d'environ 1 km) et leurs bulles (on peut couper le chat dans le profil).
-//  Serveur : migration_monde_paris.sql. Les personnages en 3D : models.js (people3d).
+//  Paris : le jeu (20/10/2026 : tout Paris ; 21/10/2026, choix du propriétaire : « on peut remettre le dé pour se déplacer »,
+//  « 4 destinations au choix », « des flèches minimalistes qui prennent pas trop de place », « on supprime la marche libre »).
+//  · Le bouton du milieu : le dé. Il propose jusqu'à 4 immeubles autour de soi (~100 m par point, un par direction) : une
+//    petite flèche de couleur autour de son personnage pour chacun (rose : on paie le loyer · vert : libre · bleu : chez soi ·
+//    violet : un « ? »), l'immeuble de la même couleur sur la carte. On touche l'un ou l'autre : son personnage y court par
+//    les vraies rues (plan public/data/walk.json, scripts/make_walk.py), et y tombe (salaire, loyer, bonus, carte Chance) ;
+//    sa case s'ouvre : libre, on l'achète.
+//  · Le métro depuis une station où l'on est tombé ; les gens autour (par carrés d'environ 500 m) et leurs bulles ; « Parler »
+//    à côté du dé (on peut couper le chat dans le profil).
+//  Serveur : migration_monde_paris.sql, migration_de.sql. Les personnages en 3D : models.js (people3d).
 // =====================================================================
 
 // ---- le personnage ------------------------------------------------------------
@@ -230,22 +231,14 @@ function fitPath(pts) { for (const tol of [1.2, 3, 6, 12, 25, 50, 100]) { const 
 // ---- l'état -------------------------------------------------------------------
 const W = { on: false, starting: false, tries: 0, me: null, admin: false, cfg: null, w: null, day: 0, taken: new Set(), chatOff: false, banned: false,
   people: new Map(), cells: new Set(), cellKey: "", chans: new Map(), chSt: new Map(), cg: new Map(), lay: 0, authed: false, feedEvery: 0, feedT: 0, listT: 0,
-  last: 0, seen: new Set(), feeding: false, raf: 0, G: null, target: null, mv: 0, moving: false, queued: null, riding: false,
-  near: [], nearSet: new Set(), nearT: 0, q: [], qPend: new Set(), qWait: new Map(), qT: 0, first: true, stepT: 0, followT: 0 };
+  last: 0, seen: new Set(), feeding: false, raf: 0, G: null, riding: false, q: [], first: true, stepT: 0,
+  opts: [], die: 0, rolling: false, run: null, rolls: 0 };   // le dé : les destinations proposées, le lancer en cours, la course en cours
 const meP = () => W.people.get(W.me);
 const kmTxt = km => { const k = Math.round(km * 10) / 10; return k.toLocaleString("fr-FR", { minimumFractionDigits: k % 1 ? 1 : 0, maximumFractionDigits: 1 }) + " km"; };
 const distTxt = m => m < 950 ? Math.max(10, Math.round(m / 10) * 10) + " m" : kmTxt(m / 1000);
-// ce que coûterait un trajet de len mètres (0 tant qu'il reste des km offerts)
-function walkCost(len) {
-  const c = W.cfg, w = W.w; if (!c || !w) return 0;
-  const f = km => Math.max(0, km - c.freeKm) * c.kmPrice;
-  return Math.ceil(f(w.km + len / 1000) - f(w.km));
-}
-// à portée pour acheter : 120 m d'un immeuble ou d'une station, 300 m d'un monument, d'un jardin, d'une place (comme le serveur)
-const reachOf = g => { const c = card(g); return c && c.lk === "p" && !isStation(g) ? W.cfg?.reachBig || 300 : W.cfg?.reach || 120; };
+const kE = n => { const a = Math.abs(n); return a >= 9.95e5 ? (a / 1e6).toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " M€" : a >= 1e4 ? Math.round(a / 1e3) + " k€" : a >= 1e3 ? (a / 1e3).toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " k€" : Math.round(a) + " €"; };
 const CELL_X = 0.00685, CELL_Y = 0.0045;   // des carrés d'environ 500 m (21/10/2026 : on écoute moins loin, chaque message coûte à chaque réception)
 const cellOf = (lo, la) => 10000 + Math.floor((lo - 2.20) / CELL_X) * 100 + Math.floor((la - 48.80) / CELL_Y);   // comme _wcell()
-const ringOn = () => W.on && mode === "all" && !W.riding && cur() === "map";
 
 // ---- démarrer : on entre dans Paris dès que la carte est prête ------------------------
 function initWorld() {
@@ -256,13 +249,12 @@ function initWorld() {
   });
   addEventListener("resize", () => { if (W.on) layoutPeople(); });
   document.addEventListener("click", e => {
-    const go = e.target.closest("[data-wgo]"); if (go) { const g = +go.dataset.wgo; justBought = null; setMovebar(""); return walkTo(centerOf(g), g, !!go.dataset.pay); }
     const mt = e.target.closest("[data-wmetro]"); if (mt) return metroSheet(+mt.dataset.wmetro);
   });
   const vv = window.visualViewport;
   if (vv) { const f = () => document.body.style.setProperty("--kb", Math.max(0, innerHeight - vv.height - vv.offsetTop) + "px"); vv.addEventListener("resize", f); vv.addEventListener("scroll", f); }
-  $("#b-main")?.addEventListener("click", mainAction);
-  $("#b-me")?.addEventListener("click", meAction);
+  $("#b-main")?.addEventListener("click", doRoll);
+  $("#b-say")?.addEventListener("click", () => { if (!canSay()) return; const f = $("#wsay"); return f && !f.hidden ? closeSay() : openSay(); });
   $("#pawnoff")?.addEventListener("click", () => centerOnMe(true));
   // sur ordinateur, comme dans un jeu : Entrée pour parler, Échap pour fermer
   document.addEventListener("keydown", e => {
@@ -281,7 +273,7 @@ function worldMapReady() {
   // la caméra derrière le perso : faire glisser la carte la libère ; la tourner ou l'incliner garde ce cap jusqu'au prochain trajet
   map.on("dragstart", e => { if (e.originalEvent) camOff(true); });
   for (const ev of ["rotatestart", "pitchstart"]) map.on(ev, e => { if (e.originalEvent) CAM.userB = true; });
-  map.on("moveend", throttle(() => { updateCells(); updateVisible(); }, 450));
+  map.on("moveend", throttle(() => { updateCells(); updateVisible(); }, 450)); map.on("moveend", layoutChips);
   worldStart();
 }
 async function worldStart() {
@@ -289,9 +281,10 @@ async function worldStart() {
   try {
     const [G, j] = await Promise.all([loadWorld(), rpc("world_join")]);
     W.G = G; W.on = true; W.tries = 0; applyJoin(j);
-    renderQ(); updateNear(true); updateVisible(); renderDock();
+    renderQ(); updateVisible(); renderDock();
     queueCells(true); clearInterval(W.listT); W.listT = setInterval(refreshPeople, 60000);
     if (W.first) { W.first = false; centerOnMe(false); }
+    if (ST.state?.profile?.pend?.length) resumeRoll();   // un dé lancé, pas encore joué (page rechargée) : les mêmes destinations
   } catch (e) {
     console.warn("monde", e); W.on = false;
     if (/does not exist|Could not find the function/i.test(e.message || "")) toast("Le jeu est en cours de mise à jour : réessayez dans quelques minutes.", "bad");
@@ -305,10 +298,10 @@ function applyJoin(j) {
   me.vis = true;
   if (j.trip?.path?.length >= 2) followTrip(me, j.trip.path, j.trip.dur, j.trip.el);
   else { me.lon = +j.pos[0]; me.lat = +j.pos[1]; stopPerson(me); }
-  window.people3d?.ring(me.lon, me.lat, W.cfg.reach, ringOn());
+  window.people3d?.ring(0, 0, 0, false);   // (l'anneau « à portée pour acheter » de la marche : plus utile avec le dé)
 }
 async function rejoin() {
-  if (W.moving || W.riding) return;
+  if (W.run || W.riding || W.rolling) return;
   try { applyJoin(await rpc("world_join")); W.cellKey = ""; queueCells(true); renderQ(); renderDock(); } catch (e) { }
 }
 // la caméra « derrière le perso » (21/10/2026, choix du propriétaire : « voir la map comme un monde open world ») : proche, basse,
@@ -331,31 +324,22 @@ function centerOnMe(quick, keepZoom) {   // keepZoom : on revient sur lui sans c
   const z = keepZoom || (quick && map.getZoom() >= 15.2) ? map.getZoom() : v.zoom;
   map.flyTo({ center: [me.lon, me.lat], zoom: z, pitch: keepZoom ? map.getPitch() : camPitch(z), padding: v.padding, duration: quick ? 600 : 1200, essential: true });
 }
-// Elle suit son personnage image par image ; quand il marche, elle se met derrière lui en regardant un peu plus loin sur le trajet
-// (elle tourne en douceur, 75° par seconde au plus). Faire glisser la carte la libère (on regarde ailleurs) ; tourner la carte garde
-// le cap choisi ; « Moi », la flèche ou un nouveau trajet la remettent derrière lui. Dézoomé (< 15,5), elle suit sans tourner.
-const CAM = { on: true, userB: false, last: 0 };
+// Elle suit son personnage image par image quand il court ; partie de la vue d'ensemble des destinations du dé, elle revient
+// en douceur, pendant la course, à la vue « derrière le perso » (proche, inclinée ; le cap ne change pas : la course est
+// rapide). Faire glisser la carte la libère (on regarde ailleurs) ; la flèche « Vous » ou un nouveau lancer la remettent sur lui.
+const CAM = { on: true, userB: false };
 function camOff(keep) {   // keep : la carte reste où elle est (on la fait glisser) ; sinon on va ailleurs : le décalage du haut s'en va
   CAM.on = false; if (!keep && map) map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
 }
-function lookAhead(me, d) {   // le cap (degrés) vers le point d mètres plus loin sur le trajet ; null s'il est trop près
-  if (!me.path || !me.cum) return null;
-  const L = me.cum[me.cum.length - 1], f = Math.min(1, (performance.now() - me.t0) / (me.dur * 1000)), at = Math.min(L, f * L + d);
-  let i = 1; while (i < me.path.length - 1 && me.cum[i] < at) i++;
-  const a = me.path[i - 1], b = me.path[i], k = (at - me.cum[i - 1]) / ((me.cum[i] - me.cum[i - 1]) || 1);
-  const dx = (a[0] + (b[0] - a[0]) * k - me.lon) * KXP, dy = (a[1] + (b[1] - a[1]) * k - me.lat) * KYP;
-  return dx * dx + dy * dy < 144 ? null : Math.atan2(dx, dy) * 180 / Math.PI;
-}
 function camStep(me, now) {
-  const dt = Math.min(.1, Math.max(0, (now - (CAM.last || now)) / 1000)); CAM.last = now;
-  // quelqu'un d'autre bouge la carte (un zoom à la molette, en pinçant, « Moi » qui y va) : on le laisse finir
+  // quelqu'un d'autre bouge la carte (un zoom à la molette, en pinçant) : on le laisse finir
   if (!CAM.on || !map || cur() !== "map" || map.isMoving()) return;
-  const z = map.getZoom(); let b = map.getBearing();
-  if (!CAM.userB && z >= 15.5) {
-    const t = lookAhead(me, 70);
-    if (t != null) { const d = ((t - b + 540) % 360) - 180; b += Math.sign(d) * Math.min(Math.abs(d) * Math.min(1, 2.2 * dt), 75 * dt); }
+  const r = W.run, v = { center: [me.lon, me.lat] };
+  if (r && r.z0 != null) {
+    const f = Math.min(1, (now - r.t0) / (r.dur * 1000)), e = f * f * (3 - 2 * f), L = (a, b) => a + (b - a) * e;
+    v.zoom = L(r.z0, r.z1); v.pitch = L(r.p0, r.p1); v.padding = { top: L(r.pad0.top || 0, r.pad1.top), bottom: L(r.pad0.bottom || 0, 0), left: L(r.pad0.left || 0, 0), right: L(r.pad0.right || 0, 0) };
   }
-  map.jumpTo({ center: [me.lon, me.lat], bearing: b });
+  map.jumpTo(v);
 }
 
 // ---- qui est autour : par carrés d'environ 1 km (temps réel, sinon relu toutes les 2,5 s) ------
@@ -530,11 +514,9 @@ function worldTick() {
   }
   if (any) W.raf = requestAnimationFrame(worldTick);
 }
-// pendant qu'on marche : le trajet qui reste, la caméra qui suit, ce qu'on peut acheter, les « ? » ramassés
+// pendant qu'on court : le trajet qui reste, la caméra qui suit
 function meStep(now, i) {
-  const me = meP();
-  window.people3d?.ring(me.lon, me.lat, W.cfg.reach, ringOn());
-  updateNear(); checkChance(); camStep(me, now);
+  const me = meP(); camStep(me, now);
   if (now - W.stepT > 220) { W.stepT = now; drawRoute(me.path.slice(i), [me.lon, me.lat]); offMe(); }
 }
 
@@ -565,7 +547,7 @@ function layoutPeople() {
     el.style.zIndex = 10 + Math.round(y + h);
     if (p.bt) clampBubble(p);
   }
-  declutterMe();
+  declutterMe(); layoutChips();
 }
 // un nom de lieu posé sur son personnage s'efface (on doit toujours se voir)
 let dmT = 0;
@@ -621,196 +603,248 @@ function drawRoute(pts, head, metro) {
   map.addLayer({ id: "wroute-e", type: "circle", source: "wroute", filter: ["==", ["get", "k"], "e"], paint: { "circle-radius": 7, "circle-color": "#2563EB", "circle-stroke-color": "#fff", "circle-stroke-width": 3 } }, before);
 }
 
-// ---- marcher ------------------------------------------------------------------
-// toucher la carte : on y va par les rues, à tous les zooms (dézoomé, on va loin d'un coup) ; map.js appelle ceci
-function worldMapClick(e) {
-  if (!W.on || mode !== "all" || W.riding) return false;
-  const q = map.getLayer("wq-c") ? map.queryRenderedFeatures(e.point, { layers: ["wq-c"] }) : [];
-  const s = q.length ? spotOf(+q[0].properties.g) : null;   // un « ? » : on va jusqu'à lui
-  tapGo(s ? [s[3], s[4]] : [e.lngLat.lng, e.lngLat.lat], null, !!s);
-  return true;
+// ---- le dé (21/10/2026) : lancer, choisir où aller (une petite flèche par destination), y courir, y tomber -------------
+// le dé : un cube blanc vu de biais (le même que du temps du plateau), la face du dessus = le résultat
+const PIPXY = { 1: [[.5, .5]], 2: [[.27, .27], [.73, .73]], 3: [[.27, .27], [.5, .5], [.73, .73]], 4: [[.27, .27], [.73, .27], [.27, .73], [.73, .73]], 5: [[.27, .27], [.73, .27], [.5, .5], [.27, .73], [.73, .73]], 6: [[.27, .25], [.73, .25], [.27, .5], [.73, .5], [.27, .75], [.73, .75]] };
+const DSIDE = { 1: [2, 3], 2: [1, 3], 3: [1, 2], 4: [1, 5], 5: [1, 3], 6: [2, 4] };
+function dieSVG(top, size) {
+  const [l, r] = DSIDE[top] || [1, 3];
+  const face = (m, fill, n) => `<g transform="matrix(${m})"><rect x=".02" y=".02" width=".96" height=".96" rx=".2" fill="${fill}"/>${PIPXY[n].map(([x, y]) => `<circle cx="${x}" cy="${y}" r=".095" fill="#0B0C10"/>`).join("")}</g>`;
+  return `<svg class="dsvg" viewBox="7 1.5 26 32" width="${size}" height="${size}" aria-hidden="true"><ellipse cx="20" cy="31" rx="10" ry="2" fill="rgba(0,0,0,.18)"/>${face("10.4,6,-10.4,6,20,4", "#FFFFFF", top)}${face("10.4,6,0,12,9.6,10", "#E4E9F3", l)}${face("10.4,-6,0,12,20,16", "#C9D3E6", r)}</svg>`;
 }
-function tapGo(ll, target, exact) {
-  const now = performance.now(), l = W.lastTap;
-  if (l && now - l.t < 600 && mLL(ll, l.ll) < 8) return;   // un double clic : un seul départ
-  W.lastTap = { t: now, ll }; walkTo(ll, target, false, exact);
+// ce qui attend sur une destination : [sorte, texte de la flèche] (rose : on paie le loyer · vert : libre · bleu : chez soi · violet : « ? »)
+function optKind(o) {
+  if (o.chance) return ["q", o.pay > 0 ? "? −" + kE(o.pay) : "?"];
+  if (o.pay > 0) return ["pay", "−" + kE(o.pay)];
+  if (o.mine > 0) return ["mine", o.bonus > 0 ? "+" + kE(o.bonus) : "Chez vous"];
+  if (o.free > 0) return ["free", "Libre"];
+  return ["none", "Pris"];
 }
-// toucher un immeuble, un monument, le repère d'une station ou d'un jardin (ll : là où l'on a touché ; e : le toucher sur la carte) :
-// à portée, sa case pour l'acheter ; trop loin, on avance jusque-là (choix du propriétaire, 21/10/2026 : « on appuie sur le bouton
-// gauche pour avancer ») — arrivé, il est en vert s'il est à vendre : on le touche pour l'acheter.
-function worldTapAt(g, ll, e) {
-  const me = meP();
-  if (!W.on || !me || mode !== "all" || W.riding || mLL([me.lon, me.lat], centerOf(g)) <= reachOf(g) - 4) return worldTapCard(g);
-  hideHint(); hintDone();
-  if (e) return worldMapClick(e);
-  tapGo(ll || centerOf(g), null, true);
+const DST = { pay: 1, free: 2, mine: 3, q: 4, none: 5 };   // l'état « dst » des immeubles (map.js : leur couleur)
+function optLabel(o) {
+  const c = card(o.card), n = c ? title(c) : "Immeuble";
+  return o.k[0] === "q" ? `${n} : carte Chance` : o.k[0] === "pay" ? `${n} : loyer à payer, ${fmtE(o.pay)}` : o.k[0] === "mine" ? `${n} : chez vous, bonus ${fmtE(o.bonus)}` : o.k[0] === "free" ? `${n} : libre, à acheter` : `${n} : déjà pris`;
 }
-const moneyDelta = x => { const p = ST.state?.profile; if (p && x) { p.cash = Math.max(0, p.cash + x); renderWallet(); } };
-const setLand = g => { const p = ST.state?.profile; if (p) { p.land = g; paintTargets(); } };
-// partir vers un point (target : l'immeuble ou la station visé, qu'on ouvre en arrivant)
-async function walkTo(ll, target, pay, exact) {
-  const me = meP(); if (!W.on || !me || !W.G || W.riding) return;
-  const c = W.cfg;
-  if (!(ll[0] > c.w && ll[0] < c.e && ll[1] > c.s && ll[1] < c.n) || (W.G.zone && !inPolyLL(W.G.zone, ll[0], ll[1]))) return toast("On reste dans Paris", "bad");
-  if (W.moving) { W.queued = [ll, target, pay, exact]; return; }   // un trajet part déjà : celui-ci suivra (le serveur veut un petit délai entre deux)
-  const plan = planW(W.G, [me.lon, me.lat], ll, target != null, exact);
-  if (!plan) return toast("Pas de rue par là", "bad");
-  if (plan.len > 14800) return toast("Trop loin d'un coup : prenez le métro", "bad");
-  if (plan.len < 3) { if (target != null) { W.target = target; arrived(); } return; }
-  const cost = walkCost(plan.len);
-  if (cost > 0 && !pay) return askPay(plan.len, cost, () => walkTo(ll, target, true, exact));
-  hintDone();
-  const mv = ++W.mv, prev = { lon: me.lon, lat: me.lat, path: me.path, cum: me.cum, seg: me.seg, t0: me.t0, dur: me.dur, walk: me.walk, target: W.target, land: ST.state?.profile?.land ?? null };
-  W.moving = true; W.target = target;
-  if (!CAM.on) centerOnMe(true, true); else CAM.userB = false;   // la caméra repart derrière lui (en douceur si on regardait ailleurs)
-  walkAlong(me, plan.pts); drawRoute(plan.pts); setLand(null);
-  const end = plan.pts[plan.pts.length - 1];
-  try {
-    const r = await rpc("world_move", { p_lon: end[0], p_lat: end[1], p_len: Math.round(plan.len), p_path: plan.pts, p_pay: !!pay });
-    if (mv === W.mv && me.path && Math.abs(me.dur - r.dur) > .05) { const f = Math.min(1, (performance.now() - me.t0) / (me.dur * 1000)); me.dur = r.dur; me.t0 = performance.now() - f * r.dur * 1000; }
-    W.w = r.w || W.w; renderDock();
-    moneyDelta((+r.back || 0) + (+r.salary || 0) - (+r.cost || 0) - (+r.toll?.toll || 0));
-    if (r.salary > 0) moneyPop(r.salary);
-    if (r.toll?.toll > 0) tollToast(r.toll);
-  } catch (e) {
-    const m = e.message || "";
-    if (mv === W.mv) {   // le serveur n'a pas bougé : on revient où l'on en était
-      Object.assign(me, { lon: prev.lon, lat: prev.lat, path: prev.path, cum: prev.cum, seg: prev.seg, t0: prev.t0, dur: prev.dur, walk: prev.walk });
-      W.target = prev.target; setLand(prev.land); pose(me); if (me.path) startTick();
-      drawRoute(me.path ? me.path.slice(me.seg) : null, me.path ? [me.lon, me.lat] : null);
-    }
-    const pm = /PAYER:(\d+)/.exec(m);
-    if (pm) askPay(plan.len, +pm[1], () => walkTo(ll, target, true, exact));
-    else if (/Doucement/.test(m)) setTimeout(() => walkTo(ll, target, pay, exact), 350);
-    else if (/Revenez/.test(m)) { W.moving = false; rejoin(); }
-    else toast(m, "bad");
-  } finally {
-    W.moving = false;
-    if (W.queued) { const q = W.queued; W.queued = null; setTimeout(() => walkTo(...q), 300); }
+let dieT = 0;
+function animDie() {   // le dé roule dans le bouton (les faces changent), puis se pose
+  const b = $("#b-main"), ico = $("#mainico"); b?.classList.add("rolling");
+  return new Promise(res => { const t0 = performance.now(); clearInterval(dieT);
+    dieT = setInterval(() => { if (ico) ico.innerHTML = dieSVG(1 + Math.floor(Math.random() * 6), 46); if (performance.now() - t0 > 640) { clearInterval(dieT); res(); } }, 80); });
+}
+function stopDie() { clearInterval(dieT); $("#b-main")?.classList.remove("rolling"); if ($("#b-main")) $("#b-main").dataset.k = ""; }
+async function doRoll() {
+  if (!W.on || W.rolling || W.run || W.riding || moving) return;
+  hideHint();
+  if (W.opts.length) return showOpts(true);   // déjà lancé : on revoit les destinations
+  const p = ST.state?.profile; if (!p) return;
+  if ((p.rolls ?? 0) <= 0 && rollWait() > 1) return buyRollsSheet();   // (le prochain lancer vient d'arriver : le serveur le sait)
+  W.rolling = true; justBought = null; setMovebar(""); closeSheet(); closeSay(); renderDock(); sfx("dice");
+  const anim = animDie();
+  let r;
+  try { r = await rpc("roll"); await anim; }
+  catch (e) {
+    W.rolling = false; stopDie(); renderDock(); const m = e.message || "";
+    if (/Plus de lancers/.test(m)) { await refreshState().catch(() => { }); renderDock(); return buyRollsSheet(); }
+    if (/Revenez/.test(m)) rejoin();
+    return toast(m, "bad");
   }
+  setState(r.state); W.rolling = false; stopDie(); W.die = r.die; W.rolls = (W.rolls || 0) + 1;
+  await ensureCards(r.options.map(o => o.card)).catch(() => { });
+  setOpts(r.die, r.options); renderWallet();
 }
-// arrivé : on paie le péage du trajet ; si l'on visait un immeuble ou une station, on s'y arrête (achat possible) et sa case s'ouvre
+async function resumeRoll() {   // un dé lancé mais pas encore joué (page rechargée, métro refusé…) : les mêmes destinations
+  if (!W.on || W.rolling || W.run || W.opts.length) return;
+  try { const r = await rpc("roll"); setState(r.state); W.die = r.die; await ensureCards(r.options.map(o => o.card)).catch(() => { }); setOpts(r.die, r.options); renderWallet(); } catch (e) { }
+}
+function setOpts(die, opts) {
+  clearOpts(); W.die = die; W.opts = opts.filter(o => card(o.card)).map(o => Object.assign({}, o, { k: optKind(o), cen: centerOf(o.card) }));
+  if (!W.opts.length) return renderDock();
+  document.body.classList.add("picking");
+  if (mapReady) for (const o of W.opts) map.setFeatureState(Object.assign({ id: o.card }, BLD), { dst: DST[o.k[0]] });   // l'immeuble de la couleur de sa flèche
+  let box = $("#dchips");
+  if (!box) {
+    box = document.createElement("div"); box.id = "dchips"; map.getContainer().appendChild(box);
+    box.addEventListener("click", e => { const b = e.target.closest("[data-dgo]"); if (b) { e.stopPropagation(); pickOpt(+b.dataset.dgo); } });
+  }
+  // (le bouton se place autour du personnage ; la pastille dedans apparaît en grandissant : sa taille ne déplace pas le bouton)
+  box.innerHTML = W.opts.map((o, i) => `<button class="dchip d-${o.k[0]}" data-dgo="${o.card}" style="--i:${i}" aria-label="${esc(optLabel(o))}"><span class="dcp"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M2.5 8h9.5M8 3.5 12.5 8 8 12.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><b>${esc(o.k[1])}</b></span></button>`).join("");
+  box.hidden = false; drawDst();
+  renderDock(); showOpts(false); layoutChips();
+  if (typeof tutTick === "function") tutTick();
+}
+function clearOpts(keep) {   // keep : la destination choisie reste en couleur jusqu'à l'arrivée
+  if (mapReady) for (const o of W.opts) if (o.card !== keep) map.setFeatureState(Object.assign({ id: o.card }, BLD), { dst: 0 });
+  W.opts = []; const box = $("#dchips"); if (box) { box.innerHTML = ""; box.hidden = true; }
+  document.body.classList.remove("picking"); drawDst();
+}
+// les destinations sur la carte : un point de la couleur de leur flèche (on les voit aussi de loin) ; pendant le choix, les autres
+// « ? » du jour s'effacent (le violet est celui de la flèche « ? »)
+function drawDst() {
+  if (!map || !mapReady) return;
+  const data = FC(W.opts.map(o => ({ type: "Feature", properties: { g: o.card, k: o.k[0] }, geometry: { type: "Point", coordinates: o.cen } })));
+  for (const l of ["wq-c", "wq-t"]) if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", W.opts.length ? "none" : "visible");
+  const src = map.getSource("dst"); if (src) return src.setData(data);
+  map.addSource("dst", { type: "geojson", data });
+  map.addLayer({ id: "dst-c", type: "circle", source: "dst", paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 6, 16, 9, 18, 12],
+    "circle-color": ["match", ["get", "k"], "pay", "#E2557A", "free", "#16A34A", "mine", "#2563EB", "q", "#7C3AED", "#64748B"], "circle-stroke-color": "#fff", "circle-stroke-width": 3, "circle-pitch-alignment": "viewport" } },
+    map.getLayer("people") ? "people" : undefined);
+}
+// la vue pour choisir : son personnage au milieu de la zone libre (entre les barres du haut et le dock), un peu dézoomé et moins
+// incliné, assez pour voir les immeubles proposés (pas plus loin que le zoom 15 : les flèches disent où ils sont)
+function freeBand() {
+  const c = map.getContainer().getBoundingClientRect(), mid = c.top + c.height / 2;
+  const rs = s => [...document.querySelectorAll(s)].map(e => e.getBoundingClientRect()).filter(r => r.height > 0 && r.width > 0);
+  const top = Math.max(c.top + 50, ...rs("#bar,#credbar,#filter,.maptop>*").filter(r => r.bottom < mid).map(r => r.bottom)) - c.top;
+  const bot = Math.min(c.bottom - 50, ...rs("#dicebar,#tabs").filter(r => r.top > mid).map(r => r.top)) - c.top;
+  return { top, bot, w: c.width, h: c.height };
+}
+function showOpts(again) {
+  const me = meP(); if (!me || !W.opts.length || !map) return;
+  const b = freeBand(), P = b.top + b.bot - b.h;   // le point visé au milieu de la bande libre
+  const R = Math.max(90, ...W.opts.map(o => mLL([me.lon, me.lat], o.cen)));
+  const half = Math.max(80, Math.min(b.w / 2 - 40, (b.bot - b.top) / 2 - 46));
+  const z = Math.log2(40075016.686 * Math.cos(me.lat * Math.PI / 180) / (512 * R * 1.3 / half));
+  CAM.on = true; hidePreviewOnly();
+  map.easeTo({ center: [me.lon, me.lat], zoom: Math.max(15, Math.min(camZoom(), z)), pitch: 40, padding: { top: Math.max(0, P), bottom: Math.max(0, -P), left: 0, right: 0 }, duration: again ? 450 : 750, essential: true });
+}
+// les flèches autour de son personnage, chacune vers son immeuble (à l'écran) ; deux flèches trop proches s'écartent
+function layoutChips() {
+  const box = $("#dchips"); if (!box || box.hidden || !W.opts.length || !map) return;
+  const me = meP(); if (!me) return;
+  const s = window.people3d?.screen(me.id), q0 = map.project([me.lon, me.lat]);
+  const cx = s ? s.hx : q0.x, cy = s ? (s.hy + s.fy) / 2 : q0.y - 14, h = s ? s.fy - s.hy : 28;
+  const R = Math.max(innerWidth < 700 ? 54 : 62, h / 2 + 26), RX = R + 14;
+  const ang = W.opts.map(o => { const q = map.project(o.cen); return Math.atan2(q.y - cy, q.x - cx); });
+  const pos = ang.slice(), n = pos.length, MIN = .9;   // (radians, ~52°)
+  for (let it = 0; it < 12; it++) {
+    const ord = pos.map((a, i) => i).sort((i, j) => pos[i] - pos[j]); let moved = false;
+    for (let k = 0; k < n; k++) {
+      const i = ord[k], j = ord[(k + 1) % n]; let d = pos[j] - pos[i]; if (k === n - 1) d += 2 * Math.PI;
+      if (n > 1 && d < MIN) { const m = (MIN - d) / 2; pos[i] -= m; pos[j] += m; moved = true; }
+    }
+    if (!moved) break;
+  }
+  [...box.children].forEach((el, i) => {
+    const a = pos[i]; if (a == null) return;
+    el.style.transform = `translate(${(cx + Math.cos(a) * RX).toFixed(1)}px,${(cy + Math.sin(a) * R).toFixed(1)}px) translate(-50%,-50%)`;
+    const svg = el.querySelector("svg"); if (svg) svg.style.transform = `rotate(${ang[i].toFixed(3)}rad)`;
+  });
+}
+// toucher une flèche, ou l'immeuble de sa couleur : son personnage y court par les rues (quelques secondes), la caméra suit
+async function pickOpt(g) {
+  const o = W.opts.find(x => x.card === g), me = meP();
+  if (!o || !me || W.run || W.rolling || W.riding) return;
+  hideHint();
+  const to = o.cen, plan = W.G ? planW(W.G, [me.lon, me.lat], to, true) : null;
+  let pts = plan ? plan.pts : [[me.lon, me.lat], to];
+  if (mLL(pts[pts.length - 1], to) > 80) pts = fitPath([...pts, to]);   // (le serveur veut finir devant l'immeuble)
+  const cum = pathLen(pts), len = cum[cum.length - 1], c = W.cfg || {};
+  const dur = Math.min(c.runMax || 7, Math.max(c.runMin || 2.5, len / (c.runSpeed || 70)));
+  const from = { lon: me.lon, lat: me.lat };
+  clearOpts(g); moving = true;
+  W.run = { g, t0: performance.now(), dur, z0: map.getZoom(), z1: camZoom(), p0: map.getPitch(), p1: camPitch(camZoom()), pad0: map.getPadding(), pad1: camPad() };
+  CAM.on = true; map.stop();
+  setTrip(me, pts, cum, dur, 0); drawRoute(pts); renderDock();
+  const run = W.run;
+  run.wait = rpc("dice_go", { p_card: g, p_path: pts }).then(r => {
+    run.res = r;
+    // le serveur a pris un autre trajet (tout droit) ou une autre durée : on suit le sien à partir d'ici
+    if (W.run === run && me.path && (r.path?.length !== pts.length || Math.abs(r.dur - dur) > .05)) {
+      const el = (performance.now() - run.t0) / 1000, left = Math.max(.4, r.dur - el);
+      if (r.path?.length !== pts.length) walkAlong(me, r.path, left); else { const f = Math.min(1, el / dur); me.dur = r.dur; me.t0 = performance.now() - f * r.dur * 1000; }
+      run.dur = Math.max(run.dur, el + left);
+    }
+    return r;
+  }).catch(e => {
+    if (W.run !== run) return null;
+    W.run = null; moving = false; me.lon = from.lon; me.lat = from.lat; stopPerson(me); drawRoute(null);
+    if (mapReady) map.setFeatureState(Object.assign({ id: g }, BLD), { dst: 0 });
+    const m = e.message || ""; toast(m, "bad");
+    if (/Revenez/.test(m)) rejoin(); else resumeRoll();
+    renderDock(); return null;
+  });
+}
+// arrivé au bout de sa course : ce qui s'est passé là (salaire, loyer payé, bonus, carte Chance), sa case s'ouvre
 async function arrived() {
-  const me = meP(), g = W.target, mv = W.mv; W.target = null;
-  drawRoute(null); offMe(); if (me) window.people3d?.ring(me.lon, me.lat, W.cfg.reach, ringOn());
-  updateNear(true); checkChance(true); queueCells();
-  try { const r = await rpc("world_stop"); W.w = r.w || W.w; if (r.toll?.toll > 0) { if (g == null) moneyDelta(-r.toll.toll); tollToast(r.toll); } renderDock(); } catch (e) { }
-  if (g != null) arriveAt(g, 0, mv);
+  const me = meP(), run = W.run; drawRoute(null); offMe();
+  if (!run) return;   // (un trajet repris après un rechargement)
+  if (CAM.on && map && cur() === "map" && !map.isMoving()) map.jumpTo({ center: [me.lon, me.lat], zoom: run.z1, pitch: run.p1, padding: run.pad1 });
+  const r = run.res || await run.wait;
+  if (W.run !== run) return;
+  W.run = null; moving = false;
+  if (mapReady) map.setFeatureState(Object.assign({ id: run.g }, BLD), { dst: 0 });
+  renderDock(); queueCells(true);
+  if (!r) return;
+  setState(r.state); renderWallet();
+  const L = r.landing; lastLanding = L; justBought = null; landCredit = null;
+  if (L.chance) { W.taken.add(L.card); renderQ(); }
+  if (L.salary > 0) moneyPop(L.salary);
+  sfx(L.toll > 0 ? "bad" : "coin");
+  await ensureCards([L.card]).catch(() => { });
+  showLand(L);
+  if (L.chance?.extra || ["booster", "bonne", "cle"].includes(L.chance?.k)) Promise.all([refreshHold(), refreshMap()]).then(() => { paintAll(); if (panelKind === "land") showLand(L); }).catch(() => { });
+  if (typeof tutTick === "function") tutTick();
 }
-async function arriveAt(g, tries, mv) {
-  if (mv !== W.mv) return;   // on est reparti entre-temps
-  try {
-    const s = await rpc("world_arrive", { p_card: g }); if (mv !== W.mv) return;
-    setState(s); renderWallet(); await ensureCards([g]); justBought = null; landCredit = null; showLand(null, g);
-  } catch (e) { if (/Trop loin/.test(e.message) && tries < 3) return setTimeout(() => arriveAt(g, tries + 1, mv), 700); toast(e.message, "bad"); }
+// toucher un immeuble, un monument ou le repère d'une station : une destination du dé, on y va ; sinon sa case (on regarde)
+function worldTapAt(g) {
+  if (W.opts.some(o => o.card === g)) return pickOpt(g);
+  if (W.opts.length || W.run || W.rolling) return;   // (en train de choisir : on choisit une flèche)
+  worldTapCard(g);
 }
-// toucher un immeuble, un monument ou une station : à portée, sa case pour l'acheter (même en marchant) ; trop loin, la case le dit
+// toucher la carte ailleurs : le point d'une destination du dé, on y va ; sinon rien (plus de marche libre)
+function worldMapClick(e) {
+  if (!W.on || !W.opts.length || !map.getLayer("dst-c")) return false;
+  const p = e.point, box = [[p.x - 10, p.y - 10], [p.x + 10, p.y + 10]];   // (un peu plus large que le point : on le touche au doigt)
+  const q = map.queryRenderedFeatures(box, { layers: ["dst-c"] }).map(f => +f.properties.g).find(g => W.opts.some(o => o.card === g));
+  if (q != null) { pickOpt(q); return true; }
+  return false;
+}
 async function worldTapCard(g) {
   await ensureCards([g]); if (!card(g)) return;
-  hideHint(); hintDone();
-  const me = meP();
-  if (W.on && me && landPos() !== g && mLL([me.lon, me.lat], centerOf(g)) <= reachOf(g) - 4) {
-    try { setState(await rpc("world_arrive", { p_card: g })); renderWallet(); } catch (e) { }
-  }
-  justBought = null; landCredit = null; showLand(null, g);
+  hideHint(); justBought = null; landCredit = null; showLand(null, g);
 }
-// les boutons de la case : trop loin (la distance, « Y aller ») ; à portée d'une station, « Prendre le métro »
-function worldLandBtns(g, view, free) {
-  if (!W.on || !W.G) return "";
-  if (view) {
-    const me = meP(); if (!me) return "";
-    const d = mLL([me.lon, me.lat], centerOf(g)), plan = planW(W.G, [me.lon, me.lat], centerOf(g), true), len = plan ? plan.len : d, cost = walkCost(len);
-    return `${free > 0 && d > reachOf(g) - 4 ? `<div class="farbuy">Trop loin pour acheter · ${distTxt(d)}</div>` : ""}<button class="btn block buy wgo" data-wgo="${g}" data-pay="${cost > 0 ? 1 : ""}"><span>🚶 Y aller · ${distTxt(len)}${cost > 0 ? ` · ${fmtE(cost)}` : ""}</span></button>`;
-  }
+// les boutons de la case : là où l'on est tombé, une station : « Prendre le métro »
+function worldLandBtns(g, view) {
+  if (!W.on || !W.G || view) return "";
   return W.G.st.has(g) ? `<button class="btn block light" data-wmetro="${g}">🚇 Prendre le métro</button>` : "";
 }
-function tollToast(t) { toast(`Péage · −${fmtE(t.toll)} (${t.n} immeuble${t.n > 1 ? "s" : ""})`, "bad"); }
-function moneyPop(n) {   // « +12 000 € » qui monte sous l'argent : le salaire de la marche
+function moneyPop(n) {   // « +20 000 € » qui monte sous l'argent : le salaire du lancer
   const m = $("#bar .money"); if (!m || !n) return; const r = m.getBoundingClientRect(); if (!r.width) return;
   const el = document.createElement("div"); el.className = "mpop num"; el.textContent = "+" + fmtE(n);
   el.style.left = (r.left + r.width / 2) + "px"; el.style.top = (r.bottom + 2) + "px"; document.body.appendChild(el);
   setTimeout(() => el.remove(), 1700);
 }
-function askPay(len, cost, go) {
-  sheet(`<b class="plst">Plus de km offerts aujourd'hui</b><p class="plp">Ce trajet : ${distTxt(len)}</p><button class="btn block buy" data-wpay><span>Payer ${fmtE(cost)}</span></button>`,
-    b => { if (b.closest("[data-wpay]")) { closeSheet(); go(); } });
+// plus de lancers : le prochain dans combien de temps, ou 5 de plus contre l'argent du jeu
+const rollWait = () => Math.max(0, (ST.state?.roll_in || 0) - (performance.now() - ST.stAt) / 1000);
+function buyRollsSheet() {
+  const price = ST.state?.rolls_price || 50000, m = Math.max(1, Math.ceil(rollWait() / 60));
+  sheet(`<b class="plst">🎲 Plus de lancers</b><p class="plp">Le prochain dans ${m} min</p><button class="btn block buy" data-brolls ${liveCash() < price ? "disabled" : ""}><span>5 lancers · ${fmtE(price)}</span></button>`,
+    async b => {
+      const x = b.closest("[data-brolls]"); if (!x || x.disabled) return; x.disabled = true;
+      try { setState(await rpc("buy_rolls")); closeSheet(); renderWallet(); toast("5 lancers en plus !", "good"); sfx("coin"); }
+      catch (e) { x.disabled = false; toast(e.message, "bad"); }
+    });
 }
 
-// ---- à portée : le vert sur la carte (ce qu'on peut acheter d'ici), l'anneau au sol ---------------------
-const NB = { grid: new Map(), done: new Set(), C: 100 };
-function indexArrs() {   // les centres des immeubles, rangés par carrés de 100 m (au fur et à mesure que les arrondissements arrivent)
-  for (let i = 0; i < 20; i++) {
-    if (NB.done.has(i) || !ARR[i]?.geo) continue; NB.done.add(i); const cen = centersOf(i);
-    for (let k = 0; k < cen.length / 2; k++) { const key = Math.floor(cen[2 * k] * KXP / NB.C) * 1e6 + Math.floor(cen[2 * k + 1] * KYP / NB.C); let l = NB.grid.get(key); if (!l) NB.grid.set(key, l = []); l.push(i * 1e5 + k); }
-  }
-}
-function nearby(lon, lat, R) {
-  indexArrs(); const out = [], x = lon * KXP, y = lat * KYP;
-  for (let i = Math.floor((x - R) / NB.C); i <= Math.floor((x + R) / NB.C); i++) for (let j = Math.floor((y - R) / NB.C); j <= Math.floor((y + R) / NB.C); j++)
-    for (const g of NB.grid.get(i * 1e6 + j) || []) { const cen = CEN[ai(g)], k = li(g), d = Math.hypot(cen[2 * k] * KXP - x, cen[2 * k + 1] * KYP - y); if (d <= R) out.push([d, g]); }
-  return out;
-}
-function updateNear(force) {
-  const now = performance.now(); if (!W.on || (!force && now - W.nearT < 450)) return; W.nearT = now;
-  const me = meP(); if (!me || !W.cfg) return;
-  const list = [];
-  if (!W.riding && !me.gone) for (const [d, g] of nearby(me.lon, me.lat, W.cfg.reachBig)) if (d <= reachOf(g) - 4 && freeOf(g) > 0) list.push([d, g]);
-  list.sort((a, b) => a[0] - b[0]);
-  const next = new Set(list.map(x => x[1]));
-  if (mapReady) {
-    for (const g of W.nearSet) if (!next.has(g)) map.setFeatureState(Object.assign({ id: g }, BLD), { near: 0 });
-    for (const g of next) if (!W.nearSet.has(g)) map.setFeatureState(Object.assign({ id: g }, BLD), { near: 1 });
-  }
-  W.nearSet = next; W.near = list.map(x => x[1]);
-}
-// le bouton du milieu : « Parler » (choix du propriétaire, 21/10/2026 : « un bouton central pour s'exprimer ») ;
-// « Moi » (revenir sur soi, les km offerts qui restent) est à côté. Chat coupé ou banni : « Moi » passe au milieu.
+// ---- le bas de l'écran : le dé au milieu (choix du propriétaire, 21/10/2026), « Parler » à côté, les boosters de l'autre côté ----
 const canSay = () => W.on && !W.chatOff && !W.banned;
-function mainAction() {
-  if (!W.on) return;
-  if (canSay()) { const f = $("#wsay"); return f && !f.hidden ? closeSay() : openSay(); }
-  meAction();
-}
-function meAction() {
-  if (!W.on) return;
-  if (panelKind) { justBought = null; setMovebar(""); }
-  centerOnMe(true); showWalkHint();
-}
-const ICO_SAY = '<svg viewBox="0 0 32 32" width="40" height="40" aria-hidden="true"><path d="M6 8.5C6 6.6 7.6 5 9.5 5h13C24.4 5 26 6.6 26 8.5v9c0 1.9-1.6 3.5-3.5 3.5H15l-5.6 4.4c-.6.5-1.4 0-1.4-.7V21h0c-1.1-.3-2-1.4-2-2.6z" fill="#fff"/><circle cx="11.5" cy="13" r="1.7" fill="#2563EB"/><circle cx="16" cy="13" r="1.7" fill="#2563EB"/><circle cx="20.5" cy="13" r="1.7" fill="#2563EB"/></svg>';
 function renderDock() {
   const b = $("#b-main"); if (!b) return;
-  const talk = canSay(), p = ST.state?.profile, me = meP();
+  const p = ST.state?.profile, me = meP();
   if (me && p && (me.party !== p.party || me.pseudo !== p.pseudo)) { me.party = p.party; me.pseudo = p.pseudo; window.people3d?.look(me.id, spec3d(me)); }
-  const face = p ? avatarSVG(lookOf(ME, p.look), p.party, 120) : "";
-  const key = (talk ? "say:" : "me:") + JSON.stringify(p?.look || null) + (p?.party || "");
-  if (b.dataset.k !== key) {
-    b.dataset.k = key; b.classList.toggle("say", talk);
-    $("#mainico").innerHTML = talk ? ICO_SAY : face; const mi = $("#meico"); if (mi) mi.innerHTML = face;
-  }
-  const lbl = talk ? "Parler" : "Moi"; if ($("#mainlbl").textContent !== lbl) $("#mainlbl").textContent = lbl;
-  b.setAttribute("aria-label", talk ? "Parler aux joueurs autour" : "Revenir sur mon personnage");
-  const m = $("#b-me"); if (m) m.hidden = !talk;   // chat coupé : « Moi » est au milieu
+  const left = p?.rolls ?? 0, pick = W.opts.length > 0, wait = rollWait();
+  if (!W.rolling) { const face = W.die || 5, k = "d" + face; if (b.dataset.k !== k) { b.dataset.k = k; $("#mainico").innerHTML = dieSVG(face, 46); } }
+  const n = $("#rollsn"), t = left > 0 ? String(left) : wait > 0 ? Math.max(1, Math.ceil(wait / 60)) + " min" : "…";
+  if (n && n.textContent !== t) n.textContent = t;
+  b.classList.toggle("empty", left <= 0 && !pick); b.classList.toggle("pick", pick); b.classList.toggle("busy", !!W.run);
+  const al = pick ? "Revoir les destinations" : left > 0 ? `Lancer le dé (${left} lancer${left > 1 ? "s" : ""})` : `Plus de lancers : le prochain dans ${Math.max(1, Math.ceil(wait / 60))} min`;
+  if (b.getAttribute("aria-label") !== al) b.setAttribute("aria-label", al);
+  if (left <= 0 && wait <= 0 && p && !W.rsT) W.rsT = setTimeout(() => { W.rsT = 0; refreshState().then(renderDock).catch(() => { }); }, 2000);   // le lancer est revenu
+  const s = $("#b-say"); if (s && s.hidden === canSay()) s.hidden = !canSay();
   sayBadge();
-  // les km offerts qui restent aujourd'hui : sous « Moi » (à côté, ou au milieu quand le chat est coupé)
-  const w = W.w, c = W.cfg, left = w && c ? Math.max(0, Math.floor((c.freeKm - w.km) * 10 + 1e-6) / 10) : null;
-  for (const [el, on] of [[$("#kmme"), talk], [$("#kmleft"), !talk]]) {
-    if (!el) continue;
-    if (left == null || !on) { if (el.id === "kmleft") el.hidden = true; else el.textContent = "Moi"; el.classList.remove("out"); continue; }
-    const t = left > 0 ? kmTxt(left) : el.id === "kmme" ? "0 km" : fmtE(c.kmPrice) + "/km";
-    if (el.textContent !== t) el.textContent = t; el.classList.toggle("out", left <= 0); el.hidden = false;
-  }
 }
-// petit rappel, les premières fois : « Touchez la carte pour marcher »
-function showWalkHint(force) {
-  let n = 0; try { n = +(localStorage.getItem("hm_whint") || 0); } catch (e) { }
-  if (!force && n >= 3) return;
-  try { localStorage.setItem("hm_whint", String(n + 1)); } catch (e) { }
-  let h = $("#whint"); if (!h) { h = document.createElement("div"); h.id = "whint"; h.textContent = "Touchez la carte pour marcher"; $("#p-map").appendChild(h); }
-  clearTimeout(h.t); h.hidden = false; h.t = setTimeout(() => { h.hidden = true; }, 3500);
-}
-function hintDone() { const h = $("#whint"); if (h) h.hidden = true; try { localStorage.setItem("hm_whint", "9"); } catch (e) { } hideHint(); }
 
-// ---- les « ? » : une carte Chance à ramasser (30 % des stations, jardins, places chaque jour, les mêmes pour tous) ------
+// ---- les « ? » : une carte Chance en tombant dessus (30 % des stations, jardins, places chaque jour, les mêmes pour tous) ------
 const chanceOn = g => ((g * 2654435761 + W.day * 97) % 4294967296) % 100 < (W.cfg?.chancePct ?? 30);   // comme _wchance_on()
 function renderQ() {
   if (!map || !mapReady || !W.on) return;
@@ -821,39 +855,6 @@ function renderQ() {
   const before = map.getLayer("people") ? "people" : undefined;
   map.addLayer({ id: "wq-c", type: "circle", source: "wq", minzoom: 13.6, paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 13.6, 7, 16, 12, 18, 17], "circle-color": "#7C3AED", "circle-stroke-color": "#fff", "circle-stroke-width": 2.5, "circle-pitch-alignment": "viewport" } }, before);
   map.addLayer({ id: "wq-t", type: "symbol", source: "wq", minzoom: 13.6, layout: { "text-field": "?", "text-font": ["Noto Sans Medium"], "text-size": ["interpolate", ["linear"], ["zoom"], 13.6, 11, 16, 17, 18, 23], "text-allow-overlap": true, "text-ignore-placement": true, "text-pitch-alignment": "viewport" }, paint: { "text-color": "#fff" } }, before);
-}
-function checkChance(force) {
-  const now = performance.now(); if (!force && now - W.qT < 250) return; W.qT = now;
-  const me = meP(); if (!W.on || !me || me.gone || !W.q.length) return;
-  const R = (W.cfg.chanceR || 40) - 6;
-  for (const q of W.q) {
-    if (W.qPend.has(q.g) || (W.qWait.get(q.g) || 0) > now || Math.abs(q.lat - me.lat) * KYP > R) continue;
-    if (mLL([me.lon, me.lat], [q.lon, q.lat]) <= R) pickChance(q.g, 0);
-  }
-}
-async function pickChance(g, tries) {
-  W.qPend.add(g);
-  try {
-    const r = await rpc("world_chance", { p_card: g });
-    W.taken.add(g); W.qPend.delete(g); renderQ();
-    if (r.state) setState(r.state); renderWallet(); showChance(r.chance);
-    if (r.chance?.extra || ["booster", "bonne", "cle"].includes(r.chance?.k)) Promise.all([refreshHold(), refreshMap()]).then(() => paintAll()).catch(() => { });
-  } catch (e) {
-    const m = e.message || "";
-    if (/Approchez/.test(m) && tries < 3) return setTimeout(() => pickChance(g, tries + 1), 700);
-    W.qPend.delete(g); W.qWait.set(g, performance.now() + 8000);
-    if (/Déjà/.test(m)) { W.taken.add(g); renderQ(); }
-    else if (/Pas de carte Chance/.test(m)) rejoin();   // un nouveau jour : les « ? » ont changé
-  }
-}
-function showChance(ch) {
-  if (!ch) return;
-  const [nm] = CHANCE[ch.k] || ["Carte Chance"], bad = BAD.has(ch.k), txt = chanceText(ch);
-  let el = $("#chpop"); if (!el) { el = document.createElement("button"); el.id = "chpop"; el.addEventListener("click", () => el.classList.remove("on")); document.body.appendChild(el); }
-  el.className = bad ? "bad" : "good";
-  el.innerHTML = `<i>?</i><span><small>Carte Chance</small><b>${esc(nm)}</b>${txt ? `<em>${esc(txt)}</em>` : ""}</span>`;
-  void el.offsetWidth; el.classList.add("on"); clearTimeout(el.t); el.t = setTimeout(() => el.classList.remove("on"), 4500);
-  sfx(bad ? "bad" : "coin"); if (!bad && window.confetti) confetti("#A855F7", 24);
 }
 
 // ---- le métro : depuis une station, vers n'importe quelle station de Paris (un ticket) --------------
@@ -884,21 +885,20 @@ function metroPath(from, to) {   // de station en station (changements compris) 
   for (let g = to; g != null; g = prev.get(g)) out.unshift(g); return out;
 }
 async function ride(from, to) {
-  const me = meP(); if (!me || W.riding) return;
+  const me = meP(); if (!me || W.riding || W.run) return;
   W.riding = true; moving = true;
   let r; try { r = await rpc("world_metro", { p_to: to }); } catch (e) { W.riding = false; moving = false; return toast(e.message, "bad"); }
-  W.mv++; W.target = null;   // un trajet à pied en cours s'arrête là
-  setState(r.state); W.w = r.w || W.w; renderWallet(); renderDock(); if (r.toll?.toll > 0) tollToast(r.toll);
+  clearOpts();   // un dé lancé et pas joué : le serveur le rend (ses destinations étaient autour de l'ancienne station)
+  setState(r.state); W.w = r.w || W.w; renderWallet(); renderDock();
   if (panelKind) { justBought = null; setMovebar(""); }
   const stops = metroPath(from, to); await ensureCards(stops.concat([to]));
   const line = stops.map(g => { const s = spotOf(g); return s ? [s[3], s[4]] : centerOf(g); });
-  stopPerson(me); me.gone = true; pose(me); layoutPeople(); window.people3d?.ring(0, 0, 0, false); drawRoute(line, null, true); sfx("dice");
+  stopPerson(me); me.gone = true; pose(me); layoutPeople(); drawRoute(line, null, true); sfx("dice");
   const dest = centerOf(to), ms = Math.min(4200, 1400 + 220 * stops.length), v = worldView();
-  CAM.on = true; CAM.userB = false; map.flyTo({ center: dest, zoom: v.zoom, pitch: v.pitch, padding: v.padding, duration: ms, essential: true });
+  CAM.on = true; map.flyTo({ center: dest, zoom: v.zoom, pitch: v.pitch, padding: v.padding, duration: ms, essential: true });
   await sleep(ms);
   me.lon = dest[0]; me.lat = dest[1]; me.gone = false; pose(me); drawRoute(null);
-  W.riding = false; moving = false; window.people3d?.ring(me.lon, me.lat, W.cfg.reach, ringOn());
-  updateNear(true); checkChance(true); queueCells(true); layoutPeople();
+  W.riding = false; moving = false; queueCells(true); layoutPeople();
   justBought = null; landCredit = null; showLand(null, to);
 }
 
@@ -906,18 +906,21 @@ async function ride(from, to) {
 function openSay() {
   if (!W.on || W.chatOff || W.banned) return;
   let f = $("#wsay");
-  if (!f) {
+  if (!f) {   // (21/10/2026, « l'onglet du chat prend une ampleur démesurée ») : une seule petite barre, « envoyer » dedans
     f = document.createElement("form"); f.id = "wsay"; f.autocomplete = "off"; f.hidden = true;
-    f.innerHTML = `<input id="wsq" maxlength="120" placeholder="Dire quelque chose…" enterkeyhint="send" aria-label="Message"><button class="go" aria-label="Envoyer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg></button><button type="button" class="x" aria-label="Fermer">×</button>`;
+    f.innerHTML = `<input id="wsq" maxlength="120" placeholder="Dire quelque chose…" enterkeyhint="send" aria-label="Message"><button class="go" aria-label="Envoyer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg></button>`;
     document.body.appendChild(f);
     f.addEventListener("submit", e => { e.preventDefault(); sendSay(); });
-    f.querySelector(".x").addEventListener("click", closeSay);
-    f.querySelector("#wsq").addEventListener("keydown", e => { if (e.key === "Escape") { e.preventDefault(); closeSay(); } });
+    const q = f.querySelector("#wsq");
+    q.addEventListener("keydown", e => { if (e.key === "Escape") { e.preventDefault(); closeSay(); } });
+    // le clavier se ferme ou l'on touche ailleurs sans avoir rien écrit : la barre s'en va (ce qu'on a écrit, lui, reste)
+    q.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== q && !q.value.trim()) closeSay(); }, 180));
+    f.querySelector(".go").addEventListener("pointerdown", e => e.preventDefault());   // (toucher « envoyer » ne ferme pas le clavier)
   }
   f.hidden = false; document.body.classList.add("saying"); $("#wsq").focus(); sayHint();
   W.unread = 0; renderLog();
 }
-function closeSay() { const f = $("#wsay"); if (f) f.hidden = true; document.body.classList.remove("saying"); $("#wsq")?.blur(); renderLog(); }
+function closeSay() { const f = $("#wsay"); if (f) f.hidden = true; document.body.classList.remove("saying"); $("#wsq")?.blur(); clearTimeout(W.sayHT); renderLog(); }
 // le fil des messages (21/10/2026, choix du propriétaire) : ce que les gens autour ont dit, à relire en ouvrant « Parler » ;
 // une pastille sur « Parler » compte ce qu'on n'a pas encore lu
 function logSay(p, t) {
@@ -932,26 +935,27 @@ function sayBadge() {
   if (nb) { nb.hidden = !n || open || !canSay(); nb.textContent = n > 9 ? "9+" : n; }
   return open;
 }
-function renderLog() {
+function renderLog() {   // les 5 derniers messages, seulement s'il y en a d'autres que les siens (les siens sont dans sa bulle)
   const open = sayBadge();
-  let el = $("#wlog"); const items = (W.log || []).slice(-8);
-  if (!open || !items.length) { if (el) el.hidden = true; return; }
+  let el = $("#wlog"); const items = (W.log || []).slice(-5);
+  if (!open || !items.some(m => m.id !== W.me)) { if (el) el.hidden = true; return; }
   if (!el) { el = document.createElement("div"); el.id = "wlog"; el.setAttribute("aria-live", "polite"); document.body.appendChild(el); }
-  el.innerHTML = items.map(m => `<p${m.id === W.me ? ' class="me"' : ""}><b style="color:${m.id === W.me ? "var(--act)" : PARTIES[m.party]?.c || "#475569"}">${esc(m.who)}</b>${esc(m.t)}</p>`).join("");
+  el.innerHTML = items.map(m => `<p${m.id === W.me ? ' class="me"' : ""}><b>${m.id === W.me ? "" : `<i style="background:${PARTIES[m.party]?.c || "#94A3B8"}"></i>`}${esc(m.who)}</b>${esc(m.t)}</p>`).join("");
   el.hidden = false; el.scrollTop = el.scrollHeight;
 }
 // un message par minute (21/10/2026, choix du propriétaire : « less is more ») : la barre affiche le temps qui reste
 const sayWait = () => Math.max(0, Math.ceil(((W.saidAt || 0) + 60000 - Date.now()) / 1000));
 function sayHint() {
   const q = $("#wsq"); if (!q) return; const s = sayWait();
-  q.placeholder = s ? `Encore ${s} s` : "Dire quelque chose…";
+  q.placeholder = s ? `Prochain message dans ${s} s` : "Dire quelque chose…";
+  $("#wsay")?.classList.toggle("wait", s > 0);
   clearTimeout(W.sayHT); if (s && $("#wsay")?.hidden === false) W.sayHT = setTimeout(sayHint, 1000);
 }
 async function sendSay() {
   const q = $("#wsq"), t = (q?.value || "").replace(/\s+/g, " ").trim(); if (!t) return closeSay();
   if (sayWait()) return toast(`Doucement : un message par minute (encore ${sayWait()} s).`, "bad");   // (le texte reste dans la barre)
   q.value = "";
-  try { await rpc("world_say", { p_text: t }); W.saidAt = Date.now(); say(meP(), t.slice(0, 120)); logSay(meP(), t); sayHint(); }
+  try { await rpc("world_say", { p_text: t }); W.saidAt = Date.now(); say(meP(), t.slice(0, 120)); logSay(meP(), t); closeSay(); }   // (son message est dans sa bulle : la barre s'en va)
   catch (e) {
     const m = e.message || "";
     if (/Revenez/.test(m)) { q.value = t; return rejoin(); }

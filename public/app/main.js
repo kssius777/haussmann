@@ -31,7 +31,7 @@ async function boot() {
     if (!ME) return showOnb("home");
     await afterLogin();
   } catch (e) {
-    console.error(e); $("#loadmsg") && ($("#loadmsg").textContent = "Impossible de charger le jeu : " + e.message);
+    console.error(e); $("#loadmsg") && ($("#loadmsg").textContent = "Impossible de charger le jeu : " + e.message); $("#loading .ld-bar")?.remove();
   }
 }
 async function startGame(first) {
@@ -45,7 +45,7 @@ async function startGame(first) {
   refreshOffers(); setInterval(() => { if (!document.hidden) refreshOffers(); }, 60000);   // (rien quand l'onglet est caché)
   try { initWorld(); } catch (e) { console.warn("monde", e); }   // Paris à pied (place.js) : on y entre dès que la carte est prête
   setTimeout(claimGift, 1500);
-  try { if (first) { if (localStorage.getItem("hm_tut") == null) localStorage.setItem("hm_tut", "1"); } else if (localStorage.getItem("hm_tut") == null) localStorage.setItem("hm_tut", "99"); } catch (e) { }
+  try { if (first) { if (localStorage.getItem("hm_tut") == null) localStorage.setItem("hm_tut", "1"); localStorage.setItem("hm_hint3", "1"); } else if (localStorage.getItem("hm_tut") == null) localStorage.setItem("hm_tut", "99"); } catch (e) { }   // (« le dé revient » : seulement pour ceux qui ont connu la marche)
   setInterval(tutTick, 700);
   setInterval(() => {
     renderWallet();
@@ -90,7 +90,7 @@ function showWelcome() {
   R.innerHTML = `<div class="bstage"><div class="rays"></div><div class="welcome">
     <p class="eyebrow" style="color:#9FB4D6">Bienvenue à Paris</p>
     <h2>${esc(p.pseudo)}, Paris est à prendre</h2>
-    <div class="wl"><span>🚶</span><div><b>Promenez-vous dans Paris</b><p>Touchez une rue : votre personnage y marche. Un immeuble libre à côté de vous ? Achetez-le.</p></div></div>
+    <div class="wl"><span>🎲</span><div><b>Lancez le dé</b><p>Choisissez où aller parmi 4 immeubles : votre personnage y court. Libre ? Achetez-le.</p></div></div>
     <div class="wl"><span>💶</span><div><b>${fmtE(p.cash)} et ${p.welcome} boosters pour démarrer</b><p>Un booster, c'est 4 biens de Paris au hasard + 1 carte Chance.</p></div></div>
     <div class="wl"><span>🏛️</span><div><b>Devenez maire</b><p>Le plus gros propriétaire d'un arrondissement touche 8 % des loyers des autres.</p></div></div>
     <div class="bbtns"><button class="btn white block" data-w="open">Ouvrir mon premier booster</button><button class="btn glass block" data-w="map">Aller dans Paris d'abord</button></div>
@@ -110,8 +110,8 @@ window.addEventListener("unhandledrejection", e => { const m = String(e.reason?.
 
 
 // =====================================================================
-//  Tutoriel en jouant : une bulle à la fois, au moment où la règle sert (20/10/2026 : plus de dé, on se promène)
-//  1 acheter près de soi (ou marcher) · 2 la case · 3 après l'achat · 3.5 marcher · 4 les boosters · 5 les mairies · 99 fini
+//  Tutoriel en jouant : une bulle à la fois, au moment où la règle sert (21/10/2026 : le dé revient)
+//  1 lancer le dé · 1.5 choisir où aller · 2 la case · 3 après l'achat · 3.5 relancer · 4 les boosters · 5 les mairies · 99 fini
 // =====================================================================
 let tutShown = "", tutMv = -1;
 // un point de la carte (un immeuble) où pointer la bulle ; null s'il n'est pas bien visible à l'écran
@@ -127,28 +127,30 @@ function tutGet() { try { return +(localStorage.getItem("hm_tut") || 99); } catc
 function tutSet(n) { try { localStorage.setItem("hm_tut", String(n)); } catch (e) { } tutTick(); }
 function tutTick() {
   const st = tutGet(); let k = "", anchor = null, html = "", ok = false;
-  const idle = cur() === "map" && $("#reveal").hidden && $("#onb").hidden && !moving && W.on;
-  const caseOpen = panelKind === "land" && !landView;
-  if (st === 1 && caseOpen) return tutSet(2);
-  else if (st === 1 && idle && !panelKind) {
-    const pt = W.near.length ? tutPoint(centerOf(W.near[0])) : null;   // la bulle pointe l'immeuble vert le plus proche
-    if (pt) { k = "1b"; anchor = pt; html = "<b>Achetez près de vous 🏠</b>En vert : à vendre, à portée de main. Touchez-en un."; }
-    else { k = "1w"; html = "<b>Touchez la carte 🚶</b>Votre personnage y marche. En vert près de vous : à vendre."; }
+  const idle = cur() === "map" && $("#reveal").hidden && $("#onb").hidden && !moving && W.on && !W.rolling;
+  const caseOpen = panelKind === "land" && !landView, picking = W.opts.length > 0;
+  if ((st === 1 || st === 1.5) && caseOpen) return tutSet(2);
+  else if (st === 1 && picking) return tutSet(1.5);
+  else if (st === 1 && idle && !panelKind) { k = "1"; anchor = "#b-main"; html = "<b>Lancez le dé 🎲</b>Il vous propose 4 immeubles autour de vous."; }
+  else if (st === 1.5 && picking && idle) {
+    const i = Math.max(0, W.opts.findIndex(o => o.k[0] === "free")), ch = $("#dchips")?.children[i];   // la bulle pointe une flèche verte
+    if (ch) { ch.id = "tutchip"; anchor = "#tutchip"; }
+    k = "1.5"; html = "<b>Choisissez où aller</b>En vert : libre, vous pourrez l'acheter. En rose : on paie le loyer.";
   }
   else if (st === 2 && caseOpen) {
     if (justBought) return tutSet(3);
     const g = landPos(), fr = g != null ? freeOf(g) : 0;
     k = "2" + (fr > 0 ? "f" : "x"); anchor = "#movebar .lb"; ok = true;
     html = fr > 0 ? "<b>Il est libre : achetez-le !</b>À crédit, vous ne payez qu'une petite partie maintenant : la banque prête le reste, remboursé tout seul par le loyer."
-      : "<b>Tout est déjà pris ici</b>Promenez-vous : il y a des immeubles libres partout dans Paris.";
+      : "<b>Tout est déjà pris ici</b>Relancez le dé : il y a des immeubles libres partout dans Paris.";
   }
   else if ((st === 2 || st === 2.5) && !panelKind && idle) return tutSet(3.5);
   else if (st === 2.5 && justBought && caseOpen) return tutSet(3);
   else if (st === 3 && panelKind === "land") { k = "3"; anchor = ".money"; ok = true; html = "<b>Bravo, c'est votre premier bien !</b>Il vous rapporte des loyers en continu, même quand vous n'êtes pas connecté. Touchez votre argent, ici, pour voir tout l'historique."; }
   else if (st === 3 && !panelKind && idle) return tutSet(3.5);
   else if (st === 3.5 && idle && !panelKind) {
-    if (tutMv < 0) tutMv = W.mv; else if (W.mv > tutMv) return tutSet(4);
-    k = "w"; ok = true; html = "<b>Promenez-vous 🚶</b>Touchez la carte : votre personnage y marche. Chaque km rapporte un salaire. Devant chez les autres, on paie un petit péage.";
+    if (tutMv < 0) tutMv = W.rolls; else if (W.rolls > tutMv) return tutSet(4);
+    k = "w"; anchor = "#b-main"; ok = true; html = "<b>Relancez le dé 🎲</b>Chaque lancer rapporte 20 000 €. Un lancer revient toutes les 30 min.";
   }
   else if (st === 4 && idle && !panelKind) { k = "4"; anchor = "#b-pack"; html = "<b>Ouvrez vos boosters</b>Chacun contient 4 vrais biens de Paris et 1 carte Chance. Vous en avez à ouvrir !"; }
   else if (st === 4 && (cur() === "booster" || !$("#reveal").hidden)) return tutSet(5);

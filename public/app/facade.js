@@ -152,7 +152,7 @@ function facWatch(m) {
   const tick = () => {
     const now = performance.now(), dt = now - last; last = now;
     if (now - t0 < 15000 || document.visibilityState !== "visible" || dt > 2000) return;
-    // (seulement quand la carte est redessinée à chaque image : la caméra suit son personnage qui marche, ou la carte bouge)
+    // (seulement quand la carte est redessinée à chaque image : la caméra suit son personnage qui court, ou la carte bouge)
     const follow = typeof meP === "function" && !!(meP() || {}).path && typeof CAM !== "undefined" && CAM.on && (typeof cur !== "function" || cur() === "map");
     if (!follow && !m.isMoving()) return;
     dts.push(dt); if (dts.length < 120) return;

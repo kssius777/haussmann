@@ -14,7 +14,7 @@ async function landingHTML() {
   }).join("");
   const steps = [
     ["Ouvrez des boosters", "De vrais biens parisiens dans chaque booster. 5 offerts, puis un par jour."],
-    ["Promenez-vous", "Marchez dans les vraies rues : un immeuble libre à côté de vous ? Achetez-le."],
+    ["Lancez le dé", "Choisissez où aller parmi 4 immeubles : libre, achetez-le."],
     ["Encaissez vos loyers", "Ils tombent tout seuls, même quand vous n'êtes pas là."],
     ["Devenez maire", "Le plus gros propriétaire d'un arrondissement prend la mairie."]
   ];

@@ -25,14 +25,16 @@ const BLD = { source: "pv", sourceLayer: "b" };
 const pvSource = () => ({ type: "vector", tiles: [location.origin + "/data/t/{z}/{x}/{y}.pbf?v=" + DATA_V], minzoom: 11, maxzoom: 15, bounds: [2.215, 48.81, 2.475, 48.906] });
 
 function colorExprs(m) {
-  const st = ["coalesce", ["feature-state", "s"], 0], se = ["boolean", ["feature-state", "sel"], false], tg = ["coalesce", ["feature-state", "tgt"], 0], nr = ["coalesce", ["feature-state", "near"], 0];
+  const st = ["coalesce", ["feature-state", "s"], 0], se = ["boolean", ["feature-state", "sel"], false], tg = ["coalesce", ["feature-state", "tgt"], 0], ds = ["coalesce", ["feature-state", "dst"], 0];
   const rarR = d => ["match", ["get", "r"], "M", MC.rarM, "L", MC.rarL, d], rarB = d => ["match", ["get", "r"], "M", MC.rarMB, "L", MC.rarLB, d];
   const lit = (d, a, b) => ["case", ["==", ["%", ["id"], 5], 0], a, ["==", ["%", ["id"], 7], 1], b, d];   // la nuit, des fenêtres allumées
   if (m === "mine") return { roof: ["case", se, MC.sel, [">=", st, 3], MC.mine, MC.muteR], body: ["case", se, MC.selB, [">=", st, 3], MC.mineB, MC.mute] };
   if (m === "sale") return { roof: ["case", se, MC.sel, ["==", st, 4], MC.sale, MC.muteR], body: ["case", se, MC.selB, ["==", st, 4], MC.saleB, MC.mute] };
-  // (avec la façade que la carte graphique dessine sur les murs : facade.js)
-  return { roof: facRoof(["case", ["==", tg, 2], "#A855F7", ["==", tg, 1], "#FACC15", se, MC.sel, [">=", st, 3], MC.mine, ["==", st, 4], MC.sale, ["==", nr, 1], "#4FCB7E", ["==", st, 2], MC.theirs, rarR(lit(MC.zinc, MC.lit, MC.lit))]),
-           body: facBody(["case", ["==", tg, 2], "#D8B4FE", ["==", tg, 1], "#FDE68A", se, MC.selB, [">=", st, 3], MC.mineB, ["==", st, 4], MC.saleB, ["==", nr, 1], "#E3F4E8", ["==", st, 2], MC.theirsB, rarB(lit(MC.stone, MC.litB, MC.lit2B))]) };
+  // (avec la façade que la carte graphique dessine sur les murs : facade.js) ; les destinations du dé de la couleur de leur flèche
+  // (place.js : 1 on paie le loyer, 2 libre, 3 chez soi, 4 un « ? », 5 déjà pris)
+  const dst = (a, b, c, d, e, x) => ["case", ["==", ds, 1], a, ["==", ds, 2], b, ["==", ds, 3], c, ["==", ds, 4], d, ["==", ds, 5], e, x];
+  return { roof: facRoof(dst("#EC4899", "#16A34A", "#2563EB", "#7C3AED", "#64748B", ["case", ["==", tg, 2], "#A855F7", ["==", tg, 1], "#FACC15", se, MC.sel, [">=", st, 3], MC.mine, ["==", st, 4], MC.sale, ["==", st, 2], MC.theirs, rarR(lit(MC.zinc, MC.lit, MC.lit))])),
+           body: facBody(dst("#F9A8D4", "#86EFAC", "#93C5FD", "#C4B5FD", "#CBD5E1", ["case", ["==", tg, 2], "#D8B4FE", ["==", tg, 1], "#FDE68A", se, MC.selB, [">=", st, 3], MC.mineB, ["==", st, 4], MC.saleB, ["==", st, 2], MC.theirsB, rarB(lit(MC.stone, MC.litB, MC.lit2B))])) };
 }
 function partyFill() {
   return ["match", ["coalesce", ["feature-state", "p"], ""], ...PARTY_ORDER.flatMap(k => [k, PARTIES[k].c]), "#FFFFFF"];
@@ -57,7 +59,6 @@ function paintAll() {
     lastState.set(g, k); map.setFeatureState(Object.assign({ id: g }, BLD), { s, sel: se });
   }
   painted = want; renderMarks(); renderTags(); renderScore(); renderFilterCounts(); paintTargets();
-  updateNear();   // qui a acheté quoi a changé : ce qui reste à vendre autour de soi aussi
 }
 let arrKey = "";
 function updateArrFill() {
@@ -81,7 +82,7 @@ function buildMap(base) {
   const ev = ST.state?.event, BLD_SRC = { source: "pv", "source-layer": "b" };
   map = new maplibregl.Map({
     container: "map", attributionControl: false, center: [2.3440, 48.8566], zoom: 14.2, pitch: 55, bearing: 0, maxPitch: 75, minZoom: 10.8,
-    doubleClickZoom: false,   // un clic fait marcher : un double clic ne zoome pas en plus (on zoome à la molette, en pinçant)
+    doubleClickZoom: false,   // un clic choisit une destination du dé : un double clic ne zoome pas en plus (on zoome à la molette, en pinçant)
     maxBounds: [[2.16, 48.77], [2.54, 48.95]], fadeDuration: 0, maxTileCacheSize: 48,   // peu de tuiles gardées en mémoire (téléphones) dragRotate: true, touchPitch: true, pitchWithRotate: true,
     style: { version: 8, glyphs: "/fonts/{fontstack}/{range}.pbf",
       light: GROUND.light, sky: GROUND.sky,
@@ -342,21 +343,22 @@ function flyTo(g) { if (!map || !mapReady) return; camOff(); const m = IDX.model
 function showOnMap(g) { go("map"); setTimeout(() => { flyTo(g); previewBuilding(g); }, 80); }
 
 // aperçu d'un immeuble : le même panneau que la case (à droite sur ordinateur, en bas sur téléphone)
-async function previewBuilding(g) {   // à portée : on peut l'acheter ; trop loin : la case le dit, avec « Y aller » (place.js)
+async function previewBuilding(g) {   // là où le dé l'a fait tomber : on peut l'acheter ; ailleurs : sa case, pour regarder (place.js)
   await ensureCards([g]); if (!card(g)) return; closeSearch(); hideHint();
   if (g === landPos()) { landView = false; showLand(); } else worldTapCard(g);
 }
 function hidePreview() { if (!moving && (panelKind !== "land" || landView)) setMovebar(""); const pv = $("#preview"); if (pv && !pv.hidden) { pv.hidden = true; sel = null; paintAll(); if (false) $("#strip").hidden = false; } }
 function closeSearch() { $("#search").hidden = true; }
-// un toucher sur la carte (g : l'immeuble ou le monument touché) : on marche là où l'on touche, à tous les zooms ; un bien à portée s'ouvre
-// (place.js). Une case ouverte : sur téléphone, le toucher la ferme seulement (sans marcher ni bouger la carte) ; sur ordinateur, où elle
-// est sur le côté, il la ferme et fait aussi avancer. La recherche ouverte : le toucher la ferme seulement.
+// un toucher sur la carte (g : l'immeuble ou le monument touché) : une destination du dé, on y va ; un autre immeuble, sa case
+// (place.js). Une case ouverte : sur téléphone, le toucher la ferme seulement (sans bouger la carte) ; sur ordinateur, où elle est sur
+// le côté, il la ferme et vaut aussi pour ce qu'on touche. La recherche ouverte : le toucher la ferme seulement.
 function mapTap(e, g) {
+  if ($("#wsay") && !$("#wsay").hidden) { closeSay(); return; }   // la barre pour parler ouverte : toucher la carte la ferme seulement
   if (panelKind === "land" && !moving) { justBought = null; setMovebar(""); closeSearch(); if (innerWidth < 900) return; }
-  if (!$("#search").hidden || performance.now() - tapGuard < 700) { closeSearch(); return; }   // ce toucher fermait la recherche : on ne part pas marcher
+  if (!$("#search").hidden || performance.now() - tapGuard < 700) { closeSearch(); return; }   // ce toucher fermait la recherche : rien d'autre
   hidePreview();
-  if (g != null) return onBuildingTap(g, [e.lngLat.lng, e.lngLat.lat], e);
-  worldMapClick(e);
+  if (worldMapClick(e)) return;   // un « ? » proposé par le dé
+  if (g != null) return onBuildingTap(g);
 }
 
 function initMapUI() {
@@ -395,8 +397,8 @@ function initMapUI() {
 
 // petit message d'aide sur la carte, jusqu'au premier achat ou aperçu
 // (20/10/2026 : pour ceux qui jouaient avec le dé, une fois) on se promène maintenant
-function showHint() { try { if (localStorage.getItem("hm_hint2") || +(localStorage.getItem("hm_tut") || 99) < 99) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "<b>Nouveau : le dé laisse place à la marche.</b> Touchez la carte pour marcher ; en vert près de vous : à vendre."; h.onclick = hideHint; $("#p-map").appendChild(h); }
-function hideHint() { if (!$("#maphint")) return; $("#maphint").remove(); try { localStorage.setItem("hm_hint2", "1"); } catch (e) { } }
+function showHint() { try { if (localStorage.getItem("hm_hint3") || +(localStorage.getItem("hm_tut") || 99) < 99) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "<b>Le dé revient 🎲</b>"; h.onclick = hideHint; $("#p-map").appendChild(h); }
+function hideHint() { if (!$("#maphint")) return; $("#maphint").remove(); try { localStorage.setItem("hm_hint3", "1"); } catch (e) { } }
 function celebrate(c) { toast(`Félicitations ! ${title(c)} est à vous. Loyer : +${fmtE(c.rent)}/jour`, "good"); if (window.confetti) confetti("#0EA5A0", 30); }
 
 // ---- rangée de cartes en bas de la carte : mes biens / à vendre ----------------------------
@@ -422,7 +424,7 @@ function showStrip(kind) {
   stripKind = kind;
   const items = kind === "mine" ? holdings().sort((a, b) => b.c.v * unitsOf(b) - a.c.v * unitsOf(a)).map(h => ({ g: h.g, c: h.c, item: { t: "own", ks: h.ks, n: h.n } }))
     : [...ST.sale].map(g => ({ g, c: card(g) })).filter(x => x.c);
-  if (!items.length) { stripKind = kind; showStrip("all"); return toast(kind === "mine" ? "Vous n'avez encore aucun bien : promenez-vous ou ouvrez un booster !" : "Rien à vendre en ce moment."); }
+  if (!items.length) { stripKind = kind; showStrip("all"); return toast(kind === "mine" ? "Vous n'avez encore aucun bien : lancez le dé ou ouvrez un booster !" : "Rien à vendre en ce moment."); }
   // pas de rangée de cartes : seulement les points sur la carte (demande du propriétaire)
   el.hidden = true; setStripPins(items); document.body.classList.add("mymode"); document.body.classList.toggle("salemode", kind === "sale"); map.setPaintProperty("arrfill", "fill-opacity", 0);
   stripCount(items); renderMarks();
