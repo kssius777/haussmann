@@ -16,7 +16,7 @@ cur.execute("""create schema if not exists realtime;
   $$ insert into realtime.sent(payload, event, topic, private) values (payload, event, topic, private) $$;
   truncate realtime.sent;""")
 for f in ["migration_admin.sql", "migration_chat.sql", "migration_chat_look.sql", "migration_metro.sql", "migration_lieux.sql",
-          "migration_monde.sql", "migration_monde_paris.sql", "migration_monde_paris.sql", "migration_vitesse.sql", "migration_temps_reel.sql"]:
+          "migration_monde.sql", "migration_monde_paris.sql", "migration_monde_paris.sql", "migration_vitesse.sql", "migration_temps_reel.sql", "migration_chat_minute.sql"]:
     cur.execute(open("supabase/" + f).read())   # la dernière 2 fois : rejouable
 c0.commit()
 db.sql("truncate place_people, chat_msg, chat_bans, walkers, world_people, chance_taken")
@@ -177,10 +177,13 @@ db.rpc(A, "world_join")
 db.rpc(A, "world_say", p_text="  Salut   Paris ")
 t, ev = last_ev(); mycell = db.sql("select cell from world_people where user_id=%s", str(A))[0][0]
 check("parler : on l'entend sur le canal de son carré, message signé par le serveur", t == f"w:{mycell}" and ev["k"] == "say" and ev["d"]["t"] == "Salut Paris" and ev["u"] == str(A))
-check("un message par seconde au plus", "Doucement" in (err(lambda: db.rpc(A, "world_say", p_text="encore")) or ""))
-for i in range(4): db.sql("update world_people set said_at = null where user_id=%s", str(A)); db.rpc(A, "world_say", p_text=f"message {i + 2}")
-db.sql("update world_people set said_at = null where user_id=%s", str(A)); e6 = err(lambda: db.rpc(A, "world_say", p_text="un de trop"))
-check("5 messages par minute au plus : un chat de rue, pas une messagerie (21/10/2026)", "5 messages par minute" in (e6 or "") and "encore" in (e6 or ""), e6)
+e2 = err(lambda: db.rpc(A, "world_say", p_text="encore"))
+check("un message par minute au plus : un chat de rue, pas une messagerie (21/10/2026)", "un message par minute" in (e2 or "") and "encore" in (e2 or ""), e2)
+db.sql("update world_people set said_at = null where user_id=%s", str(A))   # ressortir et revenir ne remet pas le compteur à zéro
+check("… même en effaçant son dernier passage (le message compte encore 1 minute)", "un message par minute" in (err(lambda: db.rpc(A, "world_say", p_text="encore")) or ""))
+db.sql("update chat_msg set at = now() - interval '61 seconds' where user_id=%s and kind='say'", str(A))
+db.rpc(A, "world_say", p_text="Une minute plus tard")
+check("une minute plus tard, on peut reparler", last_ev()[1]["d"].get("t") == "Une minute plus tard")
 fd = db.rpc(B, "world_feed", p_cells=[mycell], p_since=0)
 check("sans temps réel, world_feed rend les évènements des carrés", any(e["k"] == "say" and e["d"]["t"] == "Salut Paris" for e in fd["ev"]))
 check("couper le chat : enregistré dans le profil", db.rpc(A, "set_chat_off", p_off=True) is True and db.rpc(A, "state")["profile"]["chat_off"] is True)

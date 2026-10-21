@@ -296,6 +296,7 @@ async def main():
         await pg.fill("#wsq", "Salut !"); await pg.press("#wsq", "Enter")
         await W("[...document.querySelectorAll('#wpl .wp.me .bub:not([hidden])')].some(b => b.textContent === 'Salut !')", 10000)
         check("« Parler » (le bouton du milieu) : son message dans sa bulle, signé par le serveur", db.sql("select data->>'t', user_id::text from chat_msg where kind='say' order by id desc limit 1")[0] == ("Salut !", me))
+        check("un message par minute : la barre affiche le temps qui reste", await E("/^Encore \\d+ s$/.test(document.querySelector('#wsq').placeholder)"), await E("document.querySelector('#wsq').placeholder"))
         await pg.press("#wsq", "Escape"); await pg.wait_for_timeout(150); esc = await E("document.querySelector('#wsay').hidden")
         await E("document.activeElement?.blur?.(); 1"); await pg.keyboard.press("Enter"); await pg.wait_for_timeout(250)
         check("au clavier : Entrée pour parler, Échap pour fermer", esc and await E("!document.querySelector('#wsay').hidden && document.activeElement.id === 'wsq'"))
@@ -311,7 +312,7 @@ async def main():
         await pg.click("#avatar"); await W("document.querySelector('#chatoff')"); await pg.click("#chatoff"); await W("W.chatOff === true", 5000)
         check("profil : couper le chat (plus de « Parler » : « Moi » revient au milieu)", await E("document.querySelector('#mainlbl').textContent === 'Moi' && document.querySelector('#b-me').hidden && !document.querySelector('#kmleft').hidden") and db.sql("select chat_off from profiles where id=%s", me)[0][0] is True)
         await pg.click("[data-back]"); await pg.wait_for_timeout(300)
-        db.sql("update world_people set said_at = null, seen = now() where user_id=%s", ou); db.rpc(ou, "world_say", p_text="Tu me lis ?"); await pg.wait_for_timeout(3500)
+        db.sql("update world_people set said_at = null, seen = now() where user_id=%s", ou); db.sql("delete from chat_msg where user_id=%s and kind='say'", ou); db.rpc(ou, "world_say", p_text="Tu me lis ?"); await pg.wait_for_timeout(3500)
         check("chat coupé : les messages des autres ne s'affichent plus", await E("![...document.querySelectorAll('#wpl .bub:not([hidden])')].some(b => b.textContent === 'Tu me lis ?')"))
         await pg.click("#avatar"); await W("document.querySelector('#chatoff')"); await pg.click("#chatoff"); await W("W.chatOff === false", 5000); await pg.click("[data-back]")
         # trop loin : « Y aller », puis on l'achète une fois à portée

@@ -893,7 +893,7 @@ function openSay() {
     f.querySelector(".x").addEventListener("click", closeSay);
     f.querySelector("#wsq").addEventListener("keydown", e => { if (e.key === "Escape") { e.preventDefault(); closeSay(); } });
   }
-  f.hidden = false; document.body.classList.add("saying"); $("#wsq").focus();
+  f.hidden = false; document.body.classList.add("saying"); $("#wsq").focus(); sayHint();
   W.unread = 0; renderLog();
 }
 function closeSay() { const f = $("#wsay"); if (f) f.hidden = true; document.body.classList.remove("saying"); $("#wsq")?.blur(); renderLog(); }
@@ -919,15 +919,23 @@ function renderLog() {
   el.innerHTML = items.map(m => `<p${m.id === W.me ? ' class="me"' : ""}><b style="color:${m.id === W.me ? "var(--act)" : PARTIES[m.party]?.c || "#475569"}">${esc(m.who)}</b>${esc(m.t)}</p>`).join("");
   el.hidden = false; el.scrollTop = el.scrollHeight;
 }
+// un message par minute (21/10/2026, choix du propriétaire : « less is more ») : la barre affiche le temps qui reste
+const sayWait = () => Math.max(0, Math.ceil(((W.saidAt || 0) + 60000 - Date.now()) / 1000));
+function sayHint() {
+  const q = $("#wsq"); if (!q) return; const s = sayWait();
+  q.placeholder = s ? `Encore ${s} s` : "Dire quelque chose…";
+  clearTimeout(W.sayHT); if (s && $("#wsay")?.hidden === false) W.sayHT = setTimeout(sayHint, 1000);
+}
 async function sendSay() {
   const q = $("#wsq"), t = (q?.value || "").replace(/\s+/g, " ").trim(); if (!t) return closeSay();
+  if (sayWait()) return toast(`Doucement : un message par minute (encore ${sayWait()} s).`, "bad");   // (le texte reste dans la barre)
   q.value = "";
-  try { await rpc("world_say", { p_text: t }); say(meP(), t.slice(0, 120)); logSay(meP(), t); }
+  try { await rpc("world_say", { p_text: t }); W.saidAt = Date.now(); say(meP(), t.slice(0, 120)); logSay(meP(), t); sayHint(); }
   catch (e) {
     const m = e.message || "";
     if (/Revenez/.test(m)) { q.value = t; return rejoin(); }
     if (/banni/i.test(m)) { W.banned = true; renderDock(); closeSay(); }
-    if (/Doucement/.test(m)) q.value = t;
+    if (/Doucement/.test(m)) { q.value = t; const s = +(m.match(/encore (\d+) s/) || [])[1]; if (s) { W.saidAt = Date.now() - (60 - s) * 1000; sayHint(); } }
     toast(m, "bad");
   }
 }
