@@ -250,7 +250,10 @@ const ringOn = () => W.on && mode === "all" && !W.riding && cur() === "map";
 // ---- démarrer : on entre dans Paris dès que la carte est prête ------------------------
 function initWorld() {
   loadWorld().catch(() => { });   // le plan des rues arrive pendant que la carte se charge
-  document.addEventListener("visibilitychange", () => { if (!document.hidden && W.on) { worldFeed(); refreshPeople(); startTick(); } });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) return quietSoon();
+    wake(); if (W.on) { worldFeed(); refreshPeople(); startTick(); }
+  });
   addEventListener("resize", () => { if (W.on) layoutPeople(); });
   document.addEventListener("click", e => {
     const go = e.target.closest("[data-wgo]"); if (go) { const g = +go.dataset.wgo; justBought = null; setMovebar(""); return walkTo(centerOf(g), g, !!go.dataset.pay); }
@@ -382,6 +385,16 @@ async function listen() {
   }
   rtCheck();
 }
+// un onglet resté 30 s en arrière-plan n'écoute plus personne (21/10/2026 : Supabase compte chaque message reçu, et chaque
+// connexion ; un onglet oublié ouvert recevait tout ce qui se disait autour) ; en revenant, on réécoute et on relit qui est là
+let quietT = 0;
+function quietSoon() { clearTimeout(quietT); quietT = setTimeout(() => { if (document.hidden) quiet(); }, 30000); }
+function quiet() {
+  for (const ch of W.chans.values()) { try { SB.removeChannel(ch)?.catch?.(() => { }); } catch (e) { } }
+  W.chans.clear(); W.chSt.clear(); W.cellKey = ""; W.authed = false; W.quiet = true;   // (plus aucun canal : supabase-js ferme la connexion)
+  clearInterval(W.feedT); W.feedEvery = 20000; W.feedT = setInterval(worldFeed, 20000);
+}
+function wake() { clearTimeout(quietT); if (!W.quiet) return; W.quiet = false; if (W.on) queueCells(true); }
 function rtCheck() {   // tous les carrés en temps réel : on relit lentement (filet de sécurité, et « toujours là ») ; sinon toutes les 2,5 s
   const ok = !LOCAL_MODE && !!SB && W.cells.size > 0 && [...W.cells].every(c => W.chSt.get(c) === "SUBSCRIBED"), every = ok ? 20000 : 2500;
   if (W.feedEvery !== every) { W.feedEvery = every; clearInterval(W.feedT); W.feedT = setInterval(worldFeed, every); }
@@ -407,6 +420,7 @@ function worldEvent(e) {
   if (!W.on || !e || W.seen.has(e.e)) return;
   W.seen.add(e.e); if (e.e > W.last) W.last = e.e;
   if (W.seen.size > 800) W.seen = new Set([...W.seen].slice(-400));
+  if (e.k === "map") return syncMapSoon(300 + Math.random() * 1200);   // quelqu'un a acheté ou vendu près d'ici : la carte, tout de suite (api.js)
   const id = e.u, d = e.d || {}; let p = W.people.get(id);
   if (e.k === "join") { if (id !== W.me) { upsertPerson(d); updateVisible(); } }
   else if (e.k === "move") {

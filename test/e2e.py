@@ -18,7 +18,7 @@ async def main():
             await pg.mouse.move(box["x"] + 28, y); await pg.mouse.down()
             for i in range(1, 13): await pg.mouse.move(box["x"] + 28 + (box["width"] - 40) * i / 12, y)
             await pg.mouse.up()
-        t = time.time(); await pg.goto("http://localhost:8780/?local")
+        t = time.time(); await pg.goto(f"http://localhost:{os.environ.get('E2E_PORT', '8780')}/?local")   # E2E_PORT=8781 : un 2e serveur (HM_DB=hm2)
         await W("!document.querySelector('#onb').hidden", 60000)
         check(f"écran de connexion ({time.time()-t:.1f} s)", True)
         await W("document.querySelector('.landing .fan .hc')"); await pg.wait_for_timeout(500)
@@ -219,6 +219,23 @@ async def main():
         check("sa boutique : ses annonces et sa collection, en cartes", await E("document.querySelector('#p-detail').innerText.includes('Boutique de Ella') && document.querySelector('#p-detail').innerText.includes('En vente') && document.querySelector('#p-detail').innerText.includes('Sa collection')"))
         await pg.wait_for_timeout(300); await pg.screenshot(path=T + "19d_boutique.png", timeout=120000)
         await pg.click("#p-detail [data-back]"); await pg.wait_for_timeout(700)
+        # la carte des autres sans tout recharger (map_delta, 21/10/2026) : Ella achète un immeuble tout près → la carte le sait
+        # tout de suite (évènement « map » sur le carré du bien), et seulement cette carte revient
+        nb = db.sql("select id from cards where lk='l' and cx between %s and %s and cy between %s and %s and id not in (select card from lots) and id not in (select card from listings) limit 1",
+                    int(mx * 1e5) - 250, int(mx * 1e5) + 250, int(my * 1e5) - 150, int(my * 1e5) + 150)[0][0]
+        v0 = await E("ST.mapV"); db.sql("insert into lots(card,k,owner) values (%s,0,%s)", nb, ou)
+        await W(f"ST.own.has({nb}) && ST.own.get({nb}).owners.includes('{ou}') && stateFor({nb}) === 2", 12000)
+        dl = db.rpc(ou, "map_delta", p_since=v0)
+        check("quelqu'un achète tout près : la carte le sait tout de suite, sans tout recharger (seulement cette carte)",
+              db.sql("select count(*) from chat_msg where kind='map' and (data->>'g')::int=%s", nb)[0][0] == 1 and nb in dl["cards"] and len(dl["cards"]) <= 3 and not dl.get("full"), dl.get("cards"))
+        # un onglet resté caché n'écoute plus personne ; en revenant, il réécoute les carrés autour
+        await E("Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); quiet(); 1")
+        q1 = await E("({ q: W.quiet === true, ch: W.chans.size, every: W.feedEvery })")
+        await E("delete document.hidden; document.dispatchEvent(new Event('visibilitychange')); 1")
+        await W("!W.quiet && W.cellKey !== '' && W.cells.size > 0 && W.feedEvery === 2500", 8000)
+        check("onglet caché : il n'écoute plus personne ; en revenant, il réécoute", q1["q"] and q1["ch"] == 0 and q1["every"] == 20000, q1)
+        check("nouvelle version en ligne : le site sait comparer la sienne (rechargement en revenant sur un vieil onglet)",
+              await E("fetch('/?nv=1', { cache: 'no-store' }).then(r => r.text()).then(h => !!APP_V && (h.match(/\\/app\\/main\\.js\\?v=([\\w-]+)/) || [])[1] === APP_V)"))
         # marcher : toucher une rue (un point de rue à l'écran, pas sous un immeuble ni sous un bouton)
         tap = await E("""(() => { const m = meP();
           for (let y = 160; y < innerHeight - 270; y += 19) for (let x = 24; x < innerWidth - 24; x += 19) {

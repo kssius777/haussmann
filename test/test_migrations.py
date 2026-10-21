@@ -16,7 +16,7 @@ auto = names[names.index("migration_ping.sql"):]   # appliquées par Vercel (cel
 
 # 1. lecture : un DELETE / UPDATE sans WHERE (« on conflict … do update », « for update », triggers à part)
 bad = []
-for n in auto:
+for n in auto + ["reset_lancement.sql"]:   # (la remise à zéro passera aussi par l'API le jour du lancement)
     s = re.sub(r"--[^\n]*", "", open("supabase/" + n, encoding="utf8").read())
     for m in re.finditer(r"(?is)\b(delete\s+from|update)\s+([a-z_\.]+)\b(.*?);", s):
         if re.search(r"(?i)\bwhere\b", m.group(0)): continue
@@ -36,12 +36,13 @@ else:
     def psql(dbname, sql):
         r = subprocess.run(["psql", "-h", "localhost", "-U", "postgres", "-d", dbname, "-v", "ON_ERROR_STOP=1", "-q"], input=sql, capture_output=True, text=True)
         if r.returncode: raise RuntimeError(r.stderr[-400:])
-    psql("postgres", "drop database if exists hm_migr with (force); create database hm_migr;")
-    dsn0 = db.DSN; db.DSN = dsn0.replace("dbname=hm", "dbname=hm_migr")
+    MIG = os.environ.get("HM_DB", "hm") + "_migr"   # hm_migr (hm2_migr quand HM_DB=hm2 : deux séries de tests en même temps)
+    psql("postgres", f"drop database if exists {MIG} with (force); create database {MIG};")
+    dsn0 = db.DSN; db.DSN = dsn0.rsplit("dbname=", 1)[0] + "dbname=" + MIG
     try:
-        psql("hm_migr", open("test/prelude.sql").read() + schema0)
+        psql(MIG, open("test/prelude.sql").read() + schema0)
         db.seed(); db.seed_graph()
-        psql("hm_migr", """create schema realtime;
+        psql(MIG, """create schema realtime;
           create table realtime.messages (topic text not null, extension text not null default 'broadcast', payload jsonb, event text,
             private boolean default false, inserted_at timestamp not null default now(), id uuid not null default gen_random_uuid());
           alter table realtime.messages enable row level security;
@@ -72,5 +73,5 @@ else:
         c.close()
     finally:
         db.DSN = dsn0
-        psql("postgres", "drop database if exists hm_migr with (force);")
+        psql("postgres", f"drop database if exists {MIG} with (force);")
 print(f"\n{sum(R)}/{len(R)} tests OK"); sys.exit(0 if all(R) else 1)

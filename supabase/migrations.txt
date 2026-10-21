@@ -33,3 +33,4 @@ migration_monde_paris.sql
 migration_vitesse.sql
 migration_boutique.sql
 migration_temps_reel.sql
+migration_carte_delta.sql

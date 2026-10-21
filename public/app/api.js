@@ -128,14 +128,26 @@ async function refreshHold() {
   ST.fx = h.fx || [];
   await ensureCards([...ST.mine.keys(), ...ST.mineParts.keys()]);
 }
-async function refreshMap() {
-  const m = await rpc("map_state");
-  ST.own = new Map();
+// La carte des autres : chargée une fois en entier, puis seulement ce qui a changé depuis la dernière fois (map_delta,
+// 21/10/2026 : avant, chaque achat partait en temps réel à tous les joueurs connectés, et chacun rechargeait toute la carte).
+// Une seule demande à la fois (une réponse plus vieille ne doit pas repasser par-dessus une plus récente).
+// Rend ce qui a changé ({ full, cards, arr, sale }) ou null si rien.
+let mapQ = null;
+function refreshMap() { return (mapQ = (mapQ || Promise.resolve()).catch(() => { }).then(mapOnce)); }
+async function mapOnce() {
+  let m;
+  try { m = await rpc("map_delta", { p_since: ST.mapV || null }); }
+  catch (e) { if (!/map_delta|Could not find|does not exist/i.test(e.message || "")) throw e; m = await rpc("map_state"); m.full = true; }   // (serveur d'avant)
+  const cs = m.full ? [] : m.cards || [], was = new Set(cs.filter(g => ST.sale.has(g)));
+  if (m.full) { ST.own = new Map(); ST.sale = new Set(); ST.mayors = Array(20).fill(null); }
+  else for (const g of cs) { ST.own.delete(g); ST.sale.delete(g); }
   for (const [c, owners, n, party] of m.lots) ST.own.set(c, { owners, n: +n, party });   // party : le parti qui en possède le plus (ruban des cartes)
   for (const [c, owners, n, party] of m.parts) { const o = ST.own.get(c); if (o) { o.owners = [...new Set([...o.owners, ...owners])]; o.parts = +n; o.party = o.party || party; } else ST.own.set(c, { owners, n: 0, parts: +n, party }); }
-  ST.sale = new Set(m.sale || []);
-  ST.mayors = Array(20).fill(null);
-  for (const [arr, mayor, party, pseudo] of m.arr) if (mayor) ST.mayors[arr - 1] = { mayor, party, pseudo };
+  for (const g of m.sale || []) ST.sale.add(g);
+  for (const [arr, mayor, party, pseudo] of m.arr || []) ST.mayors[arr - 1] = mayor ? { mayor, party, pseudo } : null;
+  ST.mapV = m.v || null;
+  const arr = !!m.full || (m.arr || []).length > 0, sale = !!m.full || cs.some(g => was.has(g) !== ST.sale.has(g));
+  return m.full || cs.length || arr ? { full: !!m.full, cards: cs, arr, sale } : null;
 }
 async function refreshAll() { await Promise.all([refreshState(), refreshHold(), refreshMap()]); }
 
@@ -155,20 +167,19 @@ function baseRent(h) {
   let r = 0; for (const k of h.ks) { if (ST.mort.has(h.g + ":" + k)) continue; r += h.c.rent * (fullTitle(h) ? 1.6 : fullFloor(h.c, h.ks, k) ? 1.25 : 1); } return r;
 }
 
-// --- temps réel ---------------------------------------------------------
-let rtT = null;
+// --- ce que font les autres -------------------------------------------------
+// La carte : ce qui a changé, toutes les 20 s, et tout de suite quand quelqu'un achète ou vend près de soi (évènement « map »
+// du monde, place.js → syncMapSoon) ; son argent et ses biens : toutes les 60 s. Rien quand l'onglet est caché.
+// (Avant le 21/10/2026 : postgres_changes sur lots, parts, listings, news, arr_state, voir migration_carte_delta.sql.)
+let rtT = null, mapSeen = null, syncT = 0;
 function startRealtime(onChange) {
-  const bump = (what) => { clearTimeout(rtT); rtT = setTimeout(() => onChange(what), 700 + Math.random() * 2300); };   // (un peu de hasard : tous les joueurs ne relisent pas la carte au même instant)
-  if (LOCAL_MODE) { setInterval(() => bump("poll"), 8000); return; }
-  SB.channel("hm-live")
-    .on("postgres_changes", { event: "*", schema: "public", table: "lots" }, () => bump("map"))
-    .on("postgres_changes", { event: "*", schema: "public", table: "parts" }, () => bump("map"))
-    .on("postgres_changes", { event: "*", schema: "public", table: "listings" }, () => bump("market"))
-    .on("postgres_changes", { event: "*", schema: "public", table: "arr_state" }, () => bump("map"))
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "news" }, () => bump("feed"))
-    .subscribe();
-  setInterval(() => bump("poll"), 60000);
+  mapSeen = ch => onChange("map", ch);
+  setInterval(() => { if (!document.hidden) syncMap(); }, LOCAL_MODE ? 8000 : 20000);
+  // (un peu de hasard : tous les joueurs ne relisent pas au même instant)
+  setInterval(() => { if (document.hidden) return; clearTimeout(rtT); rtT = setTimeout(() => onChange("poll"), Math.random() * 3000); }, LOCAL_MODE ? 8000 : 60000);
 }
+function syncMapSoon(ms) { clearTimeout(syncT); syncT = setTimeout(syncMap, ms || 0); }
+async function syncMap() { try { const ch = await refreshMap(); if (ch && mapSeen) mapSeen(ch); } catch (e) { } }
 
 const liftCost = m => Math.round(m.a * (1 + 0.005 * (Date.now() - new Date(m.t).getTime()) / 864e5));
 function packsReady() { const s = ST.state; if (!s?.profile) return 0; return (s.profile.welcome || 0) + (s.free_in <= 0 ? 1 : 0); }

@@ -1,5 +1,5 @@
-import json, psycopg2, psycopg2.extras, uuid
-DSN = "host=localhost user=postgres password=pg dbname=hm"
+import json, os, psycopg2, psycopg2.extras, uuid
+DSN = "host=localhost user=postgres password=pg dbname=" + os.environ.get("HM_DB", "hm")   # HM_DB=hm2 : une autre base (tests en parallèle)
 def conn():
     c = psycopg2.connect(DSN); c.autocommit = False; return c
 def seed():

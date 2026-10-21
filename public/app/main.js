@@ -54,18 +54,33 @@ async function startGame(first) {
     const f = $("#freein"); if (f) { const s = freeIn(); if (s <= 0 && cur() === "booster") renderBoosterPage(); else f.textContent = hm(s); }
   }, 1000);
   setInterval(() => refreshState().catch(() => { }), 60000);
-  startRealtime(async what => {
+  startRealtime(async (what, ch) => {   // ch : ce qui a changé sur la carte ({ full, cards, arr, sale }), voir refreshMap
     try {
-      await refreshMap(); updateArrFill();
-      if (what === "poll") await Promise.all([refreshState(), refreshHold()]);
+      if (what === "poll") { const [, , c2] = await Promise.all([refreshState(), refreshHold(), refreshMap()]); ch = c2; }
+      if (ch?.arr) updateArrFill();
       paintAll(); renderWallet();
-      if (cur() === "paris" && what !== "poll") renderParis();
-      if (cur() === "market" && what === "market") renderMarket();
+      if (cur() === "paris" && ch?.arr) renderParis();
+      if (cur() === "market" && ch?.sale) renderMarket();
     } catch (e) { console.warn(e); }
   });
   if (first) setTimeout(showWelcome, 600); else showHint();
 }
 boot();
+
+// une nouvelle version du jeu est en ligne : en revenant sur un onglet resté au moins 30 s en arrière-plan, on recharge
+// (sinon un vieil onglet garde l'ancien code face au nouveau serveur ; 21/10/2026)
+const APP_V = ((document.querySelector('script[src*="/app/main.js"]')?.getAttribute("src") || "").match(/[?&]v=([\w-]+)/) || [])[1] || "";
+let hiddenAt = 0;
+document.addEventListener("visibilitychange", async () => {
+  if (document.hidden) { hiddenAt = Date.now(); return; }
+  const away = hiddenAt && Date.now() - hiddenAt >= 30000; hiddenAt = 0;
+  if (!away || !APP_V || !started || document.querySelector("input:focus, textarea:focus")) return;
+  try {
+    const h = await (await fetch("/?nv=" + Date.now(), { cache: "no-store" })).text();
+    const v = (h.match(/\/app\/main\.js\?v=([\w-]+)/) || [])[1];
+    if (v && v !== APP_V && !document.hidden) location.reload();
+  } catch (e) { }
+});
 
 // Accueil du nouveau joueur : ce qu'il a, et ce qu'il peut faire
 function showWelcome() {

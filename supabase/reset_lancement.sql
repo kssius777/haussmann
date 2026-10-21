@@ -12,6 +12,7 @@
 -- =====================================================================
 truncate lots, parts, arr_value, arr_state, listings, sales, news, fx, day_event, city_week, pay,
          ledger, offers, gifts, stat_day, active_day,
-         walkers, world_people, chance_taken, chat_msg, place_people, chat_bans restart identity cascade;   -- (Paris à pied : positions, km du jour, « ? », bulles)
-delete from profiles;
+         walkers, world_people, chance_taken, chat_msg, place_people, chat_bans,   -- (Paris à pied : positions, km du jour, « ? », bulles)
+         map_dirty, arr_dirty restart identity cascade;   -- (ce qui a changé sur la carte, pour map_delta)
+delete from profiles where true;   -- (« where true » : Supabase refuse un DELETE sans WHERE venant de l'API)
 delete from auth.users where id not in (select id from admins);
