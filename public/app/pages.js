@@ -516,13 +516,14 @@ function adminGiftBox(c, g, free) {
 }
 // ---- tableau de bord de l'administrateur ----
 async function adminPage() {
-  let d, R = null; try { [d, R] = await Promise.all([rpc("admin_stats"), rpc("admin_retention").catch(() => null)]); } catch (e) { return dhead("Tableau de bord") + `<div class="wrap"><p class="sub">${esc(e.message)}</p></div>`; }
+  let d, R = null, L = null; try { [d, R, L] = await Promise.all([rpc("admin_stats"), rpc("admin_retention").catch(() => null), rpc("admin_load").catch(() => null)]); } catch (e) { return dhead("Tableau de bord") + `<div class="wrap"><p class="sub">${esc(e.message)}</p></div>`; }
   const N = n => fmtN(+n || 0), K = (t, v, sub) => `<div class="kpi"><span>${t}</span><b class="num">${v}</b>${sub ? `<small class="muted">${sub}</small>` : ""}</div>`;
   const days = d.by_day || [], mx = Math.max(1, ...days.map(x => Math.max(x.signups, x.active)));
   const bars = `<div class="adbars">${days.map(x => `<div title="${x.day} · ${x.signups} inscrits · ${x.active} actifs"><i class="a" style="height:${x.active / mx * 100}%"></i><i class="s" style="height:${x.signups / mx * 100}%"></i><small>${x.day.slice(8, 10)}</small></div>`).join("")}</div>
     <div class="adleg"><span><i class="a"></i>joueurs actifs</span><span><i class="s"></i>inscrits</span></div>`;
   const ago2 = t => t ? ago(t) : "—";
   return dhead("Tableau de bord") + `<div class="wrap">
+    ${L ? chargeHTML(L) : ""}
     <h2 class="h3">Joueurs</h2>
     <div class="kpis k4">${K("Inscrits", N(d.players), `+${N(d.new_today)} aujourd'hui`)}${K("Nouveaux 7 j", N(d.new_7d), `${N(d.new_30d)} sur 30 j`)}${K("Actifs aujourd'hui", N(d.active_today))}${K("Actifs 7 j", N(d.active_7d), d.players ? `${Math.round(d.active_7d / d.players * 100)} % des inscrits` : "")}</div>
     <div class="box" style="margin-top:10px"><b>14 derniers jours</b>${bars}</div>
@@ -537,6 +538,14 @@ async function adminPage() {
     <div class="box adlist">${(d.latest || []).map(x => `<div><span>${esc(x.pseudo)} <small class="muted">${x.lots} logt · vu ${ago2(x.seen_at)}</small></span><small class="muted">inscrit ${ago2(x.created_at)}</small></div>`).join("") || "—"}</div>
     <p class="sub" style="font-size:12px;margin-top:12px">« Actif » = a marché (ou lancé le dé, avant le 20/10/2026), acheté ou ouvert un booster (compté depuis le 17/10/2026 pour les boosters).</p>
   </div>`;
+}
+// la charge (21/10/2026, « lève l'alerte quand ça chauffe et dis-moi ce que je dois faire ») : Supabase Pro bloque à 500 connexions
+// temps réel tant que le plafond de dépense est activé ; orange dès 250 joueurs en même temps, rouge dès 400 (migration_charge.sql)
+function chargeHTML(L) {
+  const t = { vert: "Tout va bien", orange: "Ça monte : préparer le serveur temps réel (500 joueurs en même temps au plus)",
+    rouge: "Limite proche : lever le plafond de dépense dans Supabase (Billing), puis le serveur temps réel" }[L.level] || "";
+  return `<h2 class="h3">Charge</h2><div class="box charge lv-${esc(L.level)}"><b>${esc(t)}</b>
+    <span class="num">${fmtN(L.now)} dans Paris en ce moment · pic du jour ${fmtN(L.peak_today)} · pic 7 j ${fmtN(L.peak_7d)} · base ${fmtN(L.db_mb)} Mo</span></div>`;
 }
 // taux de retour : parmi les inscrits d'un jour, combien reviennent le lendemain, 7 jours après, 30 jours après
 function retentionHTML(R) {

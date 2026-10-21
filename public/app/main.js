@@ -55,7 +55,10 @@ async function startGame(first) {
   }, 1000);
   startRealtime(async (what, ch) => {   // (son état, toutes les 60 s : par « poll », plus par un 2e minuteur qui tournait même onglet caché)   // ch : ce qui a changé sur la carte ({ full, cards, arr, sale }), voir refreshMap
     try {
-      if (what === "poll") { const [, , c2] = await Promise.all([refreshState(), refreshHold(), refreshMap()]); ch = c2; }
+      // ses biens : relus toutes les 5 min, ou tout de suite quand la carte dit qu'un des siens a changé (21/10/2026 :
+      // avant, toute sa collection repartait chaque minute)
+      if (what === "poll") { const [, , c2] = await Promise.all([refreshState(), Date.now() - (ST.holdAt || 0) > 300000 ? refreshHold() : null, refreshMap()]); ch = c2; }
+      if (ch?.mine && Date.now() - (ST.holdAt || 0) > 3000) await Promise.all([refreshHold(), refreshState()]);
       if (ch?.arr) updateArrFill();
       paintAll(); renderWallet();
       if (cur() === "paris" && ch?.arr) renderParis();

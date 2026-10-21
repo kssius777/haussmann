@@ -2358,3 +2358,11 @@ body.saying .mapbottom{visibility:hidden}
 .mtoth{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
 .mtoth button{padding:0;background:none;border-radius:50%}
 .behindme{opacity:.15!important;transition:opacity .2s}
+
+/* la charge du jeu, tableau de bord admin (21/10/2026) */
+.box.charge{display:flex;flex-direction:column;gap:4px;padding:12px 14px}
+.box.charge b{display:flex;align-items:center;gap:8px}
+.box.charge b::before{content:"";flex:0 0 10px;height:10px;border-radius:50%;background:#16A34A}
+.box.charge.lv-orange b::before{background:#F59E0B}
+.box.charge.lv-rouge b::before{background:#DC2626}
+.box.charge span{font-size:13px;color:var(--muted)}

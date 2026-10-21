@@ -125,7 +125,7 @@ async function refreshHold() {
   for (const [c, k, m, t, ln] of h.lots) { if (!ST.mine.has(c)) ST.mine.set(c, []); ST.mine.get(c).push(k); if (m) ST.mort.set(c + ":" + k, { a: +m, t }); if (ln) ST.loan.set(c, (ST.loan.get(c) || 0) + +ln); }
   for (const [c, n, m, t, ln] of h.parts) { ST.mineParts.set(c, n); if (m) ST.mort.set(c + ":-1", { a: +m, t }); if (ln) ST.loan.set(c, (ST.loan.get(c) || 0) + +ln); }
   for (const ks of ST.mine.values()) ks.sort((a, b) => a - b);
-  ST.fx = h.fx || [];
+  ST.fx = h.fx || []; ST.holdAt = Date.now();
   await ensureCards([...ST.mine.keys(), ...ST.mineParts.keys()]);
 }
 // La carte des autres : chargée une fois en entier, puis seulement ce qui a changé depuis la dernière fois (map_delta,
@@ -139,6 +139,7 @@ async function mapOnce() {
   try { m = await rpc("map_delta", { p_since: ST.mapV || null }); }
   catch (e) { if (!/map_delta|Could not find|does not exist/i.test(e.message || "")) throw e; m = await rpc("map_state"); m.full = true; }   // (serveur d'avant)
   const cs = m.full ? [] : m.cards || [], was = new Set(cs.filter(g => ST.sale.has(g)));
+  let mine = cs.some(g => ST.mine.has(g) || ST.mineParts.has(g));   // un de ses biens a changé (vendu, racheté…)
   if (m.full) { ST.own = new Map(); ST.sale = new Set(); ST.mayors = Array(20).fill(null); }
   else for (const g of cs) { ST.own.delete(g); ST.sale.delete(g); }
   for (const [c, owners, n, party] of m.lots) ST.own.set(c, { owners, n: +n, party });   // party : le parti qui en possède le plus (ruban des cartes)
@@ -147,7 +148,8 @@ async function mapOnce() {
   for (const [arr, mayor, party, pseudo] of m.arr || []) ST.mayors[arr - 1] = mayor ? { mayor, party, pseudo } : null;
   ST.mapV = m.v || null;
   const arr = !!m.full || (m.arr || []).length > 0, sale = !!m.full || cs.some(g => was.has(g) !== ST.sale.has(g));
-  return m.full || cs.length || arr ? { full: !!m.full, cards: cs, arr, sale } : null;
+  mine = mine || cs.some(g => (ST.own.get(g)?.owners || []).includes(ME));   // … ou un bien vient d'arriver (offre acceptée)
+  return m.full || cs.length || arr ? { full: !!m.full, cards: cs, arr, sale, mine } : null;
 }
 async function refreshAll() { await Promise.all([refreshState(), refreshHold(), refreshMap()]); }
 

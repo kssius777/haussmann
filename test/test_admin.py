@@ -56,4 +56,21 @@ check("taux de retour : l'admin n'est pas compté", got == exp and exp >= 1, (go
 E = player("Eve"); db.sql("delete from active_day where u=%s", str(E))
 db.rpc(E, "open_booster", p_kind="welcome")
 check("taux de retour : chaque visite du joueur marque le jour comme actif", db.sql("select count(*) from active_day where u=%s", str(E))[0][0] == 1)
+# la charge (21/10/2026) : combien de joueurs dans Paris en même temps, le pic du jour, et un niveau vert / orange / rouge
+cc = db.conn(); cc.cursor().execute(open("supabase/migration_charge.sql").read()); cc.cursor().execute(open("supabase/migration_charge.sql").read()); cc.commit()
+db.sql("truncate load_day")
+check("la charge : réservée aux admins", "admins" in (err(lambda: db.rpc(A, "admin_load")) or ""))
+n0 = db.rpc(ADM, "admin_load")["now"]
+for u in (A, B, E):
+    db.sql("delete from world_people where user_id=%s", str(u)); db.rpc(u, "world_join")
+L = db.rpc(ADM, "admin_load")
+check("la charge : les joueurs dans Paris en ce moment, et le pic du jour (compté à chaque arrivée)", L["now"] >= 3 and L["peak_today"] >= L["now"] - 0 and L["level"] in ("vert", "orange", "rouge") and L["db_mb"] > 0, L)
+S = db.rpc(None, "load_status")
+check("load_status : les mêmes chiffres pour la vérification automatique, sans la taille de la base, avec la clé publique", S["now"] == L["now"] and "db_mb" not in S and S["level"] == L["level"], S)
+db.sql("update load_day set peak = 260 where day = paris_today()")
+check("la charge : orange dès 250 joueurs en même temps (Supabase bloque à 500)", db.rpc(None, "load_status")["level"] == "orange")
+db.sql("update load_day set peak = 450 where day = paris_today()")
+check("… rouge dès 400", db.rpc(None, "load_status")["level"] == "rouge")
+db.sql("truncate load_day")
+check("la table de la charge est fermée aux joueurs", not db.sql("select has_table_privilege('anon', 'load_day', 'select') or has_table_privilege('authenticated', 'load_day', 'select')")[0][0])
 print(f"\n{sum(R)}/{len(R)} OK")

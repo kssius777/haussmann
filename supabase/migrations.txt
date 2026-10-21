@@ -37,3 +37,4 @@ migration_carte_delta.sql
 migration_chat_minute.sql
 migration_vitesse2.sql
 migration_groupes.sql
+migration_charge.sql

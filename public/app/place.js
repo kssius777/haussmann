@@ -407,6 +407,10 @@ function wake() { clearTimeout(quietT); if (!W.quiet) return; W.quiet = false; i
 function rtCheck() {   // tous les carrés en temps réel : on relit lentement (filet de sécurité, et « toujours là ») ; sinon toutes les 2,5 s
   const ok = !LOCAL_MODE && !!SB && W.cells.size > 0 && [...W.cells].every(c => W.chSt.get(chanOf(c)) === "SUBSCRIBED"), every = ok ? 20000 : 2500;
   if (W.feedEvery !== every) { W.feedEvery = every; clearInterval(W.feedT); W.feedT = setInterval(worldFeed, every); }
+  // qui est là : avec le temps réel, les arrivées et les départs arrivent tout seuls ; on ne relit la liste que toutes les 3 min
+  // (filet de sécurité), sinon toutes les minutes (21/10/2026 : chaque relecture renvoie tout le monde autour, avec ses trajets)
+  const look = ok ? 180000 : 60000;
+  if (W.lookEvery !== look) { W.lookEvery = look; clearInterval(W.listT); W.listT = setInterval(refreshPeople, look); }
 }
 async function worldFeed() {
   if (!W.on || W.feeding || document.hidden || !W.cells.size) return; W.feeding = true;
