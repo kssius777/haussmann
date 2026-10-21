@@ -318,7 +318,7 @@ function lifeInit() {
     "icon-size": ["interpolate", ["linear"], ["zoom"], 15, ["*", .55, ["get", "s"]], 16, ["*", .95, ["get", "s"]], 17, ["*", 1.5, ["get", "s"]], 18, ["*", 2.3, ["get", "s"]]] },
     paint: { "icon-opacity": ["interpolate", ["linear"], ["zoom"], LIFE_Z - .3, 0, LIFE_Z + .2, 1] } }, "anchor-b");
   map.addLayer({ id: "life3d", type: "fill-extrusion", source: "life3d", minzoom: 12.2, paint: { "fill-extrusion-color": ["get", "c"], "fill-extrusion-base": ["get", "b"], "fill-extrusion-height": ["get", "h"], "fill-extrusion-opacity": 1, "fill-extrusion-vertical-gradient": true } }, "anchor-top");
-  map.on("moveend", () => { LIFE.linesKey = ""; FLOW.vis = null; });
+  map.on("moveend", throttle(() => { LIFE.linesKey = ""; FLOW.vis = null; }, 1000));
   LIFE.ok = true; requestAnimationFrame(lifeLoop); return true;
 }
 (function waitMap() { try { if (lifeInit()) return; } catch (e) { console.warn("life", e); return; } setTimeout(waitMap, 1000); })();

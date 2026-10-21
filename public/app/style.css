@@ -2096,13 +2096,17 @@ body.mapfull #bar,body.mapfull #credbar,body.mapfull #tabs{backdrop-filter:none!
 .plwho{display:flex;align-items:center;gap:12px;margin:4px 40px 4px 0}
 .plwho b{display:block;font:800 17px/1.2 var(--f)} .plwho span{font:600 13px/1.3 var(--f);color:var(--muted)}
 .plban{display:grid;gap:8px;margin-top:14px}
-/* toucher quelqu'un : ce qu'il vend, ses plus beaux biens (un toucher ouvre la fiche : acheter, proposer de racheter) */
-.whs{margin-top:14px}
-.whs h4{margin:0 0 6px;font:800 12.5px/1.2 var(--f);color:var(--muted)}
-.whr{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:44px;padding:9px 12px;margin-top:6px;box-sizing:border-box;border:0;border-radius:12px;background:#F3F4F6;font:600 14px/1.25 var(--f);color:#0B0C10;text-align:left;cursor:pointer}
-.whr span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.whr b{flex:none;font-weight:800}
-.whr:active{background:#E5E7EB}
+/* toucher quelqu'un : ce qu'il vend en petites cartes (un toucher ouvre la fiche : acheter, proposer de racheter), « Voir sa boutique » */
+.whcards{display:flex;gap:10px;overflow-x:auto;margin:14px -6px 0;padding:2px 6px 4px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.whcards[hidden]{display:none}
+.whcards::-webkit-scrollbar{display:none}
+.whcard{flex:none;width:112px;padding:0;border:0;background:none;cursor:pointer;text-align:center}
+.whcard .hc{--w:112px}
+.whp{display:block;margin-top:5px;font:800 13px/1.2 var(--f);color:#0B0C10}
+.whshop{margin-top:12px}
+.pshop .plwho{margin:4px 0 6px}
+.pshop h3{margin:20px 0 10px;font:800 16px/1.2 var(--f)}
+.tagc.pshp{background:#0B0C10;color:#fff}
 .btn.danger{background:#DC2626!important;color:#fff!important;border-color:#DC2626!important}
 /* l'éditeur du personnage (profil et chat) */
 .lked{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center}

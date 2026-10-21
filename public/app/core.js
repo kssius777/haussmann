@@ -118,6 +118,13 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "
 const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 const ord = n => n === 1 ? "1er" : n + "e";
 const fmtN = n => Math.round(n).toLocaleString("fr-FR");
+// au plus une fois tous les ms, et une dernière fois à la fin : pour ce qui suit la caméra quand elle bouge sans arrêt
+// (elle suit son personnage image par image : « moveend » arrive alors à chaque image)
+function throttle(fn, ms) {
+  let t = 0, q = 0;
+  return function () { const now = performance.now(), wait = t + ms - now; clearTimeout(q);
+    if (wait <= 0) { t = now; fn(); } else q = setTimeout(() => { t = performance.now(); fn(); }, wait); };
+}
 function fmtE(n) {
   const a = Math.abs(n), s = n < 0 ? "−" : "";
   if (a >= 9.995e8) return s + (a / 1e9).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " Md€";

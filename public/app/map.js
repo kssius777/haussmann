@@ -128,8 +128,8 @@ function buildMap(base) {
       el.addEventListener("click", ev => { ev.stopPropagation(); push("arr", i); });
       a.marker = new maplibregl.Marker({ element: el }).setLngLat(a.center).addTo(map);
     });
-    buildMonMarkers(); buildSpotMarkers(); buildParkLabels(); map.on("move", queueDeclutter); map.on("resize", queueDeclutter);
-    map.on("zoom", renderMarks); map.on("zoomend", () => typeof declutterDest === "function" && declutterDest()); map.on("rotateend", () => typeof declutterDest === "function" && declutterDest()); map.on("moveend", renderTags); map.on("moveend", () => { renderSpots(map.getZoom()); declutterSpots(); });
+    buildMonMarkers(); buildSpotMarkers(); buildParkLabels(); map.on("move", throttle(declutterTop, 120)); map.on("resize", queueDeclutter);
+    map.on("zoom", renderMarks); map.on("zoomend", () => typeof declutterDest === "function" && declutterDest()); map.on("rotateend", () => typeof declutterDest === "function" && declutterDest()); map.on("moveend", throttle(() => { renderTags(); renderSpots(map.getZoom()); declutterSpots(); }, 350));
     // la boussole n'apparaît que si la carte a été tournée ; elle remet le nord en haut
     map.on("rotate", () => { const b = map.getBearing(); $("#t-north").hidden = Math.abs(b) < 2; $("#needle").style.transform = `rotate(${-b}deg)`; });
     updateArrFill(); applyMode(); paintAll(); worldMapReady();

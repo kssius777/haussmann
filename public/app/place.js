@@ -275,9 +275,9 @@ function worldMapReady() {
   box.addEventListener("click", e => { const b = e.target.closest(".wp"); if (!b) return; e.stopPropagation(); if (b.dataset.id === W.me) openLookSheet(); else openWho(b.dataset.id); });
   map.on("render", layoutPeople); map.on("move", offMe);
   // la caméra derrière le perso : faire glisser la carte la libère ; la tourner ou l'incliner garde ce cap jusqu'au prochain trajet
-  map.on("dragstart", e => { if (e.originalEvent) camOff(); });
+  map.on("dragstart", e => { if (e.originalEvent) camOff(true); });
   for (const ev of ["rotatestart", "pitchstart"]) map.on(ev, e => { if (e.originalEvent) CAM.userB = true; });
-  map.on("moveend", () => { queueCells(); updateVisible(); });
+  map.on("moveend", throttle(() => { updateCells(); updateVisible(); }, 450));
   worldStart();
 }
 async function worldStart() {
@@ -310,25 +310,30 @@ async function rejoin() {
 // la caméra « derrière le perso » (21/10/2026, choix du propriétaire : « voir la map comme un monde open world ») : proche, basse,
 // son personnage dans le bas de la zone libre (entre les barres du haut et le dock), on voit la rue devant lui
 const camZoom = () => innerWidth < 700 ? 17.2 : 17.4;
-const camPitch = z => z >= 16.8 ? 62 : z >= 15.5 ? 58 : z >= 14.5 ? 52 : 45;   // (plus incliné, on voit plus loin : plus de mémoire sur téléphone)
-function worldView() {
+const camPitch = z => z >= 16.8 ? 60 : z >= 15.5 ? 56 : z >= 14.5 ? 50 : 45;   // (plus incliné, on voit plus loin : plus lourd sur téléphone)
+// le point visé de la carte (son personnage) placé à ~70 % de la zone libre entre les barres du haut et le dock : on décale le haut
+// de la vue (« padding ») au lieu de décaler le centre, pour que la caméra puisse le suivre image par image
+function camPad() {
   const c = map.getContainer().getBoundingClientRect(), mid = c.top + c.height / 2;
   const rs = s => [...document.querySelectorAll(s)].map(e => e.getBoundingClientRect()).filter(r => r.height > 0 && r.width > 0);
   const top = Math.max(c.top + 50, ...rs("#bar,#credbar,#filter,.maptop>*").filter(r => r.bottom < mid).map(r => r.bottom)) - c.top;
   const bot = Math.min(c.bottom - 50, ...rs("#dicebar,#tabs").filter(r => r.top > mid).map(r => r.top)) - c.top;
-  return { zoom: camZoom(), pitch: camPitch(camZoom()), offset: [0, Math.round(top + (bot - top) * .7 - c.height / 2)] };
+  return { top: Math.max(0, Math.round(2 * (top + (bot - top) * .7) - c.height)), bottom: 0, left: 0, right: 0 };
 }
-function centerOnMe(quick) {
+function worldView() { return { zoom: camZoom(), pitch: camPitch(camZoom()), padding: camPad() }; }
+function centerOnMe(quick, keepZoom) {   // keepZoom : on revient sur lui sans changer le zoom (on avait dézoomé pour aller loin)
   const me = meP(); if (!me || !map) return; const v = worldView();
   CAM.on = true; CAM.userB = false;
-  const z = quick && map.getZoom() >= 15.2 ? map.getZoom() : v.zoom;
-  map.flyTo({ center: [me.lon, me.lat], zoom: z, pitch: camPitch(z), offset: v.offset, duration: quick ? 600 : 1200, essential: true });
+  const z = keepZoom || (quick && map.getZoom() >= 15.2) ? map.getZoom() : v.zoom;
+  map.flyTo({ center: [me.lon, me.lat], zoom: z, pitch: keepZoom ? map.getPitch() : camPitch(z), padding: v.padding, duration: quick ? 600 : 1200, essential: true });
 }
-// Elle suit son personnage ; quand il marche, elle se met derrière lui en regardant un peu plus loin sur le trajet (les virages
-// se prennent en douceur). Faire glisser la carte la libère (on regarde ailleurs) ; tourner la carte garde le cap choisi ;
-// « Moi », la flèche ou un nouveau trajet la remettent derrière lui. Dézoomé (< 15,5), elle suit sans tourner.
-const CAM = { on: true, userB: false, t: 0, anim: 0 };
-function camOff() { CAM.on = false; }
+// Elle suit son personnage image par image ; quand il marche, elle se met derrière lui en regardant un peu plus loin sur le trajet
+// (elle tourne en douceur, 75° par seconde au plus). Faire glisser la carte la libère (on regarde ailleurs) ; tourner la carte garde
+// le cap choisi ; « Moi », la flèche ou un nouveau trajet la remettent derrière lui. Dézoomé (< 15,5), elle suit sans tourner.
+const CAM = { on: true, userB: false, last: 0 };
+function camOff(keep) {   // keep : la carte reste où elle est (on la fait glisser) ; sinon on va ailleurs : le décalage du haut s'en va
+  CAM.on = false; if (!keep && map) map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
+}
 function lookAhead(me, d) {   // le cap (degrés) vers le point d mètres plus loin sur le trajet ; null s'il est trop près
   if (!me.path || !me.cum) return null;
   const L = me.cum[me.cum.length - 1], f = Math.min(1, (performance.now() - me.t0) / (me.dur * 1000)), at = Math.min(L, f * L + d);
@@ -337,13 +342,16 @@ function lookAhead(me, d) {   // le cap (degrés) vers le point d mètres plus l
   const dx = (a[0] + (b[0] - a[0]) * k - me.lon) * KXP, dy = (a[1] + (b[1] - a[1]) * k - me.lat) * KYP;
   return dx * dx + dy * dy < 144 ? null : Math.atan2(dx, dy) * 180 / Math.PI;
 }
-function camStep(me, now, last) {
-  if (!CAM.on || !map || cur() !== "map" || (!last && now - CAM.t < 280)) return;
-  if (map.isMoving() && now > CAM.anim) return;   // quelqu'un d'autre bouge la carte (un zoom à la molette, en pinçant) : on le laisse finir
+function camStep(me, now) {
+  const dt = Math.min(.1, Math.max(0, (now - (CAM.last || now)) / 1000)); CAM.last = now;
+  // quelqu'un d'autre bouge la carte (un zoom à la molette, en pinçant, « Moi » qui y va) : on le laisse finir
+  if (!CAM.on || !map || cur() !== "map" || map.isMoving()) return;
   const z = map.getZoom(); let b = map.getBearing();
-  if (!CAM.userB && z >= 15.5) { const t = lookAhead(me, 70); if (t != null) { const d = ((t - b + 540) % 360) - 180; if (Math.abs(d) > 4) b += Math.max(-40, Math.min(40, d)); } }
-  const ms = last ? 450 : 300; CAM.t = now; CAM.anim = now + ms;
-  map.easeTo({ center: [me.lon, me.lat], bearing: b, offset: worldView().offset, duration: ms, easing: t => t, essential: true });
+  if (!CAM.userB && z >= 15.5) {
+    const t = lookAhead(me, 70);
+    if (t != null) { const d = ((t - b + 540) % 360) - 180; b += Math.sign(d) * Math.min(Math.abs(d) * Math.min(1, 2.2 * dt), 75 * dt); }
+  }
+  map.jumpTo({ center: [me.lon, me.lat], bearing: b });
 }
 
 // ---- qui est autour : par carrés d'environ 1 km (temps réel, sinon relu toutes les 2,5 s) ------
@@ -617,7 +625,8 @@ async function walkTo(ll, target, pay, exact) {
   if (cost > 0 && !pay) return askPay(plan.len, cost, () => walkTo(ll, target, true, exact));
   hintDone();
   const mv = ++W.mv, prev = { lon: me.lon, lat: me.lat, path: me.path, cum: me.cum, seg: me.seg, t0: me.t0, dur: me.dur, walk: me.walk, target: W.target, land: ST.state?.profile?.land ?? null };
-  W.moving = true; W.target = target; CAM.on = true; CAM.userB = false; CAM.t = 0;   // la caméra repart derrière lui
+  W.moving = true; W.target = target;
+  if (!CAM.on) centerOnMe(true, true); else CAM.userB = false;   // la caméra repart derrière lui (en douceur si on regardait ailleurs)
   walkAlong(me, plan.pts); drawRoute(plan.pts); setLand(null);
   const end = plan.pts[plan.pts.length - 1];
   try {
@@ -647,7 +656,7 @@ async function walkTo(ll, target, pay, exact) {
 // arrivé : on paie le péage du trajet ; si l'on visait un immeuble ou une station, on s'y arrête (achat possible) et sa case s'ouvre
 async function arrived() {
   const me = meP(), g = W.target, mv = W.mv; W.target = null;
-  drawRoute(null); offMe(); if (me) { window.people3d?.ring(me.lon, me.lat, W.cfg.reach, ringOn()); camStep(me, performance.now(), true); }
+  drawRoute(null); offMe(); if (me) window.people3d?.ring(me.lon, me.lat, W.cfg.reach, ringOn());
   updateNear(true); checkChance(true); queueCells();
   try { const r = await rpc("world_stop"); W.w = r.w || W.w; if (r.toll?.toll > 0) { if (g == null) moneyDelta(-r.toll.toll); tollToast(r.toll); } renderDock(); } catch (e) { }
   if (g != null) arriveAt(g, 0, mv);
@@ -849,7 +858,7 @@ async function ride(from, to) {
   const line = stops.map(g => { const s = spotOf(g); return s ? [s[3], s[4]] : centerOf(g); });
   stopPerson(me); me.gone = true; pose(me); layoutPeople(); window.people3d?.ring(0, 0, 0, false); drawRoute(line, null, true); sfx("dice");
   const dest = centerOf(to), ms = Math.min(4200, 1400 + 220 * stops.length), v = worldView();
-  map.flyTo({ center: dest, zoom: v.zoom, pitch: v.pitch, offset: v.offset, duration: ms, essential: true });
+  CAM.on = true; CAM.userB = false; map.flyTo({ center: dest, zoom: v.zoom, pitch: v.pitch, padding: v.padding, duration: ms, essential: true });
   await sleep(ms);
   me.lon = dest[0]; me.lat = dest[1]; me.gone = false; pose(me); drawRoute(null);
   W.riding = false; moving = false; window.people3d?.ring(me.lon, me.lat, W.cfg.reach, ringOn());
@@ -916,27 +925,30 @@ async function setChatOff(off) {
 }
 
 // ---- les fenêtres du monde (qui est-ce, mon personnage, payer des km) ---------------------
-// toucher quelqu'un : son nom, son parti, ce qu'il vend et ses plus beaux biens (21/10/2026, demande du propriétaire :
-// « s'ils veulent, ils peuvent faire une offre ou voir les offres de vente de ce joueur, sans trop de complexité ») ;
-// un toucher ouvre la fiche du bien, où l'on achète l'annonce ou propose de racheter
-async function openWho(id) {
+// toucher quelqu'un : son nom, son parti et ce qu'il vend, en petites cartes (21/10/2026, demande du propriétaire : « voir ses biens
+// en vente avec des cartes minimalistes, et un accès vers sa boutique ») ; un toucher ouvre la fiche du bien (acheter l'annonce,
+// proposer de racheter) ; « Voir sa boutique » : ses annonces et sa collection (pages.js, playerShopPage). La fenêtre s'ouvre tout de
+// suite, les cartes arrivent juste après.
+function openWho(id) {
   const p = W.people.get(id); if (!p) return; const pr = PARTIES[p.party];
-  const his = [...ST.own.entries()].filter(([, o]) => o.owners?.includes(id)).map(([g]) => g);
-  let sells = []; try { sells = ((await rpc("market")).listings || []).filter(l => l.seller === id); } catch (e) { }
-  await ensureCards([...new Set([...sells.map(l => l.card), ...his.slice(0, 80)])]).catch(() => { });
-  const best = his.filter(g => card(g)).sort((a, b) => card(b).v - card(a).v).slice(0, 5);
-  const row = (g, right) => card(g) ? `<button class="whr" data-wb="${g}"><span>${esc(title(card(g)))}</span><b>${right}</b></button>` : "";
   sheet(`<div class="plwho">${pr ? emblemSVG(p.party, 40) : ""}<div><b>${esc(p.pseudo || "?")}</b><span>${pr ? esc(pr.n) : "Sans parti"}</span></div></div>
-    ${sells.length ? `<div class="whs"><h4>En vente</h4>${sells.slice(0, 5).map(l => row(l.card, fmtE(l.price))).join("")}</div>` : ""}
-    ${best.length ? `<div class="whs"><h4>Ses biens</h4>${best.map(g => row(g, ord(IDX.arr[ai(g)].n))).join("")}</div>` : ""}
+    <div class="whcards" id="whc" hidden></div>
+    <button class="btn block light whshop" data-push="pshop" data-arg="${esc(id)}">Voir sa boutique</button>
     ${W.admin ? `<div class="plban"><button class="btn block light" data-ban="24">Bannir du chat 24 h</button><button class="btn block danger" data-ban="0">Bannir du chat à vie</button></div>` : ""}`,
     async b => {
-      const w = b.closest("[data-wb]"); if (w) { closeSheet(); return push("b", +w.dataset.wb); }
+      if (b.closest("[data-push]")) return closeSheet();   // la fiche d'un bien, sa boutique : pages.js les ouvre
       const x = b.closest("[data-ban]"); if (!x) return;
       if (!x.dataset.sure) { x.dataset.sure = "1"; x.dataset.lbl = x.textContent; x.textContent = "Sûr ? Touchez encore"; setTimeout(() => { if (x.isConnected) { delete x.dataset.sure; x.textContent = x.dataset.lbl; } }, 3000); return; }
       try { await rpc("chat_ban", { p_user: id, p_hours: x.dataset.ban === "0" ? null : 24 }); toast(`${p.pseudo} est banni du chat${x.dataset.ban === "0" ? " à vie" : " 24 h"}`, "good"); closeSheet(); }
       catch (e) { toast(e.message, "bad"); }
     });
+  rpc("player_shop", { p_user: id }).then(async d => {
+    const ls = (d.listings || []).slice(0, 8); if (!ls.length) return;
+    await ensureCards([...new Set(ls.map(l => l.card))]).catch(() => { });
+    const box = $("#whc"); if (!box) return;
+    box.innerHTML = ls.filter(l => card(l.card)).map(l => `<button data-push="b" data-arg="${l.card}" class="whcard" aria-label="${esc(title(card(l.card)))}, ${fmtE(l.price)}">${cardHTML(card(l.card), { w: "100%" })}<b class="whp num">${fmtE(l.price)}</b></button>`).join("");
+    box.hidden = !box.innerHTML;
+  }).catch(() => { });
 }
 function openLookSheet() {
   const p = ST.state?.profile; if (!p) return;

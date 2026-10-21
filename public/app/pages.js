@@ -43,7 +43,7 @@ function back() {
 async function renderDetail(anim) {
   const top = stack[stack.length - 1]; if (!top) return; const el = $("#p-detail");
   el.hidden = false; setMapFull(); if (anim) { el.classList.remove("enter"); void el.offsetWidth; el.classList.add("enter"); el.scrollTop = 0; }
-  const K = { b: buildingPage, arr: arrPage, shop: shopPage, money: moneyPage, profile: profilePage, results: resultsPage, party: partyPage, gifts: giftsPage, admin: adminPage, chatbans: chatBansPage }[top.kind];
+  const K = { b: buildingPage, arr: arrPage, shop: shopPage, pshop: playerShopPage, money: moneyPage, profile: profilePage, results: resultsPage, party: partyPage, gifts: giftsPage, admin: adminPage, chatbans: chatBansPage }[top.kind];
   if (!K) return;
   const html = await K(top.arg);
   if (stack[stack.length - 1] !== top) return;
@@ -815,3 +815,19 @@ $("#p-detail").addEventListener("input", e => {
   $("#osget").textContent = fmtE(Math.floor(p * .95) * n);
   $$(".ochips button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.k === p));
 });
+
+// ---------------- la boutique d'un joueur (21/10/2026) : ce qu'il vend, puis sa collection ; un toucher ouvre la fiche du bien ----------------
+async function playerShopPage(id) {
+  let d = null; try { d = await rpc("player_shop", { p_user: id }); } catch (e) { return dhead("Boutique") + `<div class="wrap"><p class="empty">${esc(e.message)}</p></div>`; }
+  const sale = d.listings || [], own = (d.owned || []).slice(0, 12);
+  await ensureCards([...new Set([...sale.map(l => l.card), ...own.map(o => o.card)])]).catch(() => { });
+  const pr = PARTIES[d.party];
+  const cardBtn = (g, tag) => card(g) ? `<button data-push="b" data-arg="${g}" class="cw">${cardHTML(card(g), { w: "100%" })}${tag ? `<span class="tagc pshp num">${tag}</span>` : ""}</button>` : "";
+  const forSale = sale.filter(l => card(l.card)), mine = own.filter(o => card(o.card));
+  return dhead("Boutique de " + (d.pseudo || "?")) + `<div class="wrap pshop">
+    <div class="plwho">${pr ? emblemSVG(d.party, 36) : ""}<div><b>${esc(d.pseudo || "?")}</b><span>${pr ? esc(pr.n) : "Sans parti"}</span></div></div>
+    ${forSale.length ? `<h3>En vente</h3><div class="grid-cards">${forSale.map(l => cardBtn(l.card, fmtE(l.price))).join("")}</div>` : ""}
+    ${mine.length ? `<h3>Sa collection</h3><div class="grid-cards">${mine.map(o => cardBtn(o.card, o.n > 1 ? "×" + o.n : "")).join("")}</div>` : ""}
+    ${!forSale.length && !mine.length ? `<p class="empty">Rien pour l'instant.</p>` : ""}
+  </div>`;
+}

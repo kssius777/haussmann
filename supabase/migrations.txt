@@ -30,3 +30,5 @@ migration_lieux.sql
 migration_monde.sql
 migration_journal.sql
 migration_monde_paris.sql
+migration_vitesse.sql
+migration_boutique.sql

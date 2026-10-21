@@ -107,7 +107,9 @@ function inRing(r, x, y) { let ins = false; for (let i = 0, j = r.length - 1; i 
 const ringBox = r => { let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const [a, b] of r) { x0 = Math.min(x0, a); x1 = Math.max(x1, a); y0 = Math.min(y0, b); y1 = Math.max(y1, b); } return [x0, y0, x1, y1]; };
 function buildTrees() {
   if (typeof map === "undefined" || !map || !mapReady || map.getZoom() < 14.2 || typeof BASE === "undefined" || !BASE) return;
-  const b = map.getBounds(), W = b.getWest(), E = b.getEast(), S = b.getSouth(), N = b.getNorth();
+  // l'écran, mais à 1,2 km au plus du point visé : la caméra inclinée voit jusqu'à l'horizon, les arbres lointains ne servent à rien
+  const b = map.getBounds(), c0 = map.getCenter(), rx = 1200 / (111320 * Math.cos(48.86 * Math.PI / 180)), ry = 1200 / 110540;
+  const W = Math.max(b.getWest(), c0.lng - rx), E = Math.min(b.getEast(), c0.lng + rx), S = Math.max(b.getSouth(), c0.lat - ry), N = Math.min(b.getNorth(), c0.lat + ry);
   if (TREES.box && W >= TREES.box[0] && E <= TREES.box[2] && S >= TREES.box[1] && N <= TREES.box[3]) return;   // déjà couvert
   const dx = (E - W) * .35, dy = (N - S) * .35, V = [W - dx, S - dy, E + dx, N + dy]; TREES.box = V;
   const ML = 111320 * Math.cos(48.86 * Math.PI / 180), MA = 110540, hit = bb => bb[2] > V[0] && bb[0] < V[2] && bb[3] > V[1] && bb[1] < V[3];
@@ -153,7 +155,7 @@ function decorInit() {
   map.addSource("trees", { type: "geojson", data: { type: "FeatureCollection", features: [] }, buffer: 0, tolerance: 0 });
   map.addLayer({ id: "trees", type: "fill-extrusion", source: "trees", minzoom: 14.2, paint: { "fill-extrusion-color": treeColors(), "fill-extrusion-base": ["get", "b"], "fill-extrusion-height": ["get", "h"],
     "fill-extrusion-opacity": ["interpolate", ["linear"], ["zoom"], 14.2, 0, 14.8, 1], "fill-extrusion-vertical-gradient": true } }, "anchor-top");
-  let tm = 0; map.on("moveend", () => { clearTimeout(tm); tm = setTimeout(buildTrees, 250); });
+  map.on("moveend", throttle(buildTrees, 700));
   buildTrees(); applyDecor(true);
   setInterval(() => applyDecor(false), 60000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) applyDecor(false); });

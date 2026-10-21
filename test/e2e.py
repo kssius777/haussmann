@@ -208,11 +208,16 @@ async def main():
         eg = db.sql("select id from cards where lk='l' and lots between 2 and 6 and id not in (select card from lots) limit 1")[0][0]
         db.sql("insert into lots(card,k,owner) values (%s,0,%s),(%s,1,%s)", eg, ou, eg, ou); db.rpc(ou, "list_item", p_card=eg, p_k=0, p_n=1, p_price=777000)
         await E("refreshMap().then(() => 1)")
-        await E(f"document.querySelector('#wpl .wp[data-id=\"{ou}\"]').click(); 1"); await W("document.querySelector('#plsheet .whs')", 10000)
-        check("toucher un autre joueur : ce qu'il vend et ses biens", await E(f"document.querySelector('#plsheet').innerText.includes('En vente') && document.querySelector('#plsheet').innerText.includes('Ses biens') && !!document.querySelector('#plsheet [data-wb=\"{eg}\"]')"))
-        await pg.screenshot(path=T + "19c_joueur.png", timeout=120000)
-        await pg.click(f"#plsheet [data-wb='{eg}']"); await W("document.querySelector('#p-detail [data-back]')", 10000)
-        check("… un toucher ouvre la fiche du bien (acheter l'annonce, proposer de racheter)", await E("!document.querySelector('#p-detail').hidden && !document.querySelector('#plsheet')"))
+        await E(f"document.querySelector('#wpl .wp[data-id=\"{ou}\"]').click(); 1"); await W(f"document.querySelector('#plsheet .whcard[data-arg=\"{eg}\"]')", 10000)
+        check("toucher un autre joueur : ce qu'il vend en petites cartes, et « Voir sa boutique »", await E("document.querySelector('#plsheet .whcard .hc') && document.querySelector('#plsheet .whp').textContent.includes('777') && !!document.querySelector('#plsheet [data-push=pshop]')"))
+        await pg.wait_for_timeout(300); await pg.screenshot(path=T + "19c_joueur.png", timeout=120000)
+        await pg.click(f"#plsheet .whcard[data-arg='{eg}']"); await W("document.querySelector('#p-detail [data-back]')", 10000)
+        check("… un toucher sur la carte ouvre la fiche du bien (acheter l'annonce, proposer de racheter)", await E("!document.querySelector('#p-detail').hidden && !document.querySelector('#plsheet')"))
+        await pg.click("#p-detail [data-back]"); await pg.wait_for_timeout(700)
+        await E(f"document.querySelector('#wpl .wp[data-id=\"{ou}\"]').click(); 1"); await W("document.querySelector('#plsheet [data-push=pshop]')", 10000)
+        await pg.click("#plsheet [data-push=pshop]"); await W("document.querySelector('#p-detail .pshop .grid-cards')", 15000)
+        check("sa boutique : ses annonces et sa collection, en cartes", await E("document.querySelector('#p-detail').innerText.includes('Boutique de Ella') && document.querySelector('#p-detail').innerText.includes('En vente') && document.querySelector('#p-detail').innerText.includes('Sa collection')"))
+        await pg.wait_for_timeout(300); await pg.screenshot(path=T + "19d_boutique.png", timeout=120000)
         await pg.click("#p-detail [data-back]"); await pg.wait_for_timeout(700)
         # marcher : toucher une rue (un point de rue à l'écran, pas sous un immeuble ni sous un bouton)
         tap = await E("""(() => { const m = meP();
@@ -225,11 +230,11 @@ async def main():
             return { ll, pt: [p.x, p.y] }; } return null; })()""")
         await pg.mouse.click(tap["pt"][0], tap["pt"][1]); await pg.wait_for_timeout(600)
         check("toucher une rue fait marcher son personnage par les rues (trajet dessiné)", await E("!!meP().path && !!map.getSource('wroute')"), tap)
-        await pg.wait_for_timeout(1400)
-        cam = await E("(() => { const t = lookAhead(meP(), 70); return { on: CAM.on, z: +map.getZoom().toFixed(1), pitch: +map.getPitch().toFixed(0), d: t == null ? 0 : Math.abs(((t - map.getBearing() + 540) % 360) - 180) }; })()")
-        check("open world : la caméra proche et inclinée, derrière son personnage qui marche", cam["on"] and cam["z"] >= 16.5 and cam["pitch"] >= 55 and cam["d"] < 60, cam)
+        await pg.wait_for_timeout(2600)
+        cam = await E("(() => { const t = lookAhead(meP(), 70), m = meP(), p = map.project([m.lon, m.lat]); return { on: CAM.on, z: +map.getZoom().toFixed(1), pitch: +map.getPitch().toFixed(0), d: t == null ? 0 : Math.abs(((t - map.getBearing() + 540) % 360) - 180), y: Math.round(p.y / innerHeight * 100), walking: !!m.path }; })()")
+        check("open world : la caméra proche et inclinée, derrière son personnage qui marche (bas de l'écran)", cam["on"] and cam["walking"] and cam["z"] >= 16.5 and cam["pitch"] >= 55 and cam["d"] < 45 and 50 <= cam["y"] <= 80, cam)
         await pg.screenshot(path=T + "19b_walk.png", timeout=120000)
-        await W("!meP().path", 40000); await pg.wait_for_timeout(800)
+        await W("!meP().path", 95000); await pg.wait_for_timeout(800)
         wk = db.sql("select km, lon, lat from walkers where user_id=%s", me)[0]; tgt = tap["ll"]
         check("le serveur compte les km et connaît la nouvelle position ; salaire de la marche versé", wk[0] > 0.02 and abs(wk[1] - tgt[0]) < 2e-4 and abs(wk[2] - tgt[1]) < 2e-4
               and db.sql("select count(*) from ledger where owner=%s and kind='salary'", me)[0][0] >= 1, wk)
@@ -243,7 +248,7 @@ async def main():
             return { g, pt: [r.left + x, r.top + y] }; } return null; })()""")
         await E("setMovebar(''); 1"); await pg.mouse.click(fb["pt"][0], fb["pt"][1]); await pg.wait_for_timeout(600)
         check("trop loin : toucher un immeuble fait avancer jusque-là (sans case)", await E("!!meP().path && document.querySelector('#movebar').hidden"), fb)
-        await W("!meP().path", 40000); await pg.wait_for_timeout(500)
+        await W("!meP().path", 95000); await pg.wait_for_timeout(500)
         # dézoomé : un toucher fait avancer loin d'un coup, même sur les immeubles
         await E("map.jumpTo({ center: [meP().lon, meP().lat], zoom: 13.3, pitch: 40 }); 1"); await pg.wait_for_timeout(1200); await W("!map.isMoving()", 20000)
         zt = await E("""(() => { const r = map.getContainer().getBoundingClientRect(), m = meP(), c = map.project([m.lon, m.lat]);
@@ -253,7 +258,7 @@ async def main():
             return { pt: [r.left + x, r.top + y] }; } return null; })()""")
         km0 = await E("W.w.km"); await pg.mouse.click(zt["pt"][0], zt["pt"][1]); await pg.wait_for_timeout(700)
         check("dézoomé : toucher la carte fait avancer loin d'un coup", await E("!!meP().path"), zt)
-        await W("!meP().path", 60000); await pg.wait_for_timeout(500)
+        await W("!meP().path", 95000); await pg.wait_for_timeout(500)
         check("… et le serveur compte ces km", await E(f"W.w.km > {km0} + 0.15"), (km0, await E("W.w.km")))
         await E("centerOnMe(false); 1"); await pg.wait_for_timeout(1500); await W("!map.isMoving()", 20000)
         gp = await E("(() => { for (let y = 250; y < 520; y += 20) for (let x = 40; x < 360; x += 20) { const el = document.elementFromPoint(x, y); if (el && el.tagName === 'CANVAS') return [x, y]; } return [200, 360]; })()")
@@ -290,22 +295,22 @@ async def main():
         g = await E("""(() => { const m = meP(); let best = null; for (const [d, g] of nearby(m.lon, m.lat, 450)) { const c = card(g); if (!c || c.lk !== 'l' || freeOf(g) <= 0 || d < 190) continue; if (!best || d < best[1]) best = [g, d]; } return best && best[0]; })()""")
         await E(f"setMovebar(''); worldTapCard({g}); 1"); await W("document.querySelector('#movebar [data-wgo]')", 15000)
         check("trop loin (ouvert depuis la recherche ou un aperçu) : la case dit la distance, avec « Y aller »", await E("/Y aller · \\d+ m/.test(document.querySelector('#movebar [data-wgo]').innerText) && !document.querySelector('#movebar [data-lbuy]')"), await E("document.querySelector('#movebar [data-wgo]').innerText"))
-        await pg.click("#movebar [data-wgo]"); await W("document.querySelector('#movebar [data-lbuy]')", 60000)
+        await pg.click("#movebar [data-wgo]"); await W("document.querySelector('#movebar [data-lbuy]')", 95000)
         check("arrivé à portée : on peut l'acheter (à glisser)", await E(f"ST.state.profile.land === {g} && !!document.querySelector('#movebar .slide[data-lbuy]')"))
         # un « ? » : on y va, la carte Chance est ramassée en passant
         await E("setMovebar(''); 1"); db.sql("update walkers set km = 0 where user_id=%s", me); await E("W.w.km = 0; renderDock(); 1")
         qg = await E("(() => { const m = meP(); let best = null; for (const q of W.q) { const d = mLL([m.lon, m.lat], [q.lon, q.lat]); if (!best || d < best[1]) best = [q.g, d]; } return best && best[0]; })()")
         await E(f"(() => {{ const s = spotOf({qg}); walkTo([s[3], s[4]], null, false, true); }})(); 1")
-        await W(f"W.taken.has({qg})", 60000); await pg.wait_for_timeout(300)
+        await W(f"W.taken.has({qg})", 95000); await pg.wait_for_timeout(300)
         check("un « ? » ramassé en marchant : une carte Chance", await E("document.querySelector('#chpop').classList.contains('on')") and db.sql("select count(*) from chance_taken where user_id=%s and card=%s", me, qg)[0][0] == 1)
         await pg.screenshot(path=T + "21_chance.png", timeout=120000)
-        await W("!meP().path", 60000)
+        await W("!meP().path", 95000)
         # le métro : la station la plus proche, puis Châtelet (ou l'École Militaire) en cherchant son nom
         st = await E("(() => { const m = meP(); let best = null; for (const [g] of W.G.st) { const s = spotOf(g); if (!s) continue; const d = mLL([m.lon, m.lat], [s[3], s[4]]); if (!best || d < best[1]) best = [g, d]; } return best[0]; })()")
         dest, q = (602931, "ecole mil") if st == 1578 else (1578, "chatel")
         await E(f"setMovebar(''); worldTapCard({st}); 1"); await W("document.querySelector('#movebar [data-wgo], #movebar [data-wmetro]')", 15000)
         if await E("!!document.querySelector('#movebar [data-wgo]')"):
-            await pg.click("#movebar [data-wgo]"); await W("document.querySelector('#movebar [data-wmetro]')", 60000)
+            await pg.click("#movebar [data-wgo]"); await W("document.querySelector('#movebar [data-wmetro]')", 95000)
         await pg.click("#movebar [data-wmetro]"); await W("document.querySelector('#plsheet .mtls')", 5000)
         await pg.fill("#mtq", q); await W(f"document.querySelector('#mtres [data-wride=\"{dest}\"]')", 5000)
         check("le métro : on cherche une station de tout Paris par son nom", True)
@@ -339,7 +344,7 @@ async def main():
         await E("closeSearch(); 1")
         # ordinateur (21/10/2026) : la case est sur le côté ; un clic sur la carte la ferme et fait aussi avancer
         await pg.set_viewport_size({"width": 1280, "height": 800}); await pg.wait_for_timeout(800)
-        await E("setMovebar(''); centerOnMe(false); 1"); await pg.wait_for_timeout(1500); await W("!map.isMoving()", 20000); await W("!meP().path", 30000)
+        await E("setMovebar(''); centerOnMe(false); 1"); await pg.wait_for_timeout(1500); await W("!map.isMoving()", 20000); await W("!meP().path", 95000)
         await E("updateNear(true); worldTapCard(W.near[0] ?? nearby(meP().lon, meP().lat, 110)[0][1]); 1"); await W("!document.querySelector('#movebar').hidden", 10000); await pg.wait_for_timeout(400)
         dt = await E("""(() => { const m = meP();
           for (let y = 160; y < innerHeight - 270; y += 19) for (let x = 24; x < innerWidth - 24; x += 19) {

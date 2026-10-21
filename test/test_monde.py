@@ -16,7 +16,7 @@ cur.execute("""create schema if not exists realtime;
   $$ insert into realtime.sent(payload, event, topic, private) values (payload, event, topic, private) $$;
   truncate realtime.sent;""")
 for f in ["migration_admin.sql", "migration_chat.sql", "migration_chat_look.sql", "migration_metro.sql", "migration_lieux.sql",
-          "migration_monde.sql", "migration_monde_paris.sql", "migration_monde_paris.sql"]:
+          "migration_monde.sql", "migration_monde_paris.sql", "migration_monde_paris.sql", "migration_vitesse.sql"]:
     cur.execute(open("supabase/" + f).read())   # la dernière 2 fois : rejouable
 c0.commit()
 db.sql("truncate place_people, chat_msg, chat_bans, walkers, world_people, chance_taken")
@@ -52,7 +52,9 @@ check("marcher : les km du trajet par les rues (calculés par le serveur, jamais
 check("salaire de la marche : 20 000 € par km offert", r["salary"] == math.floor(plen / 1000 * 20000) and cash(A) == c1 + r["salary"]
       and db.sql("select kind from ledger where owner=%s order by at desc, id desc limit 1", str(A))[0][0] == "salary", (r["salary"], cash(A) - c1))
 t, ev = last_ev()
-check("les gens autour voient le trajet et la durée", ev["k"] == "move" and ev["d"]["path"] == path and abs(ev["d"]["dur"] - plen / 40) < 0.01, ev["d"].get("dur"))
+CFG = db.sql("select _world_cfg()")[0][0]
+check("les gens autour voient le trajet et la durée (à la vitesse du jeu)", ev["k"] == "move" and ev["d"]["path"] == path and abs(ev["d"]["dur"] - min(CFG["maxDur"], max(1, plen / CFG["speed"]))) < 0.01, (ev["d"].get("dur"), CFG["speed"]))
+check("le personnage marche à 12 m/s, un trajet dure 60 s au plus (21/10/2026 : « il avance trop vite »)", CFG["speed"] == 12 and CFG["maxDur"] == 60, CFG)
 check("deux déplacements en moins d'un quart de seconde : le 2e attend", "Doucement" in (err(lambda: db.rpc(A, "world_move", p_lon=x0, p_lat=y0, p_len=10)) or ""))
 done(A)
 r = db.rpc(A, "world_move", p_lon=x0 + 0.001, p_lat=y0, p_len=1, p_path=[[x0 - 0.01, y0], [x0 + 0.001, y0]])
