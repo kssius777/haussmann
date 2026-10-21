@@ -258,8 +258,14 @@ function initWorld() {
   const vv = window.visualViewport;
   if (vv) { const f = () => document.body.style.setProperty("--kb", Math.max(0, innerHeight - vv.height - vv.offsetTop) + "px"); vv.addEventListener("resize", f); vv.addEventListener("scroll", f); }
   $("#b-main")?.addEventListener("click", mainAction);
-  $("#b-say")?.addEventListener("click", openSay);
+  $("#b-me")?.addEventListener("click", meAction);
   $("#pawnoff")?.addEventListener("click", () => centerOnMe(true));
+  // sur ordinateur, comme dans un jeu : Entrée pour parler, Échap pour fermer
+  document.addEventListener("keydown", e => {
+    if (e.key !== "Enter" || e.repeat || e.isComposing || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.target.closest?.("input,textarea,select,button,a,[contenteditable]") || !canSay() || cur() !== "map" || document.querySelector("#plsheet, #onb:not([hidden]), #reveal:not([hidden])")) return;
+    e.preventDefault(); openSay();
+  });
   renderDock();
 }
 // la carte est chargée (map.js) : les personnages en 3D, leurs noms, puis on entre dans Paris
@@ -545,13 +551,28 @@ function drawRoute(pts, head, metro) {
 }
 
 // ---- marcher ------------------------------------------------------------------
-// toucher la carte (pas un immeuble) : on y va par les rues (map.js appelle ceci)
+// toucher la carte : on y va par les rues, à tous les zooms (dézoomé, on va loin d'un coup) ; map.js appelle ceci
 function worldMapClick(e) {
-  if (!W.on || mode !== "all" || W.riding || map.getZoom() < 14.2) return false;
+  if (!W.on || mode !== "all" || W.riding) return false;
   const q = map.getLayer("wq-c") ? map.queryRenderedFeatures(e.point, { layers: ["wq-c"] }) : [];
   const s = q.length ? spotOf(+q[0].properties.g) : null;   // un « ? » : on va jusqu'à lui
-  walkTo(s ? [s[3], s[4]] : [e.lngLat.lng, e.lngLat.lat], null, false, !!s);
+  tapGo(s ? [s[3], s[4]] : [e.lngLat.lng, e.lngLat.lat], null, !!s);
   return true;
+}
+function tapGo(ll, target, exact) {
+  const now = performance.now(), l = W.lastTap;
+  if (l && now - l.t < 600 && mLL(ll, l.ll) < 8) return;   // un double clic : un seul départ
+  W.lastTap = { t: now, ll }; walkTo(ll, target, false, exact);
+}
+// toucher un immeuble, un monument, le repère d'une station ou d'un jardin (ll : là où l'on a touché ; e : le toucher sur la carte) :
+// à portée, sa case pour l'acheter ; trop loin, on avance jusque-là (choix du propriétaire, 21/10/2026 : « on appuie sur le bouton
+// gauche pour avancer ») — arrivé, il est en vert s'il est à vendre : on le touche pour l'acheter.
+function worldTapAt(g, ll, e) {
+  const me = meP();
+  if (!W.on || !me || mode !== "all" || W.riding || mLL([me.lon, me.lat], centerOf(g)) <= reachOf(g) - 4) return worldTapCard(g);
+  hideHint(); hintDone();
+  if (e) return worldMapClick(e);
+  tapGo(ll || centerOf(g), null, true);
 }
 const moneyDelta = x => { const p = ST.state?.profile; if (p && x) { p.cash = Math.max(0, p.cash + x); renderWallet(); } };
 const setLand = g => { const p = ST.state?.profile; if (p) { p.land = g; paintTargets(); } };
@@ -643,7 +664,7 @@ function askPay(len, cost, go) {
     b => { if (b.closest("[data-wpay]")) { closeSheet(); go(); } });
 }
 
-// ---- à portée : le bouton « Acheter », le vert sur la carte, l'anneau au sol ---------------------
+// ---- à portée : le vert sur la carte (ce qu'on peut acheter d'ici), l'anneau au sol ---------------------
 const NB = { grid: new Map(), done: new Set(), C: 100 };
 function indexArrs() {   // les centres des immeubles, rangés par carrés de 100 m (au fur et à mesure que les arrondissements arrivent)
   for (let i = 0; i < 20; i++) {
@@ -669,39 +690,49 @@ function updateNear(force) {
     for (const g of next) if (!W.nearSet.has(g)) map.setFeatureState(Object.assign({ id: g }, BLD), { near: 1 });
   }
   W.nearSet = next; W.near = list.map(x => x[1]);
-  renderDock();
 }
-// le bouton du milieu : « Acheter » quand un bien à vendre est à portée (le plus proche, puis le suivant), sinon « Moi » (revenir sur soi)
+// le bouton du milieu : « Parler » (choix du propriétaire, 21/10/2026 : « un bouton central pour s'exprimer ») ;
+// « Moi » (revenir sur soi, les km offerts qui restent) est à côté. Chat coupé ou banni : « Moi » passe au milieu.
+const canSay = () => W.on && !W.chatOff && !W.banned;
 function mainAction() {
   if (!W.on) return;
-  if (W.near.length) {
-    const open = panelKind === "land" ? (landView ? sel : landPos()) : null;
-    return worldTapCard(W.near[(W.near.indexOf(open) + 1) % W.near.length]);
-  }
+  if (canSay()) { const f = $("#wsay"); return f && !f.hidden ? closeSay() : openSay(); }
+  meAction();
+}
+function meAction() {
+  if (!W.on) return;
   if (panelKind) { justBought = null; setMovebar(""); }
   centerOnMe(true); showWalkHint();
 }
-const ICO_BUY = '<svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"><path d="M3.5 11.2L12 4l8.5 7.2" stroke-linecap="round"/><path d="M5.8 9.6V20h12.4V9.6" fill="rgba(255,255,255,.22)"/><path d="M10 20v-5.2h4V20"/></svg>';
+const ICO_SAY = '<svg viewBox="0 0 32 32" width="40" height="40" aria-hidden="true"><path d="M6 8.5C6 6.6 7.6 5 9.5 5h13C24.4 5 26 6.6 26 8.5v9c0 1.9-1.6 3.5-3.5 3.5H15l-5.6 4.4c-.6.5-1.4 0-1.4-.7V21h0c-1.1-.3-2-1.4-2-2.6z" fill="#fff"/><circle cx="11.5" cy="13" r="1.7" fill="#2563EB"/><circle cx="16" cy="13" r="1.7" fill="#2563EB"/><circle cx="20.5" cy="13" r="1.7" fill="#2563EB"/></svg>';
 function renderDock() {
   const b = $("#b-main"); if (!b) return;
-  const n = W.on ? W.near.length : 0, buy = n > 0, p = ST.state?.profile, me = meP();
+  const talk = canSay(), p = ST.state?.profile, me = meP();
   if (me && p && (me.party !== p.party || me.pseudo !== p.pseudo)) { me.party = p.party; me.pseudo = p.pseudo; window.people3d?.look(me.id, spec3d(me)); }
-  const key = buy ? "buy" : "me:" + JSON.stringify(p?.look || null) + (p?.party || "");
-  if (b.dataset.k !== key) { b.dataset.k = key; $("#mainico").innerHTML = buy ? ICO_BUY : p ? avatarSVG(lookOf(ME, p.look), p.party, 120) : ""; b.classList.toggle("buy", buy); }
-  const lbl = buy ? "Acheter" : "Moi"; if ($("#mainlbl").textContent !== lbl) $("#mainlbl").textContent = lbl;
-  const nb = $("#nearn"); nb.hidden = n < 2; if (nb.textContent !== String(n)) nb.textContent = n;
-  const km = $("#kmleft"), w = W.w, c = W.cfg;
-  if (km && w && c) { const left = Math.max(0, Math.floor((c.freeKm - w.km) * 10 + 1e-6) / 10), t = left > 0 ? kmTxt(left) : fmtE(c.kmPrice) + "/km"; if (km.textContent !== t) km.textContent = t; km.classList.toggle("out", left <= 0); km.hidden = false; }
-  else if (km) km.hidden = true;
-  b.setAttribute("aria-label", buy ? `Acheter : ${n} bien${n > 1 ? "s" : ""} à vendre à portée` : "Revenir sur mon personnage");
-  const s = $("#b-say"); if (s) s.hidden = !W.on || W.chatOff || W.banned;
+  const face = p ? avatarSVG(lookOf(ME, p.look), p.party, 120) : "";
+  const key = (talk ? "say:" : "me:") + JSON.stringify(p?.look || null) + (p?.party || "");
+  if (b.dataset.k !== key) {
+    b.dataset.k = key; b.classList.toggle("say", talk);
+    $("#mainico").innerHTML = talk ? ICO_SAY : face; const mi = $("#meico"); if (mi) mi.innerHTML = face;
+  }
+  const lbl = talk ? "Parler" : "Moi"; if ($("#mainlbl").textContent !== lbl) $("#mainlbl").textContent = lbl;
+  b.setAttribute("aria-label", talk ? "Parler aux joueurs autour" : "Revenir sur mon personnage");
+  const m = $("#b-me"); if (m) m.hidden = !talk;   // chat coupé : « Moi » est au milieu
+  // les km offerts qui restent aujourd'hui : sous « Moi » (à côté, ou au milieu quand le chat est coupé)
+  const w = W.w, c = W.cfg, left = w && c ? Math.max(0, Math.floor((c.freeKm - w.km) * 10 + 1e-6) / 10) : null;
+  for (const [el, on] of [[$("#kmme"), talk], [$("#kmleft"), !talk]]) {
+    if (!el) continue;
+    if (left == null || !on) { if (el.id === "kmleft") el.hidden = true; else el.textContent = "Moi"; el.classList.remove("out"); continue; }
+    const t = left > 0 ? kmTxt(left) : el.id === "kmme" ? "0 km" : fmtE(c.kmPrice) + "/km";
+    if (el.textContent !== t) el.textContent = t; el.classList.toggle("out", left <= 0); el.hidden = false;
+  }
 }
-// petit rappel, les premières fois : « Touchez une rue pour marcher »
+// petit rappel, les premières fois : « Touchez la carte pour marcher »
 function showWalkHint(force) {
   let n = 0; try { n = +(localStorage.getItem("hm_whint") || 0); } catch (e) { }
   if (!force && n >= 3) return;
   try { localStorage.setItem("hm_whint", String(n + 1)); } catch (e) { }
-  let h = $("#whint"); if (!h) { h = document.createElement("div"); h.id = "whint"; h.textContent = "Touchez une rue pour marcher"; $("#p-map").appendChild(h); }
+  let h = $("#whint"); if (!h) { h = document.createElement("div"); h.id = "whint"; h.textContent = "Touchez la carte pour marcher"; $("#p-map").appendChild(h); }
   clearTimeout(h.t); h.hidden = false; h.t = setTimeout(() => { h.hidden = true; }, 3500);
 }
 function hintDone() { const h = $("#whint"); if (h) h.hidden = true; try { localStorage.setItem("hm_whint", "9"); } catch (e) { } hideHint(); }
@@ -808,6 +839,7 @@ function openSay() {
     document.body.appendChild(f);
     f.addEventListener("submit", e => { e.preventDefault(); sendSay(); });
     f.querySelector(".x").addEventListener("click", closeSay);
+    f.querySelector("#wsq").addEventListener("keydown", e => { if (e.key === "Escape") { e.preventDefault(); closeSay(); } });
   }
   f.hidden = false; document.body.classList.add("saying"); $("#wsq").focus();
 }

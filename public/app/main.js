@@ -97,6 +97,15 @@ window.addEventListener("unhandledrejection", e => { const m = String(e.reason?.
 //  1 acheter près de soi (ou marcher) · 2 la case · 3 après l'achat · 3.5 marcher · 4 les boosters · 5 les mairies · 99 fini
 // =====================================================================
 let tutShown = "", tutMv = -1;
+// un point de la carte (un immeuble) où pointer la bulle ; null s'il n'est pas bien visible à l'écran
+function tutPoint(ll) {
+  if (!map || !ll) return null;
+  const r = map.getContainer().getBoundingClientRect(), q = map.project(ll), x = r.left + q.x, y = r.top + q.y;
+  if (x < 30 || x > innerWidth - 30 || y < 140 || y > innerHeight - 200) return null;
+  let a = $("#tutpt"); if (!a) { a = document.createElement("i"); a.id = "tutpt"; a.setAttribute("aria-hidden", "true"); document.body.appendChild(a); }
+  a.style.cssText = `position:fixed;left:${x - 1}px;top:${y - 1}px;width:2px;height:2px;pointer-events:none`;
+  return "#tutpt";
+}
 function tutGet() { try { return +(localStorage.getItem("hm_tut") || 99); } catch (e) { return 99; } }
 function tutSet(n) { try { localStorage.setItem("hm_tut", String(n)); } catch (e) { } tutTick(); }
 function tutTick() {
@@ -105,8 +114,9 @@ function tutTick() {
   const caseOpen = panelKind === "land" && !landView;
   if (st === 1 && caseOpen) return tutSet(2);
   else if (st === 1 && idle && !panelKind) {
-    if (W.near.length) { k = "1b"; anchor = "#b-main"; html = "<b>Achetez près de vous 🏠</b>En vert : à vendre, à portée de main. Touchez « Acheter »."; }
-    else { k = "1w"; html = "<b>Touchez une rue 🚶</b>Votre personnage y marche. Un immeuble libre à côté de vous ? Achetez-le."; }
+    const pt = W.near.length ? tutPoint(centerOf(W.near[0])) : null;   // la bulle pointe l'immeuble vert le plus proche
+    if (pt) { k = "1b"; anchor = pt; html = "<b>Achetez près de vous 🏠</b>En vert : à vendre, à portée de main. Touchez-en un."; }
+    else { k = "1w"; html = "<b>Touchez la carte 🚶</b>Votre personnage y marche. En vert près de vous : à vendre."; }
   }
   else if (st === 2 && caseOpen) {
     if (justBought) return tutSet(3);
@@ -121,7 +131,7 @@ function tutTick() {
   else if (st === 3 && !panelKind && idle) return tutSet(3.5);
   else if (st === 3.5 && idle && !panelKind) {
     if (tutMv < 0) tutMv = W.mv; else if (W.mv > tutMv) return tutSet(4);
-    k = "w"; ok = true; html = "<b>Promenez-vous 🚶</b>Touchez une rue : votre personnage y marche. Chaque km rapporte un salaire. Devant chez les autres, on paie un petit péage.";
+    k = "w"; ok = true; html = "<b>Promenez-vous 🚶</b>Touchez la carte : votre personnage y marche. Chaque km rapporte un salaire. Devant chez les autres, on paie un petit péage.";
   }
   else if (st === 4 && idle && !panelKind) { k = "4"; anchor = "#b-pack"; html = "<b>Ouvrez vos boosters</b>Chacun contient 4 vrais biens de Paris et 1 carte Chance. Vous en avez à ouvrir !"; }
   else if (st === 4 && (cur() === "booster" || !$("#reveal").hidden)) return tutSet(5);

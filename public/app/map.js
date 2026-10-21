@@ -80,6 +80,7 @@ function buildMap(base) {
   const ev = ST.state?.event, BLD_SRC = { source: "pv", "source-layer": "b" };
   map = new maplibregl.Map({
     container: "map", attributionControl: false, center: [2.3440, 48.8566], zoom: 14.2, pitch: 55, bearing: 0, maxPitch: 75, minZoom: 10.8,
+    doubleClickZoom: false,   // un clic fait marcher : un double clic ne zoome pas en plus (on zoome à la molette, en pinçant)
     maxBounds: [[2.16, 48.77], [2.54, 48.95]], fadeDuration: 0, maxTileCacheSize: 48,   // peu de tuiles gardées en mémoire (téléphones) dragRotate: true, touchPitch: true, pitchWithRotate: true,
     style: { version: 8, glyphs: "/fonts/{fontstack}/{range}.pbf",
       light: GROUND.light, sky: GROUND.sky,
@@ -116,18 +117,12 @@ function buildMap(base) {
   map.on("load", () => { fitMin();
     mapReady = true;
     for (const L of ["bd", "rf"]) {
-      map.on("click", L, ev => { const f = ev.features[0]; if (f && f.id != null) { ev.preventDefault(); onBuildingTap(f.id); } });
+      map.on("click", L, ev => { const f = ev.features[0]; if (!ev.defaultPrevented && f && f.id != null) { ev.preventDefault(); mapTap(ev, f.id); } });
       map.on("mouseenter", L, () => map.getCanvas().style.cursor = "pointer"); map.on("mouseleave", L, () => map.getCanvas().style.cursor = "");
     }
     if (window.THREE && window.addMonuments) addMonuments(map, IDX.models);
-    map.on("click", "mfill", e => { const f = e.features[0]; if (f) { e.preventDefault(); onBuildingTap(f.id); } });
-    map.on("click", e => { if (e.defaultPrevented) return;   // un immeuble : sa case (onBuildingTap)
-      // une case ouverte ou la recherche : le toucher les ferme, sans déplacer la carte ni marcher
-      if (panelKind === "land" && !moving) { justBought = null; setMovebar(""); closeSearch(); return; }
-      if (!$("#search").hidden || performance.now() - tapGuard < 700) { closeSearch(); return; }   // ce toucher fermait la recherche : on ne part pas marcher
-      hidePreview();
-      worldMapClick(e);   // toucher une rue : son personnage y marche (place.js)
-    });
+    map.on("click", "mfill", e => { const f = e.features[0]; if (!e.defaultPrevented && f) { e.preventDefault(); mapTap(e, f.id); } });
+    map.on("click", e => { if (!e.defaultPrevented) mapTap(e, null); });
     IDX.arr.forEach((a, i) => {
       const el = document.createElement("button"); el.className = "amark"; el.innerHTML = `<b>${ord(a.n)}</b><span id="am${i}"></span>`;
       el.addEventListener("click", ev => { ev.stopPropagation(); push("arr", i); });
@@ -320,6 +315,16 @@ async function previewBuilding(g) {   // à portée : on peut l'acheter ; trop l
 }
 function hidePreview() { if (!moving && (panelKind !== "land" || landView)) setMovebar(""); const pv = $("#preview"); if (pv && !pv.hidden) { pv.hidden = true; sel = null; paintAll(); if (false) $("#strip").hidden = false; } }
 function closeSearch() { $("#search").hidden = true; }
+// un toucher sur la carte (g : l'immeuble ou le monument touché) : on marche là où l'on touche, à tous les zooms ; un bien à portée s'ouvre
+// (place.js). Une case ouverte : sur téléphone, le toucher la ferme seulement (sans marcher ni bouger la carte) ; sur ordinateur, où elle
+// est sur le côté, il la ferme et fait aussi avancer. La recherche ouverte : le toucher la ferme seulement.
+function mapTap(e, g) {
+  if (panelKind === "land" && !moving) { justBought = null; setMovebar(""); closeSearch(); if (innerWidth < 900) return; }
+  if (!$("#search").hidden || performance.now() - tapGuard < 700) { closeSearch(); return; }   // ce toucher fermait la recherche : on ne part pas marcher
+  hidePreview();
+  if (g != null) return onBuildingTap(g, [e.lngLat.lng, e.lngLat.lat], e);
+  worldMapClick(e);
+}
 
 function initMapUI() {
   $("#preview").addEventListener("click", async e => {
@@ -357,7 +362,7 @@ function initMapUI() {
 
 // petit message d'aide sur la carte, jusqu'au premier achat ou aperçu
 // (20/10/2026 : pour ceux qui jouaient avec le dé, une fois) on se promène maintenant
-function showHint() { try { if (localStorage.getItem("hm_hint2") || +(localStorage.getItem("hm_tut") || 99) < 99) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "<b>Nouveau : le dé laisse place à la marche.</b> Touchez une rue pour marcher, achetez ce qui est à portée."; h.onclick = hideHint; $("#p-map").appendChild(h); }
+function showHint() { try { if (localStorage.getItem("hm_hint2") || +(localStorage.getItem("hm_tut") || 99) < 99) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "<b>Nouveau : le dé laisse place à la marche.</b> Touchez la carte pour marcher ; en vert près de vous : à vendre."; h.onclick = hideHint; $("#p-map").appendChild(h); }
 function hideHint() { if (!$("#maphint")) return; $("#maphint").remove(); try { localStorage.setItem("hm_hint2", "1"); } catch (e) { } }
 function celebrate(c) { toast(`Félicitations ! ${title(c)} est à vous. Loyer : +${fmtE(c.rent)}/jour`, "good"); if (window.confetti) confetti("#0EA5A0", 30); }
 

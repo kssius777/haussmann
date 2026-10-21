@@ -2254,8 +2254,7 @@ body.picking .smark{display:none}
 .mts.here{background:var(--act);color:#fff}
 
 /* =====================================================================
-   Paris à pied (20/10/2026) : le bouton du milieu (« Moi », ou « Acheter » quand un bien à vendre est à portée),
-   « Parler », les noms au-dessus des personnages en 3D et leurs bulles, la barre pour parler, la carte Chance ramassée,
+   Paris à pied (20/10/2026) : le bouton du milieu (« Parler » depuis le 21/10/2026, « Moi » à côté), les noms au-dessus des personnages en 3D et leurs bulles, la barre pour parler, la carte Chance ramassée,
    le salaire qui monte sous l'argent, le métro.
    ===================================================================== */
 #b-main.dmain{width:84px!important;height:84px!important;border-radius:50%!important;padding:0;display:block;overflow:visible;perspective:none;
@@ -2263,26 +2262,28 @@ body.picking .smark{display:none}
 #b-main:active{transform:translateY(3px)}
 #b-main .mi{position:absolute;inset:0;border-radius:50%;overflow:hidden;display:block}
 #b-main .mi .pp{position:absolute;left:50%;top:8px;transform:translateX(-50%);width:auto;height:118px}
-#b-main.buy.dmain{background:radial-gradient(circle at 35% 30%,#4ADE80,#16A34A 70%)!important;box-shadow:0 6px 0 #0F7A37,0 14px 30px rgba(22,163,74,.42)!important;animation:buyPulse 1.8s ease-in-out 3!important}
-#b-main.buy .mi{display:grid;place-items:center}
-#b-main.buy .mi svg{width:38px;height:38px;margin-top:-4px}
 #b-main>b{display:none!important}
-#b-main.buy>b{display:block!important;position:absolute;bottom:-9px;left:50%;transform:translateX(-50%);margin:0;white-space:nowrap;padding:3px 11px;border-radius:999px;background:#16A34A;color:#fff;border:2px solid #fff;font:800 12.5px/1.2 var(--f)}
 #b-main>small{bottom:-9px!important;background:var(--act)!important;color:#fff!important;border:2px solid #fff!important;font:800 12px/1.25 var(--f)!important;padding:3px 10px!important;border-radius:999px}
-#b-main>small[hidden],#b-main.buy>small{display:none!important}
+#b-main>small[hidden],#b-main.say>small{display:none!important}
 #b-main>small.out{background:#EA580C!important}
-#b-main .nb{position:absolute;top:-5px;right:-5px;min-width:26px;height:26px;padding:0 6px;border-radius:13px;background:#fff;color:#15803D;font:800 14px/26px var(--f);font-style:normal;text-align:center;box-shadow:0 2px 8px rgba(15,23,42,.25)}
-#b-main .nb[hidden]{display:none}
-@keyframes buyPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
-@media (min-width:900px){#b-main.dmain{width:92px!important;height:92px!important}#b-main .mi .pp{height:128px;top:9px}}
-#b-say[hidden]{display:none!important}
-#b-say .ic svg{display:block}
-@media (max-width:899px){body.mapfull #b-say{display:grid;position:absolute;left:0;bottom:84px;margin:0}}
+/* « Parler » au milieu (21/10/2026) : la bulle blanche, l'étiquette en dessous */
+#b-main.say .mi{display:grid;place-items:center}
+#b-main.say .mi svg{width:40px;height:40px;margin-top:-2px}
+#b-main.say>b{display:block!important;position:absolute;bottom:-9px;left:50%;transform:translateX(-50%);margin:0;white-space:nowrap;padding:3px 11px;border-radius:999px;background:#0B0C10;color:#fff;border:2px solid #fff;font:800 12.5px/1.2 var(--f)}
+@media (min-width:900px){#b-main.dmain{width:92px!important;height:92px!important}#b-main .mi .pp{height:128px;top:9px}#b-main.say .mi svg{width:44px;height:44px}}
+/* « Moi » à côté : sa tête, et les km offerts qui restent aujourd'hui (orange quand il n'y en a plus) */
+#b-me[hidden]{display:none!important}
+#b-me .ic{position:relative;width:30px!important;height:30px!important;border-radius:50%;overflow:hidden;background:#E8EFFE;display:block!important}
+#b-me .ic .pp{position:absolute;left:50%;top:3px;transform:translateX(-50%);height:46px;width:auto}
+#b-me>small{color:var(--act)!important;font-weight:800!important}
+#b-me>small.out{color:#EA580C!important}
+@media (max-width:899px){body.mapfull #b-me{display:grid;position:absolute;left:0;bottom:84px;margin:0}}
 @media (min-width:900px){
-  #b-say.dside{width:92px!important;height:92px!important;padding:0!important;display:grid;place-items:center;align-content:center;position:relative;border-radius:22px}
-  #b-say .ic{width:auto!important;height:auto!important}
-  #b-say .ic svg{width:42px;height:42px;margin-top:-8px}
-  #b-say>small{position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);padding:3px 10px;border-radius:999px;background:#0B0C10;color:#fff!important;font:700 12px/1.35 var(--f)!important;white-space:nowrap}
+  #b-me.dside{width:92px!important;height:92px!important;padding:0!important;display:grid;place-items:center;align-content:center;position:relative;border-radius:22px}
+  #b-me .ic{width:54px!important;height:54px!important;margin-top:-8px}
+  #b-me .ic .pp{height:84px;top:5px}
+  #b-me>small{position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);padding:3px 10px;border-radius:999px;background:var(--act);color:#fff!important;border:2px solid #fff;font:700 12px/1.35 var(--f)!important;white-space:nowrap}
+  #b-me>small.out{background:#EA580C;color:#fff!important}
 }
 /* les noms au-dessus des têtes (la zone à toucher couvre le personnage), les bulles */
 #wpl{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:3}

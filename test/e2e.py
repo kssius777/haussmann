@@ -67,12 +67,18 @@ async def main():
         # Paris à pied (20/10/2026 : plus de dé) : son personnage en 3D, les km du jour, « Acheter » quand un bien à vendre est à portée
         await W("W.on && !!meP() && W.near.length > 0", 40000); await E("centerOnMe(false); 1"); await pg.wait_for_timeout(1500); await W("!map.isMoving() && map.areTilesLoaded()", 30000); await pg.wait_for_timeout(1000)
         await pg.screenshot(path=T + "05b_walker.png", timeout=120000)
-        check("Paris à pied : son personnage sur la carte (« Vous »), 5 km offerts, plus de dé", await E("!document.querySelector('#b-roll') && !document.querySelector('.t-chat') && meP().el.style.display !== 'none' && meP().el.textContent.includes('Vous') && document.querySelector('#kmleft').textContent.includes('5 km') && (!window.people3d || people3d.count() >= 1)"), await E("document.querySelector('#kmleft').textContent"))
+        check("Paris à pied : son personnage sur la carte (« Vous »), 5 km offerts sous « Moi », plus de dé", await E("!document.querySelector('#b-roll') && !document.querySelector('.t-chat') && meP().el.style.display !== 'none' && meP().el.textContent.includes('Vous') && document.querySelector('#kmme').textContent.includes('5 km') && (!window.people3d || people3d.count() >= 1)"), await E("document.querySelector('#kmme').textContent"))
         check("la carte en tuiles : immeubles et ponts chargés", await E("map.querySourceFeatures('pv', {sourceLayer: 'b'}).length > 200 && map.querySourceFeatures('pv', {sourceLayer: 'bridges'}).length > 0"), await E("[map.querySourceFeatures('pv', {sourceLayer: 'b'}).length, map.querySourceFeatures('pv', {sourceLayer: 'bridges'}).length]"))
-        check("un bien à vendre à portée : le bouton du milieu devient « Acheter »", await E("document.querySelector('#b-main').classList.contains('buy') && document.querySelector('#mainlbl').textContent === 'Acheter'"), await E("W.near.length"))
-        await E("document.querySelector('#b-main').click(); 1"); await W("document.querySelector('#movebar [data-lbuy]:not([disabled])')", 15000)
+        check("en bas : « Parler » au milieu, « Moi » à côté (plus de bouton « Acheter »)", await E("document.querySelector('#b-main').classList.contains('say') && document.querySelector('#mainlbl').textContent === 'Parler' && !document.querySelector('#b-me').hidden && !document.querySelector('#nearn')"))
+        # un bien à vendre à portée (en vert) : on le touche, sa case s'ouvre, on peut l'acheter d'ici
+        tb = await E("""(() => { const r = map.getContainer().getBoundingClientRect();
+          for (const g of W.near) { const q = map.project(centerOf(g)); if (q.x < 20 || q.x > r.width - 20 || q.y < 150 || q.y > r.height - 260) continue;
+            const f = map.queryRenderedFeatures([q.x, q.y], { layers: ['bd', 'rf'] }); if (!f.length || f[0].id !== g) continue;
+            const el = document.elementFromPoint(r.left + q.x, r.top + q.y); if (!el || el.tagName !== 'CANVAS') continue;
+            return { g, pt: [r.left + q.x, r.top + q.y] }; } return null; })()""")
+        await pg.mouse.click(tb["pt"][0], tb["pt"][1]); await W("document.querySelector('#movebar [data-lbuy]:not([disabled])')", 15000)
         ng = await E("+document.querySelector('[data-lbuy]').dataset.lbuy")
-        check("« Acheter » ouvre le bien à vendre le plus proche, qu'on peut acheter d'ici", await E(f"ST.state.profile.land === {ng} && W.near[0] === {ng}"))
+        check("toucher un immeuble vert (à portée) ouvre sa case : on peut l'acheter d'ici, sans marcher", ng == tb["g"] and await E(f"ST.state.profile.land === {ng} && !meP().path"), (tb, ng))
         await pg.wait_for_timeout(500); await pg.screenshot(path=T + "05e_buy.png", timeout=120000)
         await pg.click("[data-lbuy]"); await pg.wait_for_timeout(400)
         check("un simple toucher sur le bouton d'achat n'achète pas", await E(f"!(ST.mine.get({ng})||[]).length && !ST.mineParts.has({ng})"))
@@ -95,7 +101,7 @@ async def main():
         # bug du 19/10/2026 : toucher la carte loin de chez soi (ou revenir d'une fiche) déplaçait la carte
         await E(f"map.jumpTo({{center: centerOf({fg}), zoom: 16}}); previewBuilding({fg}); 1"); await W("document.querySelector('#movebar .farbuy')"); await pg.wait_for_timeout(600)
         far = await E("""(async () => { const c0 = map.getCenter(); let pt = null;
-          for (let y = 220; y < 640 && !pt; y += 17) for (let x = 16; x < 384 && !pt; x += 17) if (!map.queryRenderedFeatures([x, y]).some(f => /^(bd|rf)\\d|^mfill$/.test(f.layer.id))) pt = [x, y];
+          for (let y = 220; y < 640 && !pt; y += 17) for (let x = 16; x < 384 && !pt; x += 17) if (!map.queryRenderedFeatures([x, y]).some(f => /^(bd|rf|mfill)$/.test(f.layer.id))) pt = [x, y];
           map.fire('click', { point: pt, lngLat: map.unproject(pt), originalEvent: {}, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } });
           await new Promise(r => setTimeout(r, 900)); const c1 = map.getCenter();
           return { closed: document.querySelector('#movebar').hidden, d: Math.hypot(c1.lng - c0.lng, c1.lat - c0.lat), walk: !!meP().path }; })()""")
@@ -174,7 +180,7 @@ async def main():
         await pg.click(".money"); await W("document.querySelector('.ml')"); await pg.screenshot(path=T + "15_money.png", timeout=120000); check("mon argent : historique des mouvements", await E("document.querySelectorAll('.ml').length") >= 3, await E("document.querySelectorAll('.ml').length"))
         check("pas de boutique en vrai argent pour l'instant", await E("!document.querySelector('[data-push=shop]')")); await pg.click("[data-back]")
         await pg.click("#avatar"); await W("document.querySelector('#logout')"); await pg.screenshot(path=T + "16_profile.png", timeout=120000); await pg.click("[data-back]")
-        check("en bas : « Parler », le bouton du milieu, les boosters (plus de dé ni de téléportation)", await E("!document.querySelector('#b-tp') && !document.querySelector('#b-roll') && !!document.querySelector('#b-main') && !document.querySelector('#b-say').hidden && !!document.querySelector('#b-pack')"))
+        check("en bas : « Moi », « Parler » au milieu, les boosters (plus de dé ni de téléportation)", await E("!document.querySelector('#b-tp') && !document.querySelector('#b-roll') && document.querySelector('#mainlbl').textContent === 'Parler' && !document.querySelector('#b-me').hidden && !!document.querySelector('#b-pack')"))
         await pg.click("#t-search"); await pg.fill("#q", "eiffel"); await W("document.querySelector('#results button')", 60000); await pg.click("#results button")
         await W("document.querySelector('#movebar [data-lopen]')"); await pg.wait_for_timeout(2500); await pg.screenshot(path=T + "17_preview.png", timeout=120000)
         await pg.click("#movebar .lb [data-lopen]"); await W("document.querySelector('#p-detail .bp')"); await pg.wait_for_timeout(400); await pg.screenshot(path=T + "18_monument.png", timeout=120000)
@@ -212,11 +218,37 @@ async def main():
         wk = db.sql("select km, lon, lat from walkers where user_id=%s", me)[0]; tgt = tap["ll"]
         check("le serveur compte les km et connaît la nouvelle position ; salaire de la marche versé", wk[0] > 0.02 and abs(wk[1] - tgt[0]) < 2e-4 and abs(wk[2] - tgt[1]) < 2e-4
               and db.sql("select count(*) from ledger where owner=%s and kind='salary'", me)[0][0] >= 1, wk)
-        # parler
-        await pg.click("#b-say"); await W("!document.querySelector('#wsay').hidden")
+        # 21/10/2026 (« on appuie sur le bouton gauche pour avancer ; on dézoome et on avance ») : toucher un immeuble trop loin fait avancer
+        await E("centerOnMe(false); 1"); await pg.wait_for_timeout(1300); await W("!map.isMoving()", 20000)
+        fb = await E("""(() => { const r = map.getContainer().getBoundingClientRect(), m = meP();
+          for (let y = 170; y < r.height - 280; y += 23) for (let x = 24; x < r.width - 24; x += 23) {
+            const f = map.queryRenderedFeatures([x, y], { layers: ['bd', 'rf'] }); if (!f.length || f[0].id == null) continue;
+            const g = f[0].id; if (!card(g) || mLL([m.lon, m.lat], centerOf(g)) < reachOf(g) + 40) continue;
+            const el = document.elementFromPoint(r.left + x, r.top + y); if (!el || el.tagName !== 'CANVAS') continue;
+            return { g, pt: [r.left + x, r.top + y] }; } return null; })()""")
+        await E("setMovebar(''); 1"); await pg.mouse.click(fb["pt"][0], fb["pt"][1]); await pg.wait_for_timeout(600)
+        check("trop loin : toucher un immeuble fait avancer jusque-là (sans case)", await E("!!meP().path && document.querySelector('#movebar').hidden"), fb)
+        await W("!meP().path", 40000); await pg.wait_for_timeout(500)
+        # dézoomé : un toucher fait avancer loin d'un coup, même sur les immeubles
+        await E("map.jumpTo({ center: [meP().lon, meP().lat], zoom: 13.3, pitch: 40 }); 1"); await pg.wait_for_timeout(1200); await W("!map.isMoving()", 20000)
+        zt = await E("""(() => { const r = map.getContainer().getBoundingClientRect(), m = meP(), c = map.project([m.lon, m.lat]);
+          for (const [dx, dy] of [[90, -60], [-90, -60], [100, 40], [-100, 40], [60, -110], [-60, -110], [120, 0], [-120, 0]]) { const x = c.x + dx, y = c.y + dy;
+            if (x < 20 || x > r.width - 20 || y < 150 || y > r.height - 260) continue;
+            const el = document.elementFromPoint(r.left + x, r.top + y); if (!el || el.tagName !== 'CANVAS') continue;
+            return { pt: [r.left + x, r.top + y] }; } return null; })()""")
+        km0 = await E("W.w.km"); await pg.mouse.click(zt["pt"][0], zt["pt"][1]); await pg.wait_for_timeout(700)
+        check("dézoomé : toucher la carte fait avancer loin d'un coup", await E("!!meP().path"), zt)
+        await W("!meP().path", 60000); await pg.wait_for_timeout(500)
+        check("… et le serveur compte ces km", await E(f"W.w.km > {km0} + 0.15"), (km0, await E("W.w.km")))
+        await E("centerOnMe(false); 1"); await pg.wait_for_timeout(1500); await W("!map.isMoving()", 20000)
+        # parler : le bouton du milieu
+        await pg.click("#b-main"); await W("!document.querySelector('#wsay').hidden")
         await pg.fill("#wsq", "Salut !"); await pg.press("#wsq", "Enter")
         await W("[...document.querySelectorAll('#wpl .wp.me .bub:not([hidden])')].some(b => b.textContent === 'Salut !')", 10000)
-        check("« Parler » : son message dans sa bulle, signé par le serveur", db.sql("select data->>'t', user_id::text from chat_msg where kind='say' order by id desc limit 1")[0] == ("Salut !", me))
+        check("« Parler » (le bouton du milieu) : son message dans sa bulle, signé par le serveur", db.sql("select data->>'t', user_id::text from chat_msg where kind='say' order by id desc limit 1")[0] == ("Salut !", me))
+        await pg.press("#wsq", "Escape"); await pg.wait_for_timeout(150); esc = await E("document.querySelector('#wsay').hidden")
+        await E("document.activeElement?.blur?.(); 1"); await pg.keyboard.press("Enter"); await pg.wait_for_timeout(250)
+        check("au clavier : Entrée pour parler, Échap pour fermer", esc and await E("!document.querySelector('#wsay').hidden && document.activeElement.id === 'wsq'"))
         await E("closeSay(); 1")
         # son personnage : toucher son nom
         await E("document.querySelector('#wpl .wp.me').click(); 1"); await W("document.querySelector('#plsheet .lked')")
@@ -227,7 +259,7 @@ async def main():
         await pg.click("#plsheet .plsx")
         # couper le chat (profil) : plus de bulles des autres, plus de « Parler »
         await pg.click("#avatar"); await W("document.querySelector('#chatoff')"); await pg.click("#chatoff"); await W("W.chatOff === true", 5000)
-        check("profil : couper le chat (plus de « Parler »)", await E("!!document.querySelector('#b-say').hidden") and db.sql("select chat_off from profiles where id=%s", me)[0][0] is True)
+        check("profil : couper le chat (plus de « Parler » : « Moi » revient au milieu)", await E("document.querySelector('#mainlbl').textContent === 'Moi' && document.querySelector('#b-me').hidden && !document.querySelector('#kmleft').hidden") and db.sql("select chat_off from profiles where id=%s", me)[0][0] is True)
         await pg.click("[data-back]"); await pg.wait_for_timeout(300)
         db.sql("update world_people set said_at = null, seen = now() where user_id=%s", ou); db.rpc(ou, "world_say", p_text="Tu me lis ?"); await pg.wait_for_timeout(3500)
         check("chat coupé : les messages des autres ne s'affichent plus", await E("![...document.querySelectorAll('#wpl .bub:not([hidden])')].some(b => b.textContent === 'Tu me lis ?')"))
@@ -235,7 +267,7 @@ async def main():
         # trop loin : « Y aller », puis on l'achète une fois à portée
         g = await E("""(() => { const m = meP(); let best = null; for (const [d, g] of nearby(m.lon, m.lat, 450)) { const c = card(g); if (!c || c.lk !== 'l' || freeOf(g) <= 0 || d < 190) continue; if (!best || d < best[1]) best = [g, d]; } return best && best[0]; })()""")
         await E(f"setMovebar(''); worldTapCard({g}); 1"); await W("document.querySelector('#movebar [data-wgo]')", 15000)
-        check("trop loin : toucher un immeuble ouvre sa case avec la distance et « Y aller »", await E("/Y aller · \\d+ m/.test(document.querySelector('#movebar [data-wgo]').innerText) && !document.querySelector('#movebar [data-lbuy]')"), await E("document.querySelector('#movebar [data-wgo]').innerText"))
+        check("trop loin (ouvert depuis la recherche ou un aperçu) : la case dit la distance, avec « Y aller »", await E("/Y aller · \\d+ m/.test(document.querySelector('#movebar [data-wgo]').innerText) && !document.querySelector('#movebar [data-lbuy]')"), await E("document.querySelector('#movebar [data-wgo]').innerText"))
         await pg.click("#movebar [data-wgo]"); await W("document.querySelector('#movebar [data-lbuy]')", 60000)
         check("arrivé à portée : on peut l'acheter (à glisser)", await E(f"ST.state.profile.land === {g} && !!document.querySelector('#movebar .slide[data-lbuy]')"))
         # un « ? » : on y va, la carte Chance est ramassée en passant
@@ -271,7 +303,7 @@ async def main():
         # les lieux (20/10/2026) : la station Châtelet sur la carte, sa case avec ses lignes et le bonus réseau ; la recherche sans accent
         await pg.click("#tabs [data-tab=map]"); await pg.wait_for_timeout(300); await E("setMovebar(''); map.jumpTo({center:[2.347119, 48.85852], zoom:16.2, pitch:40}); 1"); await pg.wait_for_timeout(1500)
         await W("!!document.querySelector(\".smark.k-m[aria-label='Métro Châtelet']\")", 15000)
-        await E("document.querySelector(\".smark.k-m[aria-label='Métro Châtelet']\").click(); 1"); await W("document.querySelector('#movebar .netl')", 15000); await pg.wait_for_timeout(600)
+        await E("worldTapCard(spotMarks.find(m => m.el.getAttribute('aria-label') === 'Métro Châtelet').g); 1"); await W("document.querySelector('#movebar .netl')", 15000); await pg.wait_for_timeout(600)
         check("métro : la station Châtelet sur la carte, sa case avec ses 5 lignes et le bonus réseau", await E("document.querySelectorAll('#movebar .netl .lnb').length === 5 && document.querySelector('#movebar .hc .plq b').textContent.includes('Châtelet')"))
         await pg.screenshot(path=T + "20_metro.png", timeout=120000)
         await E("setMovebar(''); 1"); await pg.click("#t-search"); await pg.fill("#q", "chatelet"); await pg.wait_for_timeout(300)
@@ -283,6 +315,19 @@ async def main():
         await E("refreshMap().then(() => ensureCards([...ST.mine.keys()].slice(0, 5))).then(() => 1)")
         check("le ruban du parti sur une carte qu'on domine", await E("(() => { const g = [...ST.mine.keys()].find(g => ST.own.get(g)?.party && card(g)); return g != null && cardHTML(card(g)).includes('class=\"rib\"'); })()"))
         await E("closeSearch(); 1")
+        # ordinateur (21/10/2026) : la case est sur le côté ; un clic sur la carte la ferme et fait aussi avancer
+        await pg.set_viewport_size({"width": 1280, "height": 800}); await pg.wait_for_timeout(800)
+        await E("setMovebar(''); centerOnMe(false); 1"); await pg.wait_for_timeout(1500); await W("!map.isMoving()", 20000); await W("!meP().path", 30000)
+        await E("updateNear(true); worldTapCard(W.near[0] ?? nearby(meP().lon, meP().lat, 110)[0][1]); 1"); await W("!document.querySelector('#movebar').hidden", 10000); await pg.wait_for_timeout(400)
+        dt = await E("""(() => { const m = meP(); for (const [dx, dy] of [[.0012,.001],[-.0012,.001],[.0016,-.0004],[-.0016,-.0004],[.0008,.0016],[-.0008,.0016],[.002,.0008],[-.002,.0008]]) {
+          const s = snapW(W.G, m.lon + dx, m.lat + dy, 200); if (!s) continue; const p = map.project([s.x / KXP, s.y / KYP]);
+          if (p.x < 30 || p.x > innerWidth - 30 || p.y < 160 || p.y > innerHeight - 200) continue;
+          if (map.queryRenderedFeatures([p.x, p.y]).some(f => /^(bd|rf|mfill|wq-c)$/.test(f.layer.id))) continue;
+          const el = document.elementFromPoint(p.x, p.y); if (!el || el.tagName !== 'CANVAS') continue;
+          return [p.x, p.y]; } return null; })()""")
+        await pg.mouse.click(dt[0], dt[1]); await pg.wait_for_timeout(600)
+        check("ordinateur : un clic sur la carte ferme la case et fait avancer", await E("document.querySelector('#movebar').hidden && !!meP().path"), dt)
+        await pg.screenshot(path=T + "23_desktop_walk.png", timeout=120000)
         check("aucune erreur JavaScript", not errs, errs[:5])
         await b.close()
     print(f"\n{sum(R)}/{len(R)} OK")

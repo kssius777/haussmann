@@ -16,7 +16,7 @@ function paintTargets() {
   if (landPainted != null && landPainted !== g) map.setFeatureState(Object.assign({ id: landPainted }, BLD), { tgt: 0 });
   if (g != null) { map.setFeatureState(Object.assign({ id: g }, BLD), { tgt: 1 }); landPainted = g; }
 }
-function onBuildingTap(g) { if (!moving) worldTapCard(g); }   // à portée : on peut l'acheter ; trop loin : la case le dit (place.js)
+function onBuildingTap(g, ll, e) { if (!moving) worldTapAt(g, ll, e); }   // à portée : on peut l'acheter ; trop loin : on y va (place.js)
 
 // centres des immeubles (pour les maquettes des cartes)
 const CEN = [];
