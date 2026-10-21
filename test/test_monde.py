@@ -16,7 +16,7 @@ cur.execute("""create schema if not exists realtime;
   $$ insert into realtime.sent(payload, event, topic, private) values (payload, event, topic, private) $$;
   truncate realtime.sent;""")
 for f in ["migration_admin.sql", "migration_chat.sql", "migration_chat_look.sql", "migration_metro.sql", "migration_lieux.sql",
-          "migration_monde.sql", "migration_monde_paris.sql", "migration_monde_paris.sql", "migration_vitesse.sql", "migration_temps_reel.sql", "migration_chat_minute.sql", "migration_vitesse2.sql", "migration_groupes.sql", "migration_groupes.sql"]:
+          "migration_monde.sql", "migration_monde_paris.sql", "migration_monde_paris.sql", "migration_vitesse.sql", "migration_temps_reel.sql", "migration_chat_minute.sql", "migration_vitesse2.sql", "migration_groupes.sql", "migration_groupes.sql", "migration_depart.sql", "migration_depart.sql"]:
     cur.execute(open("supabase/" + f).read())   # la dernière 2 fois : rejouable
 c0.commit()
 db.sql("truncate place_people, chat_msg, chat_bans, walkers, world_people, chance_taken")
@@ -34,14 +34,23 @@ cardxy = lambda g: tuple(map(float, db.sql("select cx / 1e5, cy / 1e5 from cards
 
 # entrer
 check("sans connexion : refusé", "Connexion" in (err(lambda: db.rpc(None, "world_join")) or ""))
-j = db.rpc(A, "world_join"); nd = cardxy(400761)
-check("entrer la première fois : devant son immeuble de départ (Notre-Dame), 5 km offerts", M(j["pos"], nd) < 30 and j["w"]["left"] == 5 and j["w"]["km"] == 0, (j["pos"], j["w"]))
+j = db.rpc(A, "world_join"); SP = db.sql("select _wspawns()")[0][0]
+check("entrer la première fois : devant un grand lieu tiré au hasard (21/10/2026), 5 km offerts", min(M(j["pos"], p) for p in SP) < 8 and j["w"]["left"] == 5 and j["w"]["km"] == 0, (j["pos"], j["w"]))
+check("29 grands lieux de départ, chacun sur une rue avec au moins 15 immeubles achetables à portée", len(SP) == 29 and all(
+  db.sql("select count(*) from cards where lk in ('l','c') and _wm(%s, %s, cx / 1e5, cy / 1e5) <= 120", lo, la)[0][0] >= 15 for lo, la in SP))
 cell = db.sql("select _wcell(%s, %s)", j["pos"][0], j["pos"][1])[0][0]
 t, ev = last_ev()
 check("l'arrivée part en temps réel sur le canal privé du carré (≈ 500 m)", t == f"w:{cell}" and ev["k"] == "join", (t, ev["k"]))
 check("le jour et les « ? » déjà ramassés sont donnés au site", j["day"] == db.sql("select _wday()")[0][0] and j["taken"] == [])
-jb = db.rpc(B, "world_join")
+jb = db.rpc(B, "world_join"); put(B, j["pos"][0] + 0.0001, j["pos"][1])   # (Ben a commencé ailleurs : on le pose à côté d'Ana)
 check("on voit les gens des carrés qu'on regarde, pas les autres", len(db.rpc(A, "world_people", p_cells=[cell])) == 2 and db.rpc(A, "world_people", p_cells=[cell + 500]) == [])
+news = [player(f"Neuf{i}") for i in range(20)]; firsts = [db.rpc(u, "world_join")["pos"] for u in news]
+check("20 nouveaux joueurs : répartis devant au moins 6 lieux différents (pas de foule au même endroit)", len({min(range(len(SP)), key=lambda k: M(q, SP[k])) for q in firsts}) >= 6)
+old_p = player("Ancien"); far0 = db.sql("select id from cards where arr = 17 and lk = 'l' limit 1")[0][0]
+db.sql("update profiles set pos = %s where id=%s", far0, str(old_p))
+check("un ancien joueur du temps du dé : il commence là où était son pion", M(db.rpc(old_p, "world_join")["pos"], cardxy(far0)) < 30)
+for u in news + [old_p]: db.rpc(u, "world_leave")
+db.sql("delete from walkers where user_id = any(%s::uuid[])", [str(u) for u in news + [old_p]])
 
 # marcher
 x0, y0 = j["pos"]; tx, ty = x0 + 0.004, y0 + 0.002
@@ -227,7 +236,8 @@ db.rpc(crowd[0], "world_look", p_cells=[gcell])
 rg = db.sql("select topic, payload->'d'->>'g' from realtime.sent where payload->>'k'='regroup' order by topic")
 check("la foule partie : un seul groupe, « regroup » envoyé sur les 2 anciens canaux", db.sql("select g from world_cells where cell=%s", gcell) == []
       and rg == [(f"w:{gcell}.0", "1"), (f"w:{gcell}.1", "1")], rg)
-db.sql("truncate realtime.sent"); db.rpc(crowd[1], "world_stop"); db.rpc(crowd[1], "world_say", p_text="Re")
+rr = next(u for u in crowd[:4] if u not in (a, b))   # (pas celui qui vient de parler : un message par minute)
+db.sql("truncate realtime.sent"); db.rpc(rr, "world_stop"); db.rpc(rr, "world_say", p_text="Re")
 check("… et on reparle sur le canal du carré, comme avant", last_ev()[0] == f"w:{gcell}")
 for u in crowd[:4]: db.rpc(u, "world_leave")
 
