@@ -2056,6 +2056,9 @@ body.mapfull #bar,body.mapfull #credbar,body.mapfull #tabs{backdrop-filter:none!
 @media (max-width:370px){html body.mapfull #filter button{padding:0 7px!important;font-size:12px!important}html body.mapfull #filter .dot{display:none}}
 /* téléphone : les noms de lieux trop près de la barre du haut sont cachés (19/10/2026, « ne pas surcharger la partie haute ») */
 .undertop{opacity:0!important;pointer-events:none!important}
+/* trop de bulles : les plus lointaines et celles qui en chevauchent une autre s'effacent (declutterLabels dans map.js) */
+.lhide{opacity:0!important;pointer-events:none!important}
+.mmark,.smark,.plabel{transition:opacity .18s}
 /* =====================================================================
    Le monde ouvert, essai dans le 7e (place.js, 20/10/2026 ; avant : le chat du Champ-de-Mars) : le jeu s'efface, la carte reste ;
    la case d'un immeuble s'ouvre comme d'habitude (le monde s'efface le temps qu'elle est ouverte)
@@ -2150,8 +2153,7 @@ body.mapfull #bar,body.mapfull #credbar,body.mapfull #tabs{backdrop-filter:none!
 .smark.k-o{--sk:#B45309}
 .smark.k-a{--sk:#9F1239}
 .smark.far{padding:2px;gap:0}
-.smark.far .sn,.smark.clash .sn{display:none}
-.smark.clash{padding:2px;gap:0}
+.smark.far .sn{display:none}
 .smark.far .si{width:18px;height:18px}
 .smark.far .si svg{width:13px;height:13px}
 .smark.me{box-shadow:0 0 0 3px var(--act),0 2px 8px rgba(0,0,0,.18)}

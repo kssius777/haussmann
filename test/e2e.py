@@ -77,6 +77,10 @@ async def main():
         check("la carte en tuiles : immeubles et ponts chargés", await E("map.querySourceFeatures('pv', {sourceLayer: 'b'}).length > 200 && map.querySourceFeatures('pv', {sourceLayer: 'bridges'}).length > 0"), await E("[map.querySourceFeatures('pv', {sourceLayer: 'b'}).length, map.querySourceFeatures('pv', {sourceLayer: 'bridges'}).length]"))
         check("les façades : la carte graphique dessine fenêtres, balcons et étage en zinc (recette acceptée ; tuiles du zoom 15 avec f)",
               await E("(FAC.ok === true || FAC.slow) && map.querySourceFeatures('pv', {sourceLayer: 'b'}).some(f => f.properties.f >= 16 && f.properties.f < 80)"), await E("[FAC.ok, FAC.slow]"))
+        check("les bulles des lieux : 7 au plus, aucune sur une autre, seulement près de soi (21/10/2026, « trop de bulles »)", await E("""(() => { renderLabels();
+          const v = [...document.querySelectorAll('.mmark,.smark')].filter(e => e.isConnected && !e.classList.contains('lhide') && !e.classList.contains('undertop')).map(e => e.getBoundingClientRect()).filter(r => r.width);
+          const hit = v.some((a, i) => v.some((b, j) => j > i && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top));
+          return v.length <= 7 && !hit && monMarks.every(m => !m.on || m.d <= lblReach('mon', map.getZoom())) && spotMarks.every(s => !s.on || s.d <= lblReach('spot', map.getZoom())); })()"""))
         check("en bas : « Parler » au milieu, « Moi » à côté (plus de bouton « Acheter »)", await E("document.querySelector('#b-main').classList.contains('say') && document.querySelector('#mainlbl').textContent === 'Parler' && !document.querySelector('#b-me').hidden && !document.querySelector('#nearn')"))
         # un bien à vendre à portée (en vert) : on le touche, sa case s'ouvre, on peut l'acheter d'ici
         tb = await E("""(() => { const r = map.getContainer().getBoundingClientRect();

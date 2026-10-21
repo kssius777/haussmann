@@ -132,7 +132,7 @@ function buildMap(base) {
       a.marker = new maplibregl.Marker({ element: el }).setLngLat(a.center).addTo(map);
     });
     buildMonMarkers(); buildSpotMarkers(); buildParkLabels(); map.on("move", throttle(declutterTop, 120)); map.on("resize", queueDeclutter);
-    map.on("zoom", renderMarks); map.on("zoomend", () => typeof declutterDest === "function" && declutterDest()); map.on("rotateend", () => typeof declutterDest === "function" && declutterDest()); map.on("moveend", throttle(() => { renderTags(); renderSpots(map.getZoom()); declutterSpots(); }, 350));
+    map.on("zoom", renderMarks); map.on("zoomend", () => typeof declutterDest === "function" && declutterDest()); map.on("rotateend", () => typeof declutterDest === "function" && declutterDest()); map.on("moveend", throttle(() => { renderTags(); renderLabels(); }, 350));
     // la boussole n'apparaît que si la carte a été tournée ; elle remet le nord en haut
     map.on("rotate", () => { const b = map.getBearing(); $("#t-north").hidden = Math.abs(b) < 2; $("#needle").style.transform = `rotate(${-b}deg)`; });
     updateArrFill(); applyMode(); paintAll(); worldMapReady();
@@ -187,13 +187,24 @@ function buildSpotMarkers() {
     return { g, kind, lon, lat, name: name || "", mh: model ? model.h : 0, off: 0, mk: new maplibregl.Marker({ element: el, anchor: model ? "bottom" : "center" }).setLngLat(model ? [model.lon, model.lat] : [lon, lat]), el, on: false, far: null, st: -1 };
   });
 }
-function renderSpots(z) {
+// Les bulles (21/10/2026, « t'as pas l'impression y'a trop de bulles ? ») : seulement ce qui est près du point visé
+// (de près : monuments à 900 m, jardins et places à 600 m, stations à 450 m, noms de quartiers et de parcs à 1,5 km ; plus loin
+// quand on dézoome), jamais deux bulles l'une sur l'autre (les plus proches et les plus importantes d'abord), 7 au plus sur
+// téléphone, 14 sur ordinateur (declutterLabels). Avant, tous les lieux de l'écran : à l'horizon, le Sacré-Cœur, la Géode…
+const LBL_R = { mon: 900, spot: 600, met: 450, txt: 1500 };
+const lblReach = (k, z) => LBL_R[k] * Math.max(1, Math.pow(2, 17.2 - z));
+const lblDist = (lon, lat, c) => Math.hypot((lon - c.lng) * 73240, (lat - c.lat) * 110574);
+function renderLabels() {
+  if (!mapReady) return; const z = map.getZoom(), c = map.getCenter();
+  renderMons(z, c); renderParks(z, c); renderSpots(z, c); declutterLabels();
+}
+function renderSpots(z, c = map.getCenter()) {
   if (!spotMarks.length) return;
-  const phone = innerWidth < 700, b = map.getBounds(), dx = (b.getEast() - b.getWest()) * .4, dy = (b.getNorth() - b.getSouth()) * .4;
-  const W = b.getWest() - dx, E = b.getEast() + dx, S = b.getSouth() - dy, N = b.getNorth() + dy;   // seulement autour de l'écran : moins de repères à déplacer sur téléphone
+  const phone = innerWidth < 700;
   const ok = mode === "all" && !document.body.classList.contains("picking") && z < 19;
   for (const s of spotMarks) {
-    const m = s.kind === "m", show = ok && z >= (m ? (phone ? 14.8 : 14.4) : (phone ? 13.8 : 13.4)) && s.lon > W && s.lon < E && s.lat > S && s.lat < N;
+    const m = s.kind === "m"; s.d = lblDist(s.lon, s.lat, c);
+    const show = ok && z >= (m ? (phone ? 14.8 : 14.4) : (phone ? 13.8 : 13.4)) && s.d <= lblReach(m ? "met" : "spot", z);
     if (show && !s.on) { s.mk.addTo(map); s.el.setAttribute("aria-label", s.name); s.on = true; } else if (!show && s.on) { s.mk.remove(); s.on = false; }   // addTo met « Map marker »
     if (!show) continue;
     const far = z < (m ? 15.8 : 14.6); if (far !== s.far) { s.far = far; s.el.classList.toggle("far", far); }
@@ -201,17 +212,25 @@ function renderSpots(z) {
     const st = stateFor(s.g); if (st !== s.st) { s.st = st; s.el.classList.toggle("me", st === 3 || st === 5); s.el.classList.toggle("them", st === 2); s.el.classList.toggle("sale", st === 4); }
   }
 }
-function declutterSpots() {
-  const vis = e => e && e.isConnected && getComputedStyle(e).display !== "none";
-  const boxes = [...monMarks.filter(m => m.on).map(m => m.el), ...IDX.arr.map(a => a.marker?.getElement())].filter(vis).map(e => e.getBoundingClientRect()).filter(r => r.width);
-  const hit = (r, b) => r.left < b.right + 2 && r.right > b.left - 2 && r.top < b.bottom + 2 && r.bottom > b.top - 2;
-  const on = spotMarks.filter(s => s.on && vis(s.el)); on.forEach(s => s.el.classList.remove("clash"));
-  for (const s of on.sort((a, b) => (a.kind === "m") - (b.kind === "m"))) {   // les jardins et places d'abord, puis les stations
-    let r = s.el.getBoundingClientRect(); if (!r.width) continue;
-    if (boxes.some(b => hit(r, b))) { s.el.classList.add("clash"); r = s.el.getBoundingClientRect(); }
-    boxes.push(r);
+function declutterLabels() {
+  if (!mapReady) return;
+  const max = innerWidth < 700 ? 7 : 14, items = [], taken = [], box = r => ({ l: r.left - 3, r: r.right + 3, t: r.top - 3, b: r.bottom + 3 });
+  for (const m of monMarks) if (m.on) items.push({ e: m.el, s: (m.d || 0) * .6 });   // un monument compte plus qu'une station à la même distance
+  for (const p of spotMarks) if (p.on) items.push({ e: p.el, s: (p.d || 0) * (p.kind === "m" ? 1 : .8) });
+  for (const p of parkMarks) if (p.on) items.push({ e: p.mk.getElement(), s: (p.d || 0) * 1.4, txt: true });   // les noms écrits : sans bulle, hors du compte
+  const me = typeof meP === "function" && meP()?.el;   // son personnage et son nom restent toujours visibles
+  if (me && me.style.display !== "none") { const r = me.getBoundingClientRect(); if (r.width) taken.push({ l: r.left - 6, r: r.right + 6, t: r.top - 24, b: r.bottom + 4 }); }
+  for (const a of IDX.arr) { const e = a.marker?.getElement(); if (e && e.style.display !== "none") { const r = e.getBoundingClientRect(); if (r.width) taken.push(box(r)); } }
+  items.sort((a, b) => a.s - b.s); let n = 0;
+  for (const it of items) {
+    if (it.e.classList.contains("undertop")) continue;
+    const r = it.e.getBoundingClientRect(), q = box(r);
+    const hide = !r.width || (!it.txt && n >= max) || taken.some(t => q.l < t.r && q.r > t.l && q.t < t.b && q.b > t.t);
+    if (!hide) { taken.push(q); if (!it.txt) n++; }
+    if (it.e.classList.contains("lhide") !== hide) it.e.classList.toggle("lhide", hide);
   }
 }
+const declutterLabelsSoon = throttle(declutterLabels, 250);
 // vue dézoomée : quel parti tient chaque mairie (légende en haut de la carte)
 function renderPartyLegend(z) {
   let el = $("#partyleg"); if (!el) { el = document.createElement("div"); el.id = "partyleg"; el.onclick = () => { go("paris"); setTimeout(() => push("results"), 30); }; $("#p-map").appendChild(el); }
@@ -235,15 +254,26 @@ function renderMarks() {
     const bb = el.querySelector("b"), key = (m?.party || "") + a.n; if (bb && bb.dataset.k !== key) { bb.dataset.k = key; bb.innerHTML = (m && PARTIES[m.party] ? emblemSVG(m.party, 16) : "") + ord(a.n); }
   });
   renderPartyLegend(z);
-  // noms des quartiers et des parcs : un peu plus tard qu'avant (carte moins chargée)
+  const c = map.getCenter(); renderParks(z, c); renderSpots(z, c); renderMons(z, c);
+  queueDeclutter(); declutterLabelsSoon();
+}
+// noms des quartiers et des parcs : un peu plus tard qu'avant (carte moins chargée), et seulement autour du point visé
+function renderParks(z, c) {
   const spotZ = mode === "all" && !document.body.classList.contains("picking") ? (innerWidth < 700 ? 13.8 : 13.4) : 99;
-  for (const p of parkMarks) { const show = z >= p.minz + (p.minz < 12.6 ? 0 : .6) && z < 17.5 && !(p.dup && z >= spotZ); if (show && !p.on) { p.mk.addTo(map); p.on = true; } else if (!show && p.on) { p.mk.remove(); p.on = false; } }
-  renderSpots(z);
-  for (const m of monMarks) {
-    const show = z >= (m.r === "M" ? (innerWidth < 700 ? 13.8 : 13.4) : 14.4); m.el.classList.toggle("far", z < (m.r === "M" ? (innerWidth < 700 ? 14.8 : 14.4) : 15.5)); if (show && !m.on) { m.mk.addTo(map); m.on = true; } else if (!show && m.on) { m.mk.remove(); m.on = false; }
-    if (show && !m.ph) { const c = card(m.g); if (c) { m.ph = true; if (c.ph) m.el.querySelector("i").setAttribute("style", phStyle(c)); } }
+  for (const p of parkMarks) {
+    const ll = p.mk.getLngLat(); p.d = lblDist(ll.lng, ll.lat, c);
+    const show = z >= p.minz + (p.minz < 12.6 ? 0 : .6) && z < 17.5 && !(p.dup && z >= spotZ) && p.d <= lblReach("txt", z);
+    if (show && !p.on) { p.mk.addTo(map); p.on = true; } else if (!show && p.on) { p.mk.remove(); p.on = false; }
   }
-  queueDeclutter();
+}
+function renderMons(z, c) {
+  for (const m of monMarks) {
+    const ll = m.mk.getLngLat(); m.d = lblDist(ll.lng, ll.lat, c);
+    const show = z >= (m.r === "M" ? (innerWidth < 700 ? 13.8 : 13.4) : 14.4) && m.d <= lblReach("mon", z);
+    const far = z < (m.r === "M" ? (innerWidth < 700 ? 14.8 : 14.4) : 15.5); if (m.el.classList.contains("far") !== far) m.el.classList.toggle("far", far);
+    if (show && !m.on) { m.mk.addTo(map); m.on = true; } else if (!show && m.on) { m.mk.remove(); m.on = false; }
+    if (show && !m.ph) { const cd = card(m.g); if (cd) { m.ph = true; if (cd.ph) m.el.querySelector("i").setAttribute("style", phStyle(cd)); } }
+  }
 }
 // téléphone : pas de noms de lieux collés sous les barres du haut (19/10/2026, demande du propriétaire : « ne pas surcharger la partie haute »)
 let topLim = 0, dtRaf = 0;
