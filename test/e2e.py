@@ -370,6 +370,8 @@ async def main():
         await pg.set_viewport_size({"width": 1280, "height": 800}); await pg.wait_for_timeout(800)
         await E("setMovebar(''); centerOnMe(false); 1"); await pg.wait_for_timeout(1500); await W("!map.isMoving()", 20000); await W("!meP().path", 95000)
         await E("updateNear(true); worldTapCard(W.near[0] ?? nearby(meP().lon, meP().lat, 110)[0][1]); 1"); await W("!document.querySelector('#movebar').hidden", 10000); await pg.wait_for_timeout(400)
+        # (vue moins inclinée pour chercher une rue : de biais, les murs des immeubles cachent souvent toutes les rues visibles)
+        await E("map.jumpTo({ pitch: 25 }); 1"); await pg.wait_for_timeout(700); await W("!map.isMoving()", 20000)
         dt = await E("""(() => { const m = meP();
           for (let y = 160; y < innerHeight - 270; y += 19) for (let x = 24; x < innerWidth - 24; x += 19) {
             const q = map.unproject([x, y]), d = mLL([m.lon, m.lat], [q.lng, q.lat]); if (d < 60 || d > 450) continue;
