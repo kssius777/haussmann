@@ -341,7 +341,7 @@ window.addPeople=function(map){
     },
     look(id,sp){ const p=P.get(id); if(p) dress(p,sp); },
     remove(id){ const p=P.get(id); if(!p) return; scene.remove(p.g); drop(p.c); P.delete(id); map.triggerRepaint(); },
-    pose(id,lon,lat,head,walk,vis){ const p=P.get(id); if(!p) return; p.x=(lon-lon0)*kx; p.z=-(lat-lat0)*ky; p.g.position.set(p.x,0,p.z); p.head=head||0; p.walk=!!walk; p.vis=!!vis; map.triggerRepaint(); },
+    pose(id,lon,lat,head,walk,vis){ const p=P.get(id); if(!p) return; p.x=(lon-lon0)*kx; p.z=-(lat-lat0)*ky; p.g.position.set(p.x,0,p.z); p.head=head||0; p.walk=+walk||0; p.vis=!!vis; map.triggerRepaint(); },
     // où est le personnage à l'écran (haut de la tête, pieds), d'après la dernière image dessinée — pour les noms et les bulles
     screen(id){ const p=P.get(id); if(!p||!mvp||!p.g.visible) return null;
       const h=new T.Vector4(p.x,2.02*kNow,p.z,1).applyMatrix4(mvp), f=new T.Vector4(p.x,0,p.z,1).applyMatrix4(mvp); if(h.w<=0||f.w<=0) return null;
@@ -383,7 +383,7 @@ window.addPeople=function(map){
         const want=p.walk?Math.PI-p.head:face; let d=want-p.g.rotation.y; d=Math.atan2(Math.sin(d),Math.cos(d));
         if(Math.abs(d)>.01){ p.g.rotation.y+=d*Math.min(1,dt*(p.walk?14:5)); busy=true; } else p.g.rotation.y=want;
         const at=p.walk?1:0; if(Math.abs(p.a-at)>.01){ p.a+=(at-p.a)*Math.min(1,dt*8); busy=true; } else p.a=at;
-        if(p.a>0) p.ph+=dt*11;
+        if(p.a>0) p.ph+=dt*16*Math.max(.35,Math.min(1,p.walk));   // (walk : 1 en pleine course, moins quand il ralentit, 0 arrêté)
         const sw=Math.sin(p.ph)*.62*p.a;
         p.legL.rotation.x=sw; p.legR.rotation.x=-sw; p.armL.rotation.x=-sw*.8; p.armR.rotation.x=sw*.8;
         p.inner.position.y=Math.abs(Math.cos(p.ph))*.035*p.a;

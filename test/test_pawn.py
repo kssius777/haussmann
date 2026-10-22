@@ -7,7 +7,14 @@ def err(f):
     try: f(); return None
     except Exception as e: return str(e).split("\n")[0]
 c0 = db.conn(); cur = c0.cursor()
-for f in ["migration_monde.sql", "migration_monde_paris.sql", "migration_depart.sql", "migration_de.sql"]: cur.execute(open("supabase/" + f).read())
+# Paris et le dé : toutes les migrations depuis migration_monde.sql, dans l'ordre, comme Vercel (avant le 22/10/2026, seulement
+# quelques-unes : la base locale gardait d'anciennes versions de _wcell, world_say… et l'e2e ne voyait plus les autres joueurs)
+mig = [l.strip() for l in open("supabase/migrations.txt") if l.strip() and not l.startswith("#")]
+cur.execute("""create schema if not exists realtime;
+  create table if not exists realtime.sent(payload jsonb, event text, topic text, private boolean, at timestamptz default clock_timestamp());
+  create or replace function realtime.send(payload jsonb, event text, topic text, private boolean default true) returns void language sql as
+  $$ insert into realtime.sent(payload, event, topic, private) values (payload, event, topic, private) $$;""")
+for f in mig[mig.index("migration_monde.sql"):]: cur.execute(open("supabase/" + f).read())
 c0.commit()
 A = uuid.uuid4(); db.sql("insert into auth.users(id) values (%s)", str(A))
 s = db.rpc(A, "join_game", p_pseudo="Pion" + str(A)[:4], p_party=None)

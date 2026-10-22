@@ -16,7 +16,7 @@ cur.execute("""create schema if not exists realtime;
   $$ insert into realtime.sent(payload, event, topic, private) values (payload, event, topic, private) $$;
   truncate realtime.sent;""")
 for f in ["migration_admin.sql", "migration_chat.sql", "migration_chat_look.sql", "migration_metro.sql", "migration_lieux.sql",
-          "migration_monde.sql", "migration_monde_paris.sql", "migration_monde_paris.sql", "migration_vitesse.sql", "migration_temps_reel.sql", "migration_chat_minute.sql", "migration_vitesse2.sql", "migration_groupes.sql", "migration_groupes.sql", "migration_depart.sql", "migration_depart.sql", "migration_de.sql", "migration_de.sql"]:
+          "migration_monde.sql", "migration_monde_paris.sql", "migration_monde_paris.sql", "migration_vitesse.sql", "migration_temps_reel.sql", "migration_chat_minute.sql", "migration_vitesse2.sql", "migration_groupes.sql", "migration_groupes.sql", "migration_depart.sql", "migration_depart.sql", "migration_de.sql", "migration_de.sql", "migration_course.sql", "migration_course.sql"]:
     cur.execute(open("supabase/" + f).read())   # la dernière 2 fois : rejouable
 c0.commit()
 db.sql("truncate place_people, chat_msg, chat_bans, walkers, world_people, chance_taken")
@@ -74,7 +74,7 @@ o = next(o for o in opts if not o["chance"]); gx, gy = cardxy(o["card"])
 pth = [[x0, y0], [gx, y0], [gx, gy]]; plen = M(pth[0], pth[1]) + M(pth[1], pth[2])
 c1 = cash(A); res = db.rpc(A, "dice_go", p_card=o["card"], p_path=pth)
 want_dur = min(cfg["runMax"], max(cfg["runMin"], plen / cfg["runSpeed"]))
-check("choisir une destination : on y court par les rues (2,5 à 7 s) et on y tombe", abs(res["dur"] - want_dur) < .01 and res["path"] == pth and res["landing"]["card"] == o["card"]
+check("choisir une destination : on y court par les rues (1,2 à 3 s, 22/10/2026) et on y tombe", (cfg["runSpeed"], cfg["runMin"], cfg["runMax"]) == (180, 1.2, 3) and abs(res["dur"] - want_dur) < .01 and res["path"] == pth and res["landing"]["card"] == o["card"]
       and db.sql("select land, pos from profiles where id=%s", str(A))[0] == (o["card"], o["card"]), (res["dur"], want_dur))
 check("un salaire à chaque lancer : 20 000 €", res["landing"]["salary"] == 20000 and cash(A) == c1 + 20000 - res["landing"]["toll"]
       and db.sql("select label from ledger where owner=%s and kind='salary' order by at desc, id desc limit 1", str(A))[0][0] == "Salaire du lancer", (cash(A) - c1, res["landing"]))

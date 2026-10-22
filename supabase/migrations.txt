@@ -40,3 +40,4 @@ migration_groupes.sql
 migration_charge.sql
 migration_depart.sql
 migration_de.sql
+migration_course.sql

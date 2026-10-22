@@ -87,7 +87,11 @@ check("fonctions internes interdites aux joueurs", not any(db.sql("select has_fu
       for f in ["_chat_emit(int,uuid,text,jsonb)", "_chat_person(uuid)", "_chat_ban_until(uuid)"]))
 check("rien n'est ouvert aux visiteurs non connectés", not any(db.sql("select has_function_privilege('anon', %s, 'execute')", f)[0][0]
       for f in ["chat_join(float8,float8)", "chat_say(text)", "chat_count()", "set_look(jsonb)", "chat_ban(uuid,int)"]))
-# nettoyage : on enlève le faux temps réel et les joueurs de test
-cur = c0.cursor(); cur.execute("drop schema realtime cascade"); c0.commit()
+# nettoyage : la base locale redevient comme la vraie (les migrations d'après, dans l'ordre : set_look et chat_ban ont changé
+# depuis, pour Paris ; sinon l'e2e qui suit teste les anciennes), puis on enlève le faux temps réel et les joueurs de test
+mig = [l.strip() for l in open("supabase/migrations.txt") if l.strip() and not l.startswith("#")]
+cur = c0.cursor()
+for f in mig[mig.index("migration_chat_look.sql") + 1:]: cur.execute(open("supabase/" + f).read())
+cur.execute("drop schema realtime cascade"); c0.commit()
 db.sql("truncate place_people, chat_msg, chat_bans")
 print(f"\n{sum(R)}/{len(R)} OK")

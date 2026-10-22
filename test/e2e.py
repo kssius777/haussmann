@@ -101,8 +101,8 @@ async def main():
         check("pendant le choix, toucher un autre immeuble ne fait rien (on choisit une flèche)", ob and await E("W.opts.length > 0 && document.querySelector('#movebar').hidden && !W.run"))
         # une flèche verte (libre) : son personnage y court, il y tombe, sa case s'ouvre ; libre : on l'achète en glissant
         i = await E("Math.max(0, W.opts.findIndex(o => o.k[0] === 'free'))"); gch = await E(f"W.opts[{i}].card"); free_ok = await E(f"W.opts[{i}].k[0] === 'free'")
-        await pg.click(f"#dchips .dchip >> nth={i}"); await pg.wait_for_timeout(700)
-        check("toucher une flèche : son personnage y court par les rues (trajet dessiné), les flèches s'en vont", await E("!!W.run && !!meP().path && !!map.getSource('wroute') && !document.querySelectorAll('#dchips .dchip').length"))
+        await pg.click(f"#dchips .dchip >> nth={i}"); await pg.wait_for_timeout(200)
+        check("toucher une flèche : son personnage y court par les rues (trajet dessiné, 1,2 à 3 s), les flèches s'en vont", await E("!!W.run && !!meP().path && !!map.getSource('wroute') && !document.querySelectorAll('#dchips .dchip').length && W.run.dur >= 1.19 && W.run.dur <= 3.01"))
         await W("!W.run", 60000); await W("!document.querySelector('#movebar').hidden", 15000); await pg.wait_for_timeout(600)
         cam = await E("(() => ({ on: CAM.on, z: +map.getZoom().toFixed(1), pitch: +map.getPitch().toFixed(0) }))()")
         check("arrivé : la caméra proche et inclinée sur son personnage (« derrière le perso »)", cam["on"] and cam["z"] >= 16.5 and cam["pitch"] >= 55, cam)

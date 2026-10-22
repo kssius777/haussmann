@@ -477,14 +477,15 @@ function updateVisible() {
   for (const p of W.people.values()) { const v = p.id === W.me || keep.has(p.id); if (v !== p.vis) { p.vis = v; pose(p); } }
   layoutPeople();
 }
-// suivre un trajet (les rues) en dur secondes ; sans durée : à la vitesse du jeu
+// la durée d'une course (comme dice_go) : à la vitesse du jeu, entre runMin et runMax secondes (1,2 à 3 s)
+function runDur(L) { const c = W.cfg || {}; return Math.min(c.runMax || 3, Math.max(c.runMin || 1.2, L / (c.runSpeed || 180))); }
+// suivre un trajet (les rues) en dur secondes ; sans durée : comme une course du dé
 function walkAlong(p, pts, dur) {
   if (!pts || pts.length < 2) return;
   pts = pts.map(q => [+q[0], +q[1]]); pts[0] = [p.lon, p.lat];   // on part d'où il est vraiment à l'écran
   const cum = pathLen(pts), L = cum[cum.length - 1];
   if (L < .5) { const e = pts[pts.length - 1]; p.lon = e[0]; p.lat = e[1]; stopPerson(p); return; }
-  const c = W.cfg || { speed: 40, maxDur: 30 };
-  setTrip(p, pts, cum, dur || Math.min(c.maxDur, Math.max(1, L / c.speed)), 0);
+  setTrip(p, pts, cum, dur || runDur(L), 0);
 }
 function followTrip(p, path, dur, el) {   // un trajet déjà commencé depuis el secondes
   const pts = path.map(q => [+q[0], +q[1]]), cum = pathLen(pts);
@@ -503,13 +504,14 @@ function worldTick() {
   const now = performance.now(); let any = false;
   for (const p of W.people.values()) {
     if (!p.path) continue;
-    const f = Math.min(1, (now - p.t0) / (p.dur * 1000)), at = f * p.cum[p.cum.length - 1];
+    // il part vite et ralentit en arrivant (la caméra, qui se rapproche pendant ce temps, ne s'emballe pas à la fin)
+    const f = Math.min(1, (now - p.t0) / (p.dur * 1000)), at = (1 - (1 - f) * (1 - f)) * p.cum[p.cum.length - 1];
     let i = p.seg; if (i < 1 || p.cum[i - 1] > at) i = 1; while (i < p.path.length - 1 && p.cum[i] < at) i++; p.seg = i;
     const a = p.path[i - 1], b = p.path[i], k = (at - p.cum[i - 1]) / ((p.cum[i] - p.cum[i - 1]) || 1);
     p.lon = a[0] + (b[0] - a[0]) * k; p.lat = a[1] + (b[1] - a[1]) * k;
     const dx = (b[0] - a[0]) * KXP, dy = (b[1] - a[1]) * KYP; if (dx * dx + dy * dy > .01) p.head = Math.atan2(dx, dy);
     if (f >= 1) { p.path = null; p.walk = false; pose(p); if (p.id === W.me) arrived(); continue; }
-    p.walk = true; pose(p); any = true;
+    p.walk = Math.min(1, 2 * (1 - f)); pose(p); any = true;   // (ses jambes ralentissent avec lui)
     if (p.id === W.me) meStep(now, i);
   }
   if (any) W.raf = requestAnimationFrame(worldTick);
@@ -730,7 +732,7 @@ function layoutChips() {
     const svg = el.querySelector("svg"); if (svg) svg.style.transform = `rotate(${ang[i].toFixed(3)}rad)`;
   });
 }
-// toucher une flèche, ou l'immeuble de sa couleur : son personnage y court par les rues (quelques secondes), la caméra suit
+// toucher une flèche, ou l'immeuble de sa couleur : son personnage y court par les rues (1,2 à 3 s), la caméra suit
 async function pickOpt(g) {
   const o = W.opts.find(x => x.card === g), me = meP();
   if (!o || !me || W.run || W.rolling || W.riding) return;
@@ -738,8 +740,7 @@ async function pickOpt(g) {
   const to = o.cen, plan = W.G ? planW(W.G, [me.lon, me.lat], to, true) : null;
   let pts = plan ? plan.pts : [[me.lon, me.lat], to];
   if (mLL(pts[pts.length - 1], to) > 80) pts = fitPath([...pts, to]);   // (le serveur veut finir devant l'immeuble)
-  const cum = pathLen(pts), len = cum[cum.length - 1], c = W.cfg || {};
-  const dur = Math.min(c.runMax || 7, Math.max(c.runMin || 2.5, len / (c.runSpeed || 70)));
+  const cum = pathLen(pts), dur = runDur(cum[cum.length - 1]);
   const from = { lon: me.lon, lat: me.lat };
   clearOpts(g); moving = true;
   W.run = { g, t0: performance.now(), dur, z0: map.getZoom(), z1: camZoom(), p0: map.getPitch(), p1: camPitch(camZoom()), pad0: map.getPadding(), pad1: camPad() };
