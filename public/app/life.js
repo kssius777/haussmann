@@ -264,7 +264,7 @@ const ANECDOTES = [
 function lifeSeen() { try { return JSON.parse(localStorage.getItem("hm_anec") || "[]"); } catch (e) { return []; } }
 function lifeTalk() {
   if (LIFE.bubble || typeof moving !== "undefined" && moving) return;
-  const B = document.body.classList; if (B.contains("landopen") || B.contains("picking") || document.querySelector("#coach:not([hidden]), #maphint")) return;
+  const B = document.body.classList; if (B.contains("landopen") || B.contains("picking") || B.contains("insalon") || document.querySelector("#coach:not([hidden]), #maphint")) return;
   const cw = map.getCanvas().clientWidth, ch = map.getCanvas().clientHeight;
   const peds = LIFE.agents.filter(a => { if (a.kind !== "ped" || a.x == null) return false; const q = map.project([a.x, a.y]); return q.x > 125 && q.x < cw - 125 && q.y > 190 && q.y < ch - 230; });
   if (!peds.length) { LIFE.nextTalk = performance.now() + 8000; return; }

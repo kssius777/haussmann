@@ -353,7 +353,7 @@ function closeSearch() { $("#search").hidden = true; }
 // (place.js). Une case ouverte : sur téléphone, le toucher la ferme seulement (sans bouger la carte) ; sur ordinateur, où elle est sur
 // le côté, il la ferme et vaut aussi pour ce qu'on touche. La recherche ouverte : le toucher la ferme seulement.
 function mapTap(e, g) {
-  if ($("#wsay") && !$("#wsay").hidden) { closeSay(); return; }   // la barre pour parler ouverte : toucher la carte la ferme seulement
+  if (typeof S !== "undefined" && S.on) { if (document.activeElement?.id === "wsq") document.activeElement.blur(); else salonTap(e); return; }   // au salon : toucher la pelouse (le clavier ouvert : on le ferme seulement)
   if (panelKind === "land" && !moving) { justBought = null; setMovebar(""); closeSearch(); if (innerWidth < 900) return; }
   if (!$("#search").hidden || performance.now() - tapGuard < 700) { closeSearch(); return; }   // ce toucher fermait la recherche : rien d'autre
   hidePreview();

@@ -239,13 +239,15 @@ function sharedRenderer(map,gl){ if(!R0){ R0=new T.WebGLRenderer({canvas:map.get
   R0.debug.checkShaderErrors=false; } return R0; }   // (21/10/2026 : vérifier chaque shader bloquait le démarrage, getProgramInfoLog)
 
 // =====================================================================
-//  Les personnages en 3D (20/10/2026, demande du propriétaire : « le perso est un peu trop 2D, ça fait South Park »).
-//  Un petit bonhomme (tête, cheveux, haut, pantalon ou jupe, bras et jambes qui bougent quand il marche) aux couleurs de
-//  « Mon personnage » (place.js donne les couleurs). Dessiné par-dessus les immeubles, comme une épingle de carte, et grossi
-//  quand on dézoome pour rester visible ; l'anneau de portée (ce qu'on peut acheter d'ici) est au sol, caché par les immeubles.
-//  Repère : mètres, x = est, y = haut, z = sud ; le personnage regarde vers +z.
+//  Les montgolfières (25/10/2026, choix du propriétaire : « ça fait bizarre le perso, comment il avance » ; avant, depuis le
+//  20/10/2026 : un petit personnage en 3D qui courait dans les rues). Une enveloppe en 16 fuseaux aux couleurs de « Ma
+//  montgolfière » (place.js donne la couleur, la 2e couleur et le motif), sa nacelle en osier et ses 4 cordes. Dessinée
+//  par-dessus les immeubles, comme une épingle de carte, et grossie quand on dézoome pour rester visible. Immobile au repos
+//  (rien à redessiner : pas d'animation qui tourne sur un téléphone) ; quand elle vole vers la destination du dé, place.js la
+//  fait monter, glisser puis redescendre (alt). Son ombre au sol, bleue pour soi.
+//  Repère : mètres, x = est, y = haut, z = sud.
 // =====================================================================
-const mat4=(x,y,z,rx,ry,rz,sx,sy,sz)=>new T.Matrix4().compose(new T.Vector3(x||0,y||0,z||0),new T.Quaternion().setFromEuler(new T.Euler(rx||0,ry||0,rz||0)),new T.Vector3(sx||1,sy||1,sz||1));
+const BTOP=2.62, BBOT=.28;   // le haut de l'enveloppe et le bas de la nacelle (avant le grossissement k)
 function piece(geo,color,m){
   const g=geo.index?geo.toNonIndexed():geo; if(g!==geo) geo.dispose(); if(m) g.applyMatrix4(m);
   const n=g.attributes.position.count, c=new T.Color(color), a=new Float32Array(n*3);
@@ -259,57 +261,38 @@ function bake(list){
   const g=new T.BufferGeometry(); g.setAttribute("position",new T.BufferAttribute(P,3)); g.setAttribute("normal",new T.BufferAttribute(N,3)); g.setAttribute("color",new T.BufferAttribute(C,3));
   g.computeBoundingSphere(); return g;
 }
-const HIP=.92, LEG=.92, HY=1.77, HR=.205;   // hanches, jambes (jusqu'au sol), centre et rayon de la tête
-// s : { g (1 = femme), skin, hair, cut (0 court, 1 long, 2 chignon, 3 bouclé, 4 carré, 5 rasé), top, bot, acc (0 rien, 1 lunettes, 2 lunettes de soleil, 3 béret, 4 casquette) }
-function charGeos(s){
-  const f=s.g===1, tw=f?.165:.2, tb=f?.14:.168, body=[];
-  // une jambe (pivot à la hanche) : pantalon, ou jambe nue sous la jupe ; baskets blanches
-  const r=f?.058:.078, leg=bake([
-    piece(new T.CylinderGeometry(r,r*.88,LEG-.06,8),f?s.skin:s.bot,mat4(0,-(LEG-.06)/2,0)),
-    piece(new T.BoxGeometry(.13,.08,.27),"#F7F7F4",mat4(0,-LEG+.065,.045)),
-    piece(new T.BoxGeometry(.135,.026,.28),"#BFC5CF",mat4(0,-LEG+.013,.045))]);
-  // un bras (pivot à l'épaule) : manche du haut, avant-bras et main
-  const arm=bake([
-    piece(new T.SphereGeometry(.066,8,6),s.top,mat4(0,0,0)),
-    piece(new T.CylinderGeometry(.064,.058,.3,8),s.top,mat4(0,-.13,0)),
-    piece(new T.CylinderGeometry(.05,.046,.27,8),s.skin,mat4(0,-.4,0)),
-    piece(new T.SphereGeometry(.058,8,6),s.skin,mat4(0,-.56,0))]);
-  // jupe, ou bassin du pantalon
-  if(f){ body.push(piece(new T.CylinderGeometry(.155,.285,.44,14,1,true),s.bot,mat4(0,.73,0)));
-         body.push(piece(new T.CircleGeometry(.285,14),s.bot,mat4(0,.51,0,Math.PI/2,0,0))); }
-  else body.push(piece(new T.CylinderGeometry(.17,.165,.2,12),s.bot,mat4(0,HIP,0)));
-  body.push(piece(new T.CylinderGeometry(tw,tb,.52,12),s.top,mat4(0,1.2,0)));                                 // buste
-  body.push(piece(new T.SphereGeometry(tw,12,6,0,Math.PI*2,0,Math.PI/2),s.top,mat4(0,1.455,0,0,0,0,1,.42,1)));   // épaules
-  body.push(piece(new T.CylinderGeometry(.058,.062,.12,8),s.skin,mat4(0,1.53,0)));                             // cou
-  body.push(piece(new T.SphereGeometry(HR,14,10),s.skin,mat4(0,HY,0)));                                        // tête
-  for(const x of [-.062,.062]) body.push(piece(new T.SphereGeometry(.024,6,5),"#1F2430",mat4(x,HY+.015,HR*.9)));   // yeux
-  body.push(piece(new T.SphereGeometry(.026,6,5),s.skin,mat4(0,HY-.025,HR*.97)));                              // nez
-  // cheveux : une calotte inclinée vers l'arrière (front dégagé), plus selon la coupe
-  const H=s.hair, cap=(rr,th,tilt)=>piece(new T.SphereGeometry(rr,14,8,0,Math.PI*2,0,th),H,mat4(0,HY,0,tilt,0,0));
-  if(s.cut===5) body.push(cap(HR+.006,Math.PI*.46,-.25));
-  else body.push(cap(HR+.014,Math.PI*.55,-.38));
-  if(s.cut===1) body.push(piece(new T.CylinderGeometry(HR+.02,HR+.055,.4,14,1,true,Math.PI*.3,Math.PI*1.4),H,mat4(0,HY-.13,-.012)));   // longs
-  if(s.cut===2) body.push(piece(new T.SphereGeometry(HR*.5,10,8),H,mat4(0,HY+HR*.72,-HR*.72)));                                              // chignon
-  if(s.cut===3) for(const [x,y,z] of [[0,.17,-.03],[.08,.14,.03],[-.08,.14,.03],[.13,.07,-.07],[-.13,.07,-.07],[.09,.06,-.15],[-.09,.06,-.15],[0,.09,-.17],[.15,-.01,-.03],[-.15,-.01,-.03]])
-    body.push(piece(new T.SphereGeometry(HR*.42,8,6),H,mat4(x*HR/.17,HY+y*HR/.17,z*HR/.17)));                                          // bouclés
-  if(s.cut===4) body.push(piece(new T.CylinderGeometry(HR+.03,HR+.04,.22,14,1,true,Math.PI*.24,Math.PI*1.52),H,mat4(0,HY-.06,-.01)));  // carré
-  // accessoires
-  const ink="#1F2430";
-  if(s.acc===1){ for(const x of [-.062,.062]) body.push(piece(new T.TorusGeometry(.037,.009,6,14),ink,mat4(x,HY+.015,HR*.93+.012))); body.push(piece(new T.BoxGeometry(.05,.01,.01),ink,mat4(0,HY+.02,HR+.01))); }
-  if(s.acc===2){ for(const x of [-.06,.06]) body.push(piece(new T.BoxGeometry(.088,.05,.02),"#111827",mat4(x,HY+.015,HR*.93+.012))); body.push(piece(new T.BoxGeometry(.05,.012,.012),"#111827",mat4(0,HY+.025,HR+.01))); }
-  if(s.acc===3){ body.push(piece(new T.CylinderGeometry(HR+.035,HR+.045,.075,16),"#1F2937",mat4(-.015,HY+HR*.95,-.01,0,0,.16))); body.push(piece(new T.CylinderGeometry(.012,.012,.04,6),"#1F2937",mat4(-.05,HY+HR*.95+.06,0))); }
-  if(s.acc===4){ body.push(piece(new T.SphereGeometry(HR+.022,14,7,0,Math.PI*2,0,Math.PI*.5),s.top,mat4(0,HY+.01,0,-.12,0,0))); body.push(piece(new T.BoxGeometry(.22,.022,.17),s.top,mat4(0,HY+.055,HR+.06,-.14,0,0))); }
-  return { body:bake(body), leg, arm, sw:f?.08:.092, sh:tw+.05 };
+// s : { c (couleur), d (2e couleur), p (motif : 0 fuseaux, 1 unie, 2 ceinture, 3 damier) }
+function balloonGeo(s){
+  const N=16, prof=[[.13,.98],[.22,1.08],[.35,1.27],[.49,1.5],[.6,1.74],[.66,1.97],[.67,2.13],[.63,2.3],[.53,2.44],[.37,2.55],[.19,2.61],[0,BTOP]];
+  const env=new T.LatheGeometry(prof.map(([r,y])=>new T.Vector2(r,y)),N), e=env.toNonIndexed(); env.dispose();
+  const pos=e.attributes.position, n=pos.count, col=new Float32Array(n*3), A=new T.Color(s.c), B=new T.Color(s.d);
+  for(let i=0;i<n;i+=3){   // la couleur de chaque triangle : son fuseau (l'angle de son centre) et sa hauteur
+    const x=pos.getX(i)+pos.getX(i+1)+pos.getX(i+2), y=(pos.getY(i)+pos.getY(i+1)+pos.getY(i+2))/3, z=pos.getZ(i)+pos.getZ(i+1)+pos.getZ(i+2);
+    let a=Math.atan2(x,z); if(a<0) a+=2*Math.PI;
+    const f=Math.floor(a/(2*Math.PI)*N)%N, b=Math.floor((y-.98)/.29);
+    const two=s.p===0?f%2===1:s.p===2?(y>1.6&&y<1.92)||y<1.13:s.p===3?(f+b)%2===1:false, c=two?B:A;
+    for(let k=0;k<3;k++){ col[3*(i+k)]=c.r; col[3*(i+k)+1]=c.g; col[3*(i+k)+2]=c.b; }
+  }
+  e.setAttribute("color",new T.BufferAttribute(col,3));
+  const up=new T.Vector3(0,1,0), parts=[e];
+  for(const [sx,sz] of [[1,1],[1,-1],[-1,1],[-1,-1]]){   // les cordes : de la bouche de l'enveloppe aux coins de la nacelle
+    const a=new T.Vector3(sx*.09,.99,sz*.09), b=new T.Vector3(sx*.125,.54,sz*.125), L=a.distanceTo(b);
+    parts.push(piece(new T.CylinderGeometry(.012,.012,L,5,1,true),"#4B3621",new T.Matrix4().compose(a.clone().add(b).multiplyScalar(.5),new T.Quaternion().setFromUnitVectors(up,b.clone().sub(a).normalize()),new T.Vector3(1,1,1))));
+  }
+  parts.push(piece(new T.BoxGeometry(.27,.25,.27),"#A0703F",new T.Matrix4().makeTranslation(0,BBOT+.125,0)));   // la nacelle
+  parts.push(piece(new T.BoxGeometry(.3,.045,.3),"#5B3A1F",new T.Matrix4().makeTranslation(0,.55,0)));          // son bord
+  parts.push(piece(new T.TorusGeometry(.13,.022,6,16),"#334155",new T.Matrix4().makeRotationX(Math.PI/2).setPosition(0,.98,0)));   // la bouche
+  return bake(parts);
 }
-window.MON.charGeos=charGeos;   // pour les tests (aperçu des personnages)
+window.MON.balloonGeo=balloonGeo;   // (pour les tests : aperçu)
 window.addPeople=function(map){
   const lon0=2.3488, lat0=48.8534, origin=maplibregl.MercatorCoordinate.fromLngLat([lon0,lat0],0), s=origin.meterInMercatorCoordinateUnits();
   const kx=111320*Math.cos(lat0*Math.PI/180), ky=110574;
   const scene=new T.Scene(), ringScene=new T.Scene(), camera=new T.Camera();   // ringScene : ce qui est au sol, caché par les immeubles (l'anneau, les voitures)
-  scene.add(new T.HemisphereLight(0xffffff,0xb9ad98,.6)); const sun=new T.DirectionalLight(0xffffff,.66); sun.position.set(-.5,1,.65); scene.add(sun);   // plus de relief (21/10/2026)
+  scene.add(new T.HemisphereLight(0xffffff,0xb9ad98,.62)); const sun=new T.DirectionalLight(0xffffff,.64); sun.position.set(-.5,1,.65); scene.add(sun);
   const MAT=new T.MeshLambertMaterial({vertexColors:true,side:T.DoubleSide});
-  const SHG=new T.CircleGeometry(.36,20); SHG.rotateX(-Math.PI/2);
-  const SH=new T.MeshBasicMaterial({color:0x0F172A,transparent:true,opacity:.2,depthWrite:false}), SHME=new T.MeshBasicMaterial({color:0x2563EB,transparent:true,opacity:.35,depthWrite:false});
+  const SHG=new T.CircleGeometry(.5,24); SHG.rotateX(-Math.PI/2);
+  const SH=new T.MeshBasicMaterial({color:0x0F172A,transparent:true,opacity:.18,depthWrite:false}), SHME=new T.MeshBasicMaterial({color:0x2563EB,transparent:true,opacity:.34,depthWrite:false});
   // l'anneau de portée, au sol (caché derrière les immeubles)
   const ringG=new T.Group(); ringG.visible=false; ringScene.add(ringG);
   { const rg=new T.RingGeometry(.975,1,96); rg.rotateX(-Math.PI/2); const fg=new T.CircleGeometry(1,96); fg.rotateX(-Math.PI/2);
@@ -319,32 +302,30 @@ window.addPeople=function(map){
   ringScene.add(new T.HemisphereLight(0xffffff,0xcfc2a8,.8)); { const s2=new T.DirectionalLight(0xffffff,.45); s2.position.set(-.5,1,.65); ringScene.add(s2); }
   const BOXG=new T.BoxGeometry(1,1,1), BOXM=new T.MeshLambertMaterial({color:0xffffff}), bm=new T.Matrix4(), bq=new T.Quaternion(), bv=new T.Vector3(), bs=new T.Vector3(), bc=new T.Color(), up=new T.Vector3(0,1,0);
   let boxIM=null, boxCap=0, ringWant=false;
-  const P=new Map(), cache=new Map();
-  const geos=sp=>{ const key=JSON.stringify(sp); let c=cache.get(key); if(!c){ c=Object.assign(charGeos(sp),{key,n:0}); cache.set(key,c); } c.n++; return c; };
-  const drop=c=>{ if(--c.n>0) return; cache.delete(c.key); c.body.dispose(); c.leg.dispose(); c.arm.dispose(); };
+  const P=new Map(), cache=new Map();   // une seule forme par montgolfière différente (mêmes couleurs, même motif : partagée)
+  const geos=sp=>{ const key=JSON.stringify(sp); let c=cache.get(key); if(!c){ c={geo:balloonGeo(sp),key,n:0}; cache.set(key,c); } c.n++; return c; };
+  const drop=c=>{ if(--c.n>0) return; cache.delete(c.key); c.geo.dispose(); };
   function dress(p,sp){
-    if(p.c) { p.inner.remove(p.body,p.legL,p.legR,p.armL,p.armR); drop(p.c); }
-    const c=p.c=geos(sp);
-    p.body=new T.Mesh(c.body,MAT); p.legL=new T.Mesh(c.leg,MAT); p.legR=new T.Mesh(c.leg,MAT); p.armL=new T.Mesh(c.arm,MAT); p.armR=new T.Mesh(c.arm,MAT);
-    p.legL.position.set(-c.sw,HIP,0); p.legR.position.set(c.sw,HIP,0);
-    p.armL.position.set(-c.sh,1.43,0); p.armR.position.set(c.sh,1.43,0); p.armL.rotation.z=-.09; p.armR.rotation.z=.09;
-    p.inner.add(p.body,p.legL,p.legR,p.armL,p.armR); map.triggerRepaint();
+    if(p.c){ p.inner.remove(p.mesh); drop(p.c); }
+    const c=p.c=geos(sp); p.mesh=new T.Mesh(c.geo,MAT); p.inner.add(p.mesh); map.triggerRepaint();
   }
-  let mvp=null, kNow=16, CW=0, CH=0, tPrev=performance.now();
+  let mvp=null, kNow=16, CW=0, CH=0;
   const api={
     k(z){ return Math.min(60,Math.max(3.5,(innerWidth<700?17:19)*Math.pow(2,(16.5-z)*.8))); },
     add(id,sp,me){
       if(P.has(id)) return api.look(id,sp);
       const g=new T.Group(), inner=new T.Group(); g.add(inner); g.visible=false;
       const sh=new T.Mesh(SHG,me?SHME:SH); sh.position.y=.02; g.add(sh);
-      const p={g,inner,c:null,head:0,walk:false,vis:false,ph:0,a:0,x:0,z:0}; dress(p,sp); scene.add(g); P.set(id,p);
+      const p={g,inner,sh,c:null,mesh:null,alt:0,vis:false,x:0,z:0}; dress(p,sp); scene.add(g); P.set(id,p);
     },
     look(id,sp){ const p=P.get(id); if(p) dress(p,sp); },
     remove(id){ const p=P.get(id); if(!p) return; scene.remove(p.g); drop(p.c); P.delete(id); map.triggerRepaint(); },
-    pose(id,lon,lat,head,walk,vis){ const p=P.get(id); if(!p) return; p.x=(lon-lon0)*kx; p.z=-(lat-lat0)*ky; p.g.position.set(p.x,0,p.z); p.head=head||0; p.walk=+walk||0; p.vis=!!vis; map.triggerRepaint(); },
-    // où est le personnage à l'écran (haut de la tête, pieds), d'après la dernière image dessinée — pour les noms et les bulles
+    // alt : de combien elle est montée (en vol), en unités du dessin
+    pose(id,lon,lat,alt,vis){ const p=P.get(id); if(!p) return; p.x=(lon-lon0)*kx; p.z=-(lat-lat0)*ky; p.g.position.set(p.x,0,p.z);
+      p.alt=+alt||0; p.inner.position.y=p.alt; p.sh.scale.setScalar(1/(1+p.alt*.6)); p.vis=!!vis; map.triggerRepaint(); },
+    // où est la montgolfière à l'écran (haut de l'enveloppe, bas de la nacelle), d'après la dernière image dessinée — pour les noms et les bulles
     screen(id){ const p=P.get(id); if(!p||!mvp||!p.g.visible) return null;
-      const h=new T.Vector4(p.x,2.02*kNow,p.z,1).applyMatrix4(mvp), f=new T.Vector4(p.x,0,p.z,1).applyMatrix4(mvp); if(h.w<=0||f.w<=0) return null;
+      const h=new T.Vector4(p.x,(BTOP+p.alt)*kNow,p.z,1).applyMatrix4(mvp), f=new T.Vector4(p.x,(BBOT+p.alt)*kNow,p.z,1).applyMatrix4(mvp); if(h.w<=0||f.w<=0) return null;
       return { hx:(h.x/h.w+1)/2*CW, hy:(1-h.y/h.w)/2*CH, fx:(f.x/f.w+1)/2*CW, fy:(1-f.y/f.w)/2*CH }; },
     ring(lon,lat,r,on){ ringWant=!!on; if(on){ ringG.position.set((lon-lon0)*kx,.6,-(lat-lat0)*ky); ringG.scale.set(r,1,r); } map.triggerRepaint(); },
     // q : {x, y (lon, lat du centre), a (cap en degrés), l (longueur), w (largeur), b (bas), h (haut), c (couleur)}
@@ -365,7 +346,7 @@ window.addPeople=function(map){
   map.addLayer({id:"people",type:"custom",renderingMode:"3d",
     onAdd(m,gl){ renderer=sharedRenderer(m,gl); },
     render(gl,matrix){
-      const z=map.getZoom(), now=performance.now(), dt=Math.min(.1,(now-tPrev)/1000); tPrev=now;
+      const z=map.getZoom();
       ringG.visible=ringWant&&z>=14.2;
       const people=z>=13.6, ground=ringG.visible||(boxIM&&boxIM.count>0);
       if(!people&&!ground){ mvp=null; return; }
@@ -375,24 +356,11 @@ window.addPeople=function(map){
       if(!people){ mvp=null; renderer.resetState(); renderer.render(ringScene,camera); return; }
       mvp=m; kNow=api.k(z);
       const cv=map.getCanvas(); CW=cv.clientWidth; CH=cv.clientHeight;
-      const face=-map.getBearing()*Math.PI/180; let busy=false;
-      for(const p of P.values()){
-        p.g.visible=p.vis; if(!p.vis) continue;
-        p.g.scale.setScalar(kNow);
-        // en marchant : dans le sens du trajet ; à l'arrêt : il se tourne vers nous
-        const want=p.walk?Math.PI-p.head:face; let d=want-p.g.rotation.y; d=Math.atan2(Math.sin(d),Math.cos(d));
-        if(Math.abs(d)>.01){ p.g.rotation.y+=d*Math.min(1,dt*(p.walk?14:5)); busy=true; } else p.g.rotation.y=want;
-        const at=p.walk?1:0; if(Math.abs(p.a-at)>.01){ p.a+=(at-p.a)*Math.min(1,dt*8); busy=true; } else p.a=at;
-        if(p.a>0) p.ph+=dt*16*Math.max(.35,Math.min(1,p.walk));   // (walk : 1 en pleine course, moins quand il ralentit, 0 arrêté)
-        const sw=Math.sin(p.ph)*.62*p.a;
-        p.legL.rotation.x=sw; p.legR.rotation.x=-sw; p.armL.rotation.x=-sw*.8; p.armR.rotation.x=sw*.8;
-        p.inner.position.y=Math.abs(Math.cos(p.ph))*.035*p.a;
-      }
+      for(const p of P.values()){ p.g.visible=p.vis; if(p.vis) p.g.scale.setScalar(kNow); }
       renderer.resetState();
       if(ground) renderer.render(ringScene,camera);
-      renderer.state.buffers.depth.setMask(true); renderer.clearDepth();   // les personnages par-dessus les immeubles
+      renderer.state.buffers.depth.setMask(true); renderer.clearDepth();   // les montgolfières par-dessus les immeubles
       renderer.render(scene,camera);
-      if(busy) map.triggerRepaint();
     }});
 };
 })();

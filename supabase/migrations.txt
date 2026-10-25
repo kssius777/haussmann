@@ -41,3 +41,4 @@ migration_charge.sql
 migration_depart.sql
 migration_de.sql
 migration_course.sql
+migration_salon.sql

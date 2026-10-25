@@ -11,6 +11,7 @@ const TABS = ["map", "booster", "assets", "market", "paris"];
 const cur = () => stack.length ? "detail" : tab;
 
 function go(t) {
+  if (typeof S !== "undefined" && S.on) closeSalon();   // (une page s'ouvre : on quitte le salon)
   if (t === "chat" || !TABS.includes(t)) t = "map";   // (l'ancien onglet « Balade » : le monde est maintenant la carte)
   stack.length = 0; $("#p-detail").hidden = true;
   tab = t; if (t === "assets") assetMort = false; if (t === "market") marketSell = false;
@@ -34,7 +35,7 @@ function renderTab(t) {
   if (t === "paris") renderParis();
   if (t === "map") { renderScore(); renderFilterCounts(); }
 }
-function push(kind, arg) { stack.push({ kind, arg }); renderDetail(true); }
+function push(kind, arg) { if (typeof S !== "undefined" && S.on) closeSalon(); stack.push({ kind, arg }); renderDetail(true); }
 function back() {
   stack.pop(); if (stack.length) return renderDetail(true);
   $("#p-detail").hidden = true; sel = null; setMapFull(); renderTab(tab);
@@ -744,7 +745,7 @@ async function profilePage() {
     ${!pr ? `<div class="box"><b>Vous n'avez pas encore de parti</b><p class="sub" style="margin:4px 0 0">Rejoignez un camp pour toucher +${MEMBER_BONUS} % de loyers dans les arrondissements qu'il tient, et jouer pour l'Hôtel de Ville.</p></div>` : ""}
     ${pr ? `<div class="box" style="border-left:6px solid ${pr.c};display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center">${emblemSVG(p.party, 56)}<div><b style="color:${pr.c};font-size:17px">${esc(pr.n)}</b><div class="motto">« ${esc(pr.motto)} »</div><div class="sub" style="margin:4px 0 0;font-size:13px"><b>Pouvoir :</b> ${esc(pr.power)}</div><p class="sub" style="margin:6px 0 0">Vous protège de : ${esc(shieldText(p.party))}. Dans les arrondissements tenus par votre parti, vos loyers sont à +${MEMBER_BONUS} %.</p></div></div>` : ""}
     <div style="margin-top:10px"><button class="btn block ${pr ? "light" : ""}" data-push="party" ${pr && wait > 0 ? "disabled" : ""}>${!pr ? "Choisir mon parti" : wait > 0 ? `Changer de parti possible dans ${hm(wait)}` : "Changer de parti"}</button></div>
-    <h2 class="h2">Mon personnage</h2>
+    <h2 class="h2">Ma montgolfière</h2>
     <div class="box lkwrap">${lookEditorHTML(lookOf(ME, p.look), p.party)}</div>
     ${ST.admin ? `<h2 class="h2">Admin</h2><button class="btn block" data-push="admin">📊 Tableau de bord</button><button class="btn block light" data-push="gifts" style="margin-top:8px">🎁 Liens cadeaux (giveaway)</button><button class="btn block light" data-push="chatbans" style="margin-top:8px">🚫 Bannis du chat</button>` : ""}
     <h2 class="h2">Réglages</h2>

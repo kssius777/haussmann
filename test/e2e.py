@@ -5,7 +5,7 @@ T = os.path.join(os.path.dirname(__file__), "shots") + "/"; os.makedirs(T, exist
 R = []
 def check(n, ok, info=""): R.append(ok); print(("PASS " if ok else "FAIL ") + n + (f"  · {info}" if info != "" else ""), flush=True)
 async def main():
-    db.sql("truncate profiles, lots, parts, arr_value, arr_state, listings, sales, news, fx, day_event, city_week, pay, walkers, world_people, chance_taken, chat_msg restart identity cascade")
+    db.sql("truncate profiles, lots, parts, arr_value, arr_state, listings, sales, news, fx, day_event, city_week, pay, walkers, world_people, chance_taken, chat_msg, place_people restart identity cascade")
     async with async_playwright() as p:
         b = await p.chromium.launch(args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"])
         pg = await b.new_page(viewport={"width": 400, "height": 820}, device_scale_factor=2)
@@ -70,10 +70,10 @@ async def main():
         db.sql("update walkers set lon=2.3486, lat=48.85203, lon0=2.3486, lat0=48.85203, dur=0, path=null, settled=true where user_id=%s", uid)   # (l'ancien départ : 18 rue de la Bûcherie)
         db.sql("update world_people set lon=2.3486, lat=48.85203, cell=_wcell(2.3486, 48.85203) where user_id=%s", uid)
         await pg.reload(); await W("typeof W !== 'undefined' && W.on && !!meP() && mapReady", 120000)
-        # le dé (21/10/2026, « on peut remettre le dé pour se déplacer ») : au milieu du dock, 10 lancers ; son personnage en 3D
+        # le dé (21/10/2026, « on peut remettre le dé pour se déplacer ») : au milieu du dock, 10 lancers ; sa montgolfière en 3D (25/10/2026)
         await W("W.on && !!meP()", 40000); await E("centerOnMe(false); 1"); await pg.wait_for_timeout(1500); await W("!map.isMoving() && map.areTilesLoaded()", 30000); await pg.wait_for_timeout(1000)
         await pg.screenshot(path=T + "05b_walker.png", timeout=120000)
-        check("Paris : son personnage sur la carte (« Vous »), le dé au milieu avec ses 10 lancers", await E("!!document.querySelector('#b-main .dsvg') && document.querySelector('#rollsn').textContent === '10' && !document.querySelector('.t-chat') && meP().el.style.display !== 'none' && meP().el.textContent.includes('Vous') && (!window.people3d || people3d.count() >= 1)"), await E("document.querySelector('#rollsn').textContent"))
+        check("Paris : sa montgolfière sur la carte (« Vous »), le dé au milieu avec ses 10 lancers", await E("!!document.querySelector('#b-main .dsvg') && document.querySelector('#rollsn').textContent === '10' && !document.querySelector('.t-chat') && meP().el.style.display !== 'none' && meP().el.textContent.includes('Vous') && (!window.people3d || people3d.count() >= 1)"), await E("document.querySelector('#rollsn').textContent"))
         check("la carte en tuiles : immeubles et ponts chargés", await E("map.querySourceFeatures('pv', {sourceLayer: 'b'}).length > 200 && map.querySourceFeatures('pv', {sourceLayer: 'bridges'}).length > 0"), await E("[map.querySourceFeatures('pv', {sourceLayer: 'b'}).length, map.querySourceFeatures('pv', {sourceLayer: 'bridges'}).length]"))
         check("les façades : la carte graphique dessine fenêtres, balcons et étage en zinc (recette acceptée ; tuiles du zoom 15 avec f)",
               await E("(FAC.ok === true || FAC.slow) && map.querySourceFeatures('pv', {sourceLayer: 'b'}).some(f => f.properties.f >= 16 && f.properties.f < 80)"), await E("[FAC.ok, FAC.slow]"))
@@ -82,14 +82,14 @@ async def main():
           const hit = v.some((a, i) => v.some((b, j) => j > i && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top));
           return v.length <= 7 && !hit && monMarks.every(m => !m.on || m.d <= lblReach('mon', map.getZoom())) && spotMarks.every(s => !s.on || s.d <= lblReach('spot', map.getZoom())); })()"""))
         check("en bas : le dé au milieu, « Parler » à côté, les boosters (plus de « Moi » ni de km)", await E("!document.querySelector('#b-say').hidden && !document.querySelector('#b-me') && !document.querySelector('#kmme') && !!document.querySelector('#b-pack')"))
-        # lancer : jusqu'à 4 destinations, une petite flèche de couleur autour de son personnage pour chacune, l'immeuble de la même couleur
+        # lancer : jusqu'à 4 destinations, une petite flèche de couleur autour de sa montgolfière pour chacune, l'immeuble de la même couleur
         await pg.click("#b-main"); await W("W.opts.length > 0", 30000); await pg.wait_for_timeout(1200); await W("!map.isMoving()", 20000)
         dd = await E("""(() => { const m = meP(), s = window.people3d?.screen(m.id), p = map.project([m.lon, m.lat]), cx = s ? s.hx : p.x, cy = s ? (s.hy + s.fy) / 2 : p.y;
           const chips = [...document.querySelectorAll('#dchips .dchip')];
           return { n: W.opts.length, chips: chips.length, die: W.die, left: document.querySelector('#rollsn').textContent, kinds: W.opts.map(o => o.k[1]),
             dst: W.opts.every(o => map.getFeatureState({ id: o.card, source: 'pv', sourceLayer: 'b' }).dst > 0),
             near: chips.every(c => { const r = c.getBoundingClientRect(), q = map.getContainer().getBoundingClientRect(); return Math.hypot(r.left - q.left + r.width / 2 - p.x, r.top - q.top + r.height / 2 - p.y) < 190; }) }; })()""")
-        check("lancer le dé : 3 ou 4 destinations, une petite flèche de couleur autour de son personnage pour chacune, l'immeuble de la même couleur, un lancer en moins",
+        check("lancer le dé : 3 ou 4 destinations, une petite flèche de couleur autour de sa montgolfière pour chacune, l'immeuble de la même couleur, un lancer en moins",
               3 <= dd["n"] <= 4 and dd["chips"] == dd["n"] and dd["dst"] and dd["near"] and dd["left"] == "9", dd)
         await pg.screenshot(path=T + "05c_de.png", timeout=120000)
         ob = await E("""(() => { const r = map.getContainer().getBoundingClientRect(), ids = new Set(W.opts.map(o => o.card));
@@ -99,13 +99,15 @@ async def main():
             return [r.left + x, r.top + y]; } return null; })()""")
         if ob: await pg.mouse.click(ob[0], ob[1]); await pg.wait_for_timeout(500)
         check("pendant le choix, toucher un autre immeuble ne fait rien (on choisit une flèche)", ob and await E("W.opts.length > 0 && document.querySelector('#movebar').hidden && !W.run"))
-        # une flèche verte (libre) : son personnage y court, il y tombe, sa case s'ouvre ; libre : on l'achète en glissant
+        # une flèche verte (libre) : sa montgolfière y vole, elle s'y pose, sa case s'ouvre ; libre : on l'achète en glissant
         i = await E("Math.max(0, W.opts.findIndex(o => o.k[0] === 'free'))"); gch = await E(f"W.opts[{i}].card"); free_ok = await E(f"W.opts[{i}].k[0] === 'free'")
+        await E("window.__altMax = 0; window.__altStop = false; (function rec() { const m = meP(); if (m && m.alt > __altMax) __altMax = m.alt; if (!__altStop) requestAnimationFrame(rec); })(); 1")
         await pg.click(f"#dchips .dchip >> nth={i}"); await pg.wait_for_timeout(200)
-        check("toucher une flèche : son personnage y court par les rues (trajet dessiné, 1,2 à 3 s), les flèches s'en vont", await E("!!W.run && !!meP().path && !!map.getSource('wroute') && !document.querySelectorAll('#dchips .dchip').length && W.run.dur >= 1.19 && W.run.dur <= 3.01"))
+        check("toucher une flèche : sa montgolfière y vole tout droit (trajet dessiné, 1,2 à 3 s), les flèches s'en vont", await E("!!W.run && meP().path?.length === 2 && !!map.getSource('wroute') && !document.querySelectorAll('#dchips .dchip').length && W.run.dur >= 1.19 && W.run.dur <= 3.01"))
         await W("!W.run", 60000); await W("!document.querySelector('#movebar').hidden", 15000); await pg.wait_for_timeout(600)
+        check("… en volant, elle monte au-dessus des toits, puis redescend sur l'immeuble", await E("__altStop = true; __altMax > .5 && !meP().alt"), await E("__altMax"))
         cam = await E("(() => ({ on: CAM.on, z: +map.getZoom().toFixed(1), pitch: +map.getPitch().toFixed(0) }))()")
-        check("arrivé : la caméra proche et inclinée sur son personnage (« derrière le perso »)", cam["on"] and cam["z"] >= 16.5 and cam["pitch"] >= 55, cam)
+        check("posée : la caméra proche et inclinée sur sa montgolfière (« derrière le perso »), elle est redescendue", cam["on"] and cam["z"] >= 16.5 and cam["pitch"] >= 55 and await E("!meP().alt"), cam)
         check("il y tombe : sa case s'ouvre, le salaire du lancer est versé", await E(f"ST.state.profile.land === {gch} && panelKind === 'land' && !landView")
               and db.sql("select land from profiles where id=%s", uid)[0][0] == gch and db.sql("select count(*) from ledger where owner=%s and kind='salary' and label='Salaire du lancer'", uid)[0][0] == 1)
         ng = gch
@@ -140,7 +142,7 @@ async def main():
           map.fire('click', { point: pt, lngLat: map.unproject(pt), originalEvent: {}, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } });
           await new Promise(r => setTimeout(r, 900)); const c1 = map.getCenter();
           return { closed: document.querySelector('#movebar').hidden, d: Math.hypot(c1.lng - c0.lng, c1.lat - c0.lat), walk: !!meP().path }; })()""")
-        check("toucher la carte ailleurs ferme la case, sans bouger la carte (ni le personnage)", far["closed"] and far["d"] < 1e-5 and not far["walk"], far)
+        check("toucher la carte ailleurs ferme la case, sans bouger la carte (ni sa montgolfière)", far["closed"] and far["d"] < 1e-5 and not far["walk"], far)
         c0 = await E("map.getCenter().toArray()"); await E(f"push('b',{fg}); 1"); await W("document.querySelector('#p-detail [data-back]')"); await pg.click("#p-detail [data-back]"); await pg.wait_for_timeout(900)
         c1 = await E("map.getCenter().toArray()"); check("retour d'une fiche : la carte reste où elle était", abs(c1[0] - c0[0]) + abs(c1[1] - c0[1]) < 1e-5, (c0, c1))
         db.sql(f"update profiles set land={fg}, cash=cash+1000000"); await E("refreshState().then(()=>1)")
@@ -225,7 +227,7 @@ async def main():
         await pg.click("#t-search"); await pg.mouse.click(200, 450); await pg.wait_for_timeout(200)
         check("la recherche se ferme en touchant ailleurs", await E("document.querySelector('#search').hidden"))
         # Paris, avec les autres (place.js) : les gens autour et leurs bulles, plus de marche libre, le dé (l'immeuble de la couleur
-        # d'une flèche), parler, son personnage, couper le chat, un « ? », le métro sur toutes les lignes, sa position hors de l'écran
+        # d'une flèche), le salon, sa montgolfière, couper le chat, un « ? », le métro sur toutes les lignes, sa position hors de l'écran
         await E("setMovebar(''); closeSearch(); 1")
         me = await E("ME"); mx, my = await E("[meP().lon, meP().lat]")
         ou = str(uuid.uuid4()); db.sql("insert into auth.users(id) values (%s)", ou); db.rpc(ou, "join_game", p_pseudo="Ella" + ou[:4], p_party="rempart")
@@ -234,10 +236,9 @@ async def main():
         db.sql("update world_people set lon=%s, lat=%s, cell=_wcell(%s, %s), seen=now() where user_id=%s", ex, ey, ex, ey, ou)
         await E("centerOnMe(false); 1"); await pg.wait_for_timeout(1500); await W("!map.isMoving()", 20000); await E("W.cellKey = ''; updateCells(); 1")
         await W(f"W.people.has('{ou}') && W.people.get('{ou}').el.style.display !== 'none'", 15000)
-        check("on voit les autres joueurs autour de soi, en 3D avec leur nom", await E(f"W.people.get('{ou}').el.textContent.includes('Ella') && (!window.people3d || people3d.count() >= 2)"))
-        db.rpc(ou, "world_say", p_text="Bienvenue !")
-        await W("[...document.querySelectorAll('#wpl .bub:not([hidden])')].some(b => b.textContent === 'Bienvenue !')", 10000)
-        check("le message d'un autre joueur s'affiche dans une bulle au-dessus de lui", True)
+        check("on voit les autres joueurs autour de soi : leur montgolfière en 3D, avec leur nom", await E(f"W.people.get('{ou}').el.textContent.includes('Ella') && (!window.people3d || people3d.count() >= 2)"))
+        db.rpc(ou, "world_say", p_text="Bienvenue !"); await pg.wait_for_timeout(3500)   # (un site d'avant peut encore en envoyer)
+        check("plus aucun mot sur la carte de Paris (25/10/2026 : on parle au salon)", await E("![...document.querySelectorAll('#wpl .bub:not([hidden])')].length"))
         await pg.screenshot(path=T + "19_monde.png", timeout=120000)
         # toucher un autre joueur : ce qu'il vend et ses biens ; un toucher ouvre la fiche (acheter l'annonce, proposer de racheter)
         eg = db.sql("select id from cards where lk='l' and lots between 2 and 6 and id not in (select card from lots) limit 1")[0][0]
@@ -271,7 +272,7 @@ async def main():
         check("onglet caché : il n'écoute plus personne ; en revenant, il réécoute", q1["q"] and q1["ch"] == 0 and q1["every"] == 20000, q1)
         check("nouvelle version en ligne : le site sait comparer la sienne (rechargement en revenant sur un vieil onglet)",
               await E("fetch('/?nv=1', { cache: 'no-store' }).then(r => r.text()).then(h => !!APP_V && (h.match(/\\/app\\/main\\.js\\?v=([\\w-]+)/) || [])[1] === APP_V)"))
-        # plus de marche libre (21/10/2026) : toucher une rue ne fait pas bouger son personnage
+        # plus de marche libre (21/10/2026) : toucher une rue ne fait pas bouger sa montgolfière
         await E("setMovebar(''); centerOnMe(false); 1"); await pg.wait_for_timeout(1500); await W("!map.isMoving()", 20000)
         tap = await E("""(() => { const m = meP();
           for (let y = 160; y < innerHeight - 270; y += 19) for (let x = 24; x < innerWidth - 24; x += 19) {
@@ -282,13 +283,13 @@ async def main():
             const el = document.elementFromPoint(p.x, p.y); if (!el || el.tagName !== 'CANVAS') continue;
             return { ll, pt: [p.x, p.y] }; } return null; })()""")
         if tap: await pg.mouse.click(tap["pt"][0], tap["pt"][1]); await pg.wait_for_timeout(700)
-        check("plus de marche libre : toucher une rue ne fait pas bouger son personnage", tap and await E("!meP().path && !W.run"), tap)
-        # faire glisser la carte libère la caméra ; un lancer la remet sur son personnage
+        check("plus de marche libre : toucher une rue ne fait pas bouger sa montgolfière", tap and await E("!meP().path && !W.run"), tap)
+        # faire glisser la carte libère la caméra ; un lancer la remet sur sa montgolfière
         gp = await E("(() => { for (let y = 250; y < 520; y += 20) for (let x = 40; x < 360; x += 20) { const el = document.elementFromPoint(x, y); if (el && el.tagName === 'CANVAS') return [x, y]; } return [200, 360]; })()")
         await pg.mouse.move(gp[0], gp[1]); await pg.mouse.down(); await pg.mouse.move(gp[0] + 40, gp[1] + 60, steps=8); await pg.mouse.up(); await pg.wait_for_timeout(500)
         free = await E("CAM.on")
         await pg.click("#b-main"); await W("W.opts.length > 0", 30000); await pg.wait_for_timeout(1200); await W("!map.isMoving()", 20000)
-        check("faire glisser la carte libère la caméra ; un lancer la remet sur son personnage", free is False and await E("CAM.on && document.querySelector('#pawnoff').hidden"))
+        check("faire glisser la carte libère la caméra ; un lancer la remet sur sa montgolfière", free is False and await E("CAM.on && document.querySelector('#pawnoff').hidden"))
         # toucher l'immeuble de la couleur d'une flèche (au lieu de la flèche) : on y va aussi
         hb = await E("""(() => { const r = map.getContainer().getBoundingClientRect();
           for (const o of W.opts) { const c = map.project(o.cen);
@@ -301,35 +302,46 @@ async def main():
         await pg.wait_for_timeout(500)
         check("toucher l'immeuble de la couleur d'une flèche : on y va aussi", await E(f"!!W.run && W.run.g === {hb['g']}"), hb)
         await W("!W.run", 60000); await W("!document.querySelector('#movebar').hidden", 15000); await pg.wait_for_timeout(500); await E("setMovebar(''); 1")
-        # le fil des messages : la pastille sur « Parler » compte le message d'Ella, on le relit en ouvrant
-        check("un message reçu : une pastille sur « Parler »", await E("!document.querySelector('#saynb').hidden && document.querySelector('#saynb').textContent === '1'"), await E("document.querySelector('#saynb').textContent"))
-        # parler : le bouton à côté du dé
-        await pg.click("#b-say"); await W("!document.querySelector('#wsay').hidden")
-        check("« Parler » ouvre le fil des messages : on relit ce qu'Ella a dit", await E("!document.querySelector('#wlog').hidden && document.querySelector('#wlog').innerText.includes('Bienvenue !') && document.querySelector('#saynb').hidden"))
+        # le salon du Champ-de-Mars (25/10/2026) : « Parler » y emmène ; la pastille verte dit combien de joueurs y sont
+        db.sql("delete from chat_msg where user_id=%s and kind='say'", ou)
+        db.rpc(ou, "chat_join", p_lon=2.2975, p_lat=48.8562); await E("salonCount().then(() => 1)")
+        check("« Parler » : une pastille verte, combien de joueurs sont au salon", await E("!document.querySelector('#saynb').hidden && document.querySelector('#saynb').textContent === '1'"), await E("document.querySelector('#saynb').textContent"))
+        await pg.click("#b-say"); await W(f"S.on && S.people.has('{ou}') && S.people.has(ME)", 20000); await pg.wait_for_timeout(1500); await W("!map.isMoving()", 20000)
+        check("« Parler » emmène au salon du Champ-de-Mars : les montgolfières de ceux qui sont là, le jeu s'efface", await E(f"""document.body.classList.contains('insalon') && W.away && document.querySelector('#sln').textContent === '2 joueurs ici'
+          && !!document.querySelector('#spl .wp[data-id="{ou}"]') && getComputedStyle(document.querySelector('#tabs')).display === 'none' && getComputedStyle(document.querySelector('#wpl')).display === 'none'
+          && inStage(S.people.get(ME).lon, S.people.get(ME).lat) && map.getBearing() < -30"""))
+        db.rpc(ou, "chat_say", p_text="Bienvenue !")
+        await W("[...document.querySelectorAll('#spl .bub:not([hidden])')].some(b => b.textContent === 'Bienvenue !')", 10000)
+        check("au salon : le petit mot d'un autre en bulle, et dans le fil", await E("!document.querySelector('#wlog').hidden && document.querySelector('#wlog').innerText.includes('Bienvenue !')"))
         await pg.fill("#wsq", "Salut !"); await pg.press("#wsq", "Enter")
-        await W("[...document.querySelectorAll('#wpl .wp.me .bub:not([hidden])')].some(b => b.textContent === 'Salut !')", 10000)
-        check("« Parler » : son message dans sa bulle, signé par le serveur ; la barre s'en va", db.sql("select data->>'t', user_id::text from chat_msg where kind='say' order by id desc limit 1")[0] == ("Salut !", me)
-              and await E("document.querySelector('#wsay').hidden"))
-        await pg.click("#b-say"); await W("!document.querySelector('#wsay').hidden")
-        check("un message par minute : la barre affiche le temps qui reste", await E("/^Prochain message dans \\d+ s$/.test(document.querySelector('#wsq').placeholder) && document.querySelector('#wsay').classList.contains('wait')"), await E("document.querySelector('#wsq').placeholder"))
-        await pg.press("#wsq", "Escape"); await pg.wait_for_timeout(150); esc = await E("document.querySelector('#wsay').hidden")
-        await E("document.activeElement?.blur?.(); 1"); await pg.keyboard.press("Enter"); await pg.wait_for_timeout(250)
-        check("au clavier : Entrée pour parler, Échap pour fermer", esc and await E("!document.querySelector('#wsay').hidden && document.activeElement.id === 'wsq'"))
-        await E("closeSay(); 1")
-        # son personnage : toucher son nom
+        await W("[...document.querySelectorAll('#spl .wp.me .bub:not([hidden])')].some(b => b.textContent === 'Salut !')", 10000)
+        check("son petit mot : dans sa bulle, signé par le serveur", db.sql("select data->>'t', user_id::text, room from chat_msg where kind='say' order by id desc limit 1")[0][:2] == ("Salut !", me))
+        check("un mot par minute : la barre affiche le temps qui reste", await E("/^Prochain mot dans \\d+ s$/.test(document.querySelector('#wsq').placeholder) && document.querySelector('#wsay').classList.contains('wait')"), await E("document.querySelector('#wsq').placeholder"))
+        await pg.screenshot(path=T + "20_salon.png", timeout=120000)
+        # toucher la pelouse : sa montgolfière y va (le serveur le sait)
+        lp = await E("""(() => { for (const [u, v] of [[.3, .7], [.7, .7], [.5, .85], [.25, .5], [.75, .45]]) { const ll = stageAt(u, v), q = map.project(ll), r = map.getContainer().getBoundingClientRect();
+            const el = document.elementFromPoint(r.left + q.x, r.top + q.y); if (el && el.tagName === 'CANVAS') return { ll, pt: [r.left + q.x, r.top + q.y] }; } return null; })()""")
+        if lp: await pg.mouse.click(lp["pt"][0], lp["pt"][1])
+        await pg.wait_for_timeout(1500)
+        pos = db.sql("select lon, lat from place_people where user_id=%s", me)
+        check("au salon : toucher la pelouse, sa montgolfière y va", lp and pos and abs(pos[0][0] - lp["ll"][0]) < 2e-5 and abs(pos[0][1] - lp["ll"][1]) < 2e-5, (lp, pos))
+        await pg.click("[data-slx]"); await W("!S.on && !map.isMoving()", 20000); await pg.wait_for_timeout(600)
+        check("« ← » : retour dans la partie, là où l'on était (le salon le sait)", await E("!document.body.classList.contains('insalon') && !W.away && meP().vis && getComputedStyle(document.querySelector('#tabs')).display !== 'none' && !document.querySelector('#wsay')")
+              and not db.sql("select 1 from place_people where user_id=%s", me))
+        # sa montgolfière : toucher son nom
         await E("document.querySelector('#wpl .wp.me').click(); 1"); await W("document.querySelector('#plsheet .lked')")
         await pg.click("#plsheet [data-look='t:5']"); await pg.wait_for_timeout(1200)
-        check("toucher son personnage : choisir la couleur de son haut (enregistrée)", db.sql("select look->>'t' from profiles where id=%s", me)[0][0] == "5")
-        await pg.click("#plsheet [data-look='g:1']"); await pg.click("#plsheet [data-look='h:4']"); await pg.wait_for_timeout(1200)
-        check("une femme blonde (enregistré)", db.sql("select look->>'g', look->>'h' from profiles where id=%s", me)[0] == ("1", "4"))
+        check("toucher sa montgolfière : choisir sa couleur (enregistrée)", db.sql("select look->>'t' from profiles where id=%s", me)[0][0] == "5")
+        await pg.click("#plsheet [data-look='a:2']"); await pg.wait_for_timeout(1200)
+        check("… et son motif (enregistré)", db.sql("select look->>'a' from profiles where id=%s", me)[0][0] == "2" and await E("!!document.querySelector(\"#plsheet [data-look='a:2'].on\")"))
         await pg.click("#plsheet .plsx")
-        # couper le chat (profil) : plus de bulles des autres, plus de « Parler »
+        # couper le chat (profil) : plus de « Parler », plus de salon
         await pg.click("#avatar"); await W("document.querySelector('#chatoff')"); await pg.click("#chatoff"); await W("W.chatOff === true", 5000)
         check("profil : couper le chat (plus de « Parler »)", await E("document.querySelector('#b-say').hidden") and db.sql("select chat_off from profiles where id=%s", me)[0][0] is True)
         await pg.click("[data-back]"); await pg.wait_for_timeout(300)
-        db.sql("update world_people set said_at = null, seen = now() where user_id=%s", ou); db.sql("delete from chat_msg where user_id=%s and kind='say'", ou); db.rpc(ou, "world_say", p_text="Tu me lis ?"); await pg.wait_for_timeout(3500)
-        check("chat coupé : les messages des autres ne s'affichent plus", await E("![...document.querySelectorAll('#wpl .bub:not([hidden])')].some(b => b.textContent === 'Tu me lis ?')"))
+        check("chat coupé : plus de salon", await E("openSalon().then(() => !S.on)"))
         await pg.click("#avatar"); await W("document.querySelector('#chatoff')"); await pg.click("#chatoff"); await W("W.chatOff === false", 5000); await pg.click("[data-back]")
+        db.rpc(ou, "chat_leave")
         # un « ? » proposé par le dé (posé par la base, comme si le dé l'avait tiré) : on y tombe, une carte Chance
         await E("setMovebar(''); 1")
         qg = await E("(() => { const m = meP(); let best = null; for (const q of W.q) { const d = mLL([m.lon, m.lat], [q.lon, q.lat]); if (!best || d < best[1]) best = [q.g, d]; } return best && best[0]; })()")
@@ -356,13 +368,13 @@ async def main():
         check("le métro emmène à la station choisie (un ticket), sa case s'ouvre", abs(wk[0] - dx) < 1e-4 and abs(wk[1] - dy) < 1e-4 and await E(f"ST.state.profile.land === {dest}")
               and db.sql("select count(*) from ledger where owner=%s and kind='metro' and card=%s", me, dest)[0][0] == 1, wk)
         await pg.wait_for_timeout(500); await W("!map.isMoving()", 30000); await E("setMovebar(''); 1")
-        # son personnage hors de l'écran : une flèche au bord, qui ramène sur lui
+        # sa montgolfière hors de l'écran : une flèche au bord, qui ramène sur lui
         await E("map.jumpTo({center: [2.30, 48.87], zoom: 15.5}); 1"); await pg.wait_for_timeout(800)
-        check("son personnage hors de l'écran : une flèche au bord, « Vous · … km »", await E("!document.querySelector('#pawnoff').hidden && document.querySelector('#pawnoff').textContent.includes('Vous ·')"))
+        check("sa montgolfière hors de l'écran : une flèche au bord, « Vous · … km »", await E("!document.querySelector('#pawnoff').hidden && document.querySelector('#pawnoff').textContent.includes('Vous ·')"))
         await pg.click("#pawnoff"); await pg.wait_for_timeout(1500); await W("!map.isMoving()", 20000)
-        check("toucher la flèche ramène sur son personnage", await E("document.querySelector('#pawnoff').hidden"))
+        check("toucher la flèche ramène sur sa montgolfière", await E("document.querySelector('#pawnoff').hidden"))
         await pg.click("#avatar"); await W("document.querySelector('#p-detail .lkwrap .lksw.on')")
-        check("profil : « Mon personnage » avec le haut choisi", await E("!!document.querySelector(\"#p-detail .lkwrap [data-look='t:5'].on\")")); await pg.click("[data-back]")
+        check("profil : « Ma montgolfière » avec la couleur choisie", await E("!!document.querySelector(\"#p-detail .lkwrap [data-look='t:5'].on\")")); await pg.click("[data-back]")
         # les lieux (20/10/2026) : la station Châtelet sur la carte, sa case avec ses lignes et le bonus réseau ; la recherche sans accent
         await pg.click("#tabs [data-tab=map]"); await pg.wait_for_timeout(300); await E("setMovebar(''); map.jumpTo({center:[2.347119, 48.85852], zoom:16.2, pitch:40}); 1"); await pg.wait_for_timeout(1500)
         await W("!!document.querySelector(\".smark.k-m[aria-label='Métro Châtelet']\")", 15000)

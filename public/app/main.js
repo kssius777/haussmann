@@ -90,7 +90,7 @@ function showWelcome() {
   R.innerHTML = `<div class="bstage"><div class="rays"></div><div class="welcome">
     <p class="eyebrow" style="color:#9FB4D6">Bienvenue à Paris</p>
     <h2>${esc(p.pseudo)}, Paris est à prendre</h2>
-    <div class="wl"><span>🎲</span><div><b>Lancez le dé</b><p>Choisissez où aller parmi 4 immeubles : votre personnage y court. Libre ? Achetez-le.</p></div></div>
+    <div class="wl"><span>🎲</span><div><b>Lancez le dé</b><p>Choisissez où aller parmi 4 immeubles : votre montgolfière s'y pose. Libre ? Achetez-le.</p></div></div>
     <div class="wl"><span>💶</span><div><b>${fmtE(p.cash)} et ${p.welcome} boosters pour démarrer</b><p>Un booster, c'est 4 biens de Paris au hasard + 1 carte Chance.</p></div></div>
     <div class="wl"><span>🏛️</span><div><b>Devenez maire</b><p>Le plus gros propriétaire d'un arrondissement touche 8 % des loyers des autres.</p></div></div>
     <div class="bbtns"><button class="btn white block" data-w="open">Ouvrir mon premier booster</button><button class="btn glass block" data-w="map">Aller dans Paris d'abord</button></div>

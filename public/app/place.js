@@ -3,87 +3,61 @@
 //  Paris : le jeu (20/10/2026 : tout Paris ; 21/10/2026, choix du propriétaire : « on peut remettre le dé pour se déplacer »,
 //  « 4 destinations au choix », « des flèches minimalistes qui prennent pas trop de place », « on supprime la marche libre »).
 //  · Le bouton du milieu : le dé. Il propose jusqu'à 4 immeubles autour de soi (~100 m par point, un par direction) : une
-//    petite flèche de couleur autour de son personnage pour chacun (rose : on paie le loyer · vert : libre · bleu : chez soi ·
-//    violet : un « ? »), l'immeuble de la même couleur sur la carte. On touche l'un ou l'autre : son personnage y court par
-//    les vraies rues (plan public/data/walk.json, scripts/make_walk.py), et y tombe (salaire, loyer, bonus, carte Chance) ;
+//    petite flèche de couleur autour de sa montgolfière pour chacun (rose : on paie le loyer · vert : libre · bleu : chez soi ·
+//    violet : un « ? »), l'immeuble de la même couleur sur la carte. On touche l'un ou l'autre : sa montgolfière y vole tout
+//    droit (25/10/2026 ; avant : un personnage qui courait par les rues), et y tombe (salaire, loyer, bonus, carte Chance) ;
 //    sa case s'ouvre : libre, on l'achète.
-//  · Le métro depuis une station où l'on est tombé ; les gens autour (par carrés d'environ 500 m) et leurs bulles ; « Parler »
-//    à côté du dé (on peut couper le chat dans le profil).
-//  Serveur : migration_monde_paris.sql, migration_de.sql. Les personnages en 3D : models.js (people3d).
+//  · Le métro depuis une station où l'on est tombé ; les gens autour (par carrés d'environ 500 m), sans un mot : on parle au
+//    salon du Champ-de-Mars (salon.js), « Parler » à côté du dé (on peut couper le chat dans le profil).
+//  Serveur : migration_monde_paris.sql, migration_de.sql. Les montgolfières en 3D : models.js (people3d).
 // =====================================================================
 
-// ---- le personnage ------------------------------------------------------------
-// g genre (0 homme, 1 femme) · s peau · h cheveux · c coupe · t haut (-1 = couleur du parti) · b bas · a accessoire
-const LOOK = {
-  skin: ["#F6D3B5", "#F2C9A0", "#E0AC80", "#C98E62", "#8D5A3B", "#5C3A26"],
-  hair: ["#1A1A1A", "#3B2B20", "#6B4226", "#A0522D", "#E8B84A", "#EFE3C2", "#B4532A", "#9CA3AF"],   // noir, brun, châtain, auburn, blond, platine, roux, gris
-  hairN: ["Noir", "Brun", "Châtain", "Auburn", "Blond", "Platine", "Roux", "Gris"],
-  top: ["#0F172A", "#FFFFFF", "#DC2626", "#F59E0B", "#16A34A", "#2563EB", "#9333EA"],
-  bot: ["#26324A", "#111827", "#3B5B92", "#C8B08A", "#F1F1EE"],
-  cutN: ["Court", "Long", "Chignon", "Bouclé", "Carré", "Rasé"],
-  accN: ["Rien", "Lunettes", "Lunettes de soleil", "Béret", "Casquette"]
+// ---- la montgolfière (25/10/2026, choix du propriétaire ; avant : un personnage) ----------------
+// « Ma montgolfière » garde les champs de look de l'ancien personnage (set_look les veut tous) : t = sa couleur (-1 : celle de
+// son parti ; les 7 couleurs de l'ancien haut, dans le même ordre : chacun garde la sienne), a = son motif (0 fuseaux, 1 unie,
+// 2 ceinture, 3 damier) ; g, s, h, c, b ne servent plus.
+const BAL = {
+  col: ["#0F172A", "#FFFFFF", "#DC2626", "#F59E0B", "#16A34A", "#2563EB", "#9333EA"],
+  colN: ["Noire", "Blanche", "Rouge", "Jaune", "Verte", "Bleue", "Violette"],
+  two: ["#F59E0B", "#2563EB", "#FFFFFF", "#DC2626", "#FFFFFF", "#FFFFFF", "#FDE68A"],   // la 2e couleur de chacune
+  motN: ["Fuseaux", "Unie", "Ceinture", "Damier"]
 };
-const circ = (x, y, r) => `M${x - r} ${y}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0z`;
-const CUTS = [
-  "M7 9.5C7 4.8 10 2.5 14 2.5s7 2.3 7 7c-1.8-1.9-4.2-2.8-7-2.8s-5.2.9-7 2.8z",
-  "M6.6 10.5C6.4 4.9 9.6 2.4 14 2.4s7.6 2.5 7.4 8.1v6.5c-1 .4-1.7.1-2-.6V9.2c-1.8-1.5-3.6-2.1-5.4-2.1S10.4 7.7 8.6 9.2v7.2c-.3.7-1 1-2 .6z",
-  "M7 9.3C7 4.8 10 2.6 14 2.6s7 2.2 7 6.7c-2-1.4-4.4-2.1-7-2.1s-5 .7-7 2.1zM14 .2a2.6 2.6 0 1 1 0 5.2 2.6 2.6 0 0 1 0-5.2z",
-  [[8.6, 6.4, 3.1], [11.8, 3.9, 3.4], [16.2, 3.9, 3.4], [19.4, 6.4, 3.1], [7, 9.6, 2.3], [21, 9.6, 2.3], [14, 3.2, 3]].map(c => circ(...c)).join(""),
-  "M6.6 10.5C6.4 4.9 9.6 2.4 14 2.4s7.6 2.5 7.4 8.1v4.9h-2.3V9.2c-1.8-1.5-3.6-2.1-5.4-2.1S10.4 7.7 8.6 9.2v6.2H6.6z",
-  "M7.2 8.6C7.6 4.9 10.3 3.1 14 3.1s6.4 1.8 6.8 5.5c-1.9-1.1-4.2-1.7-6.8-1.7s-4.9.6-6.8 1.7z"
-];
-// pas encore choisi : un personnage au hasard, toujours le même pour chacun, avec la couleur de son parti
+// pas encore choisie : la couleur de son parti et un motif au hasard, toujours le même pour chacun
 function lookOf(id, look) {
   if (look && look.s != null) return Object.assign({ g: 0, b: 0, a: 0 }, look);
   let h = 7; for (const ch of String(id || "")) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return { g: (h >>> 13) % 2, s: h % 6, h: (h >>> 5) % 6, c: (h >>> 9) % 3, t: -1, b: 0, a: 0 };
+  return { g: (h >>> 13) % 2, s: h % 6, h: (h >>> 5) % 6, c: (h >>> 9) % 3, t: -1, b: 0, a: (h >>> 3) % 4 };
 }
-const topColor = (L, party) => L.t >= 0 ? LOOK.top[L.t] : (PARTIES[party]?.c || "#64748B");
-function accSVG(L, party) {
-  const ink = "#1F2430";
-  if (L.a === 1) return `<g fill="none" stroke="${ink}" stroke-width=".8"><circle cx="11.4" cy="11" r="2.1"/><circle cx="16.6" cy="11" r="2.1"/><path d="M13.5 11h1"/></g>`;
-  if (L.a === 2) return `<g fill="${ink}"><rect x="8.9" y="9.6" width="4.4" height="2.8" rx="1.3"/><rect x="14.7" y="9.6" width="4.4" height="2.8" rx="1.3"/><rect x="13.1" y="10.3" width="1.8" height=".7"/></g>`;
-  if (L.a === 3) return `<g fill="#1F2937"><ellipse cx="13.2" cy="4.4" rx="8.4" ry="2.7" transform="rotate(-8 13.2 4.4)"/><circle cx="13" cy="1.6" r=".9"/></g>`;
-  if (L.a === 4) { const c = topColor(L, party); return `<path d="M7.3 7.8C7.6 4 10.4 2.3 14 2.3s6.4 1.7 6.7 5.5z" fill="${c}" stroke="rgba(15,23,42,.32)" stroke-width=".7"/><path d="M14 7.6h9.3c.7 0 .9.9.3 1.2-1.5.7-5.6.6-9.6.2z" fill="${c}" stroke="rgba(15,23,42,.32)" stroke-width=".6"/>`; }
-  return "";
+// ses couleurs et son motif : pour la 3D (models.js) et l'aperçu (balloonSVG)
+function balloonSpec(L, party) {
+  const t = L.t >= 0 && L.t < BAL.col.length ? L.t : -1;
+  return { c: t >= 0 ? BAL.col[t] : (PARTIES[party]?.c || "#64748B"), d: t >= 0 ? BAL.two[t] : "#FFFFFF", p: ((L.a | 0) % 4 + 4) % 4 };
 }
-function avatarSVG(L, party, h) {
-  L = Object.assign({ g: 0, b: 0, a: 0 }, L);
-  const skin = LOOK.skin[L.s] || LOOK.skin[0], hair = LOOK.hair[L.h] || LOOK.hair[0], top = topColor(L, party), bot = LOOK.bot[L.b] || LOOK.bot[0];
-  const o = 'stroke="rgba(15,23,42,.32)" stroke-width=".7"', f = L.g === 1;
-  // femme : épaules un peu plus fines, une jupe ; homme : un pantalon
-  const legs = f ? `<rect x="10" y="33" width="3.2" height="11" rx="1.6" fill="${skin}"/><rect x="14.8" y="33" width="3.2" height="11" rx="1.6" fill="${skin}"/>`
-    : `<rect x="9" y="31" width="4.4" height="13" rx="2.2" fill="${bot}"/><rect x="14.6" y="31" width="4.4" height="13" rx="2.2" fill="${bot}"/>`;
-  const skirt = f ? `<path d="M7.6 29.5h12.8l2.2 8.3c.1.5-.2.9-.7.9H6.1c-.5 0-.8-.4-.7-.9z" fill="${bot}" ${o}/>` : "";
-  const tx = f ? 7.2 : 6.4, tw = f ? 13.6 : 15.2, ax = f ? 4 : 3.2, ax2 = f ? 20 : 20.6;
-  return `<svg class="pp" width="${Math.round(h * 28 / 48)}" height="${Math.round(h)}" viewBox="0 0 28 48" aria-hidden="true">
-<ellipse cx="14" cy="46" rx="9" ry="2.2" fill="rgba(15,23,42,.2)"/>
-<g class="legs">${legs}<ellipse cx="11" cy="44.3" rx="3" ry="1.5" fill="#fff" ${o}/><ellipse cx="17" cy="44.3" rx="3" ry="1.5" fill="#fff" ${o}/></g>
-<rect x="${ax}" y="18.5" width="4" height="12" rx="2" fill="${top}" ${o}/><rect x="${ax2}" y="18.5" width="4" height="12" rx="2" fill="${top}" ${o}/>
-<circle cx="${ax + 2}" cy="31" r="1.9" fill="${skin}"/><circle cx="${ax2 + 2}" cy="31" r="1.9" fill="${skin}"/>
-${skirt}<rect x="${tx}" y="17" width="${tw}" height="${f ? 14 : 16.5}" rx="5" fill="${top}" ${o}/>
-<rect x="11.5" y="15.2" width="5" height="3.5" rx="1.5" fill="${skin}"/>
-${L.c === 1 || L.c === 4 ? `<path d="${CUTS[L.c]}" fill="${hair}"/>` : ""}<circle cx="14" cy="10" r="7" fill="${skin}" ${o}/>
-<path d="${CUTS[L.c] || CUTS[0]}" fill="${hair}"${L.c === 5 ? ' opacity=".85"' : ""}/>
-<circle cx="11.4" cy="11" r="1" fill="#1F2430"/><circle cx="16.6" cy="11" r="1" fill="#1F2430"/>
-${f ? '<path d="M10.2 9.7l-.7-.6M17.8 9.7l.7-.6" stroke="#1F2430" stroke-width=".6" stroke-linecap="round"/>' : ""}
-<path d="M12 13.9c1.2.9 2.8.9 4 0" fill="none" stroke="#1F2430" stroke-width=".8" stroke-linecap="round"/>${accSVG(L, party)}</svg>`;
+// l'aperçu de face : l'enveloppe et ses fuseaux (des méridiens), la nacelle
+let balN = 0;
+function balloonSVG(s, h) {
+  const id = "bl" + (++balN), M = th => 17 * Math.sin(th * Math.PI / 180);
+  const env = "M20 2C30.4 2 37 9.7 37 19c0 7.9-5.6 12.8-9.7 16.9-.9.9-1.9 2.1-3.3 2.1h-8c-1.4 0-2.4-1.2-3.3-2.1C8.6 31.8 3 26.9 3 19 3 9.7 9.6 2 20 2z";
+  const gore = (a, b) => { const xa = M(a), xb = M(b); return `M20 1A${Math.abs(xa).toFixed(2)} 18 0 0 ${xa >= 0 ? 1 : 0} 20 37A${Math.abs(xb).toFixed(2)} 18 0 0 ${xb >= 0 ? 0 : 1} 20 1z`; };
+  const odd = [1, 3, 5, 7].map(i => gore(-90 + 22.5 * i, -67.5 + 22.5 * i)).join(""), even = [0, 2, 4, 6].map(i => gore(-90 + 22.5 * i, -67.5 + 22.5 * i)).join("");
+  const pat = s.p === 0 ? `<path d="${odd}" fill="${s.d}"/>`
+    : s.p === 2 ? `<rect y="17.4" width="40" height="7" fill="${s.d}"/><rect y="34.7" width="40" height="5" fill="${s.d}"/>`
+    : s.p === 3 ? `<path d="${odd}" fill="${s.d}" clip-path="url(#${id}t)"/><path d="${even}" fill="${s.d}" clip-path="url(#${id}m)"/>` : "";
+  return `<svg class="blsvg" width="${Math.round(h * 40 / 52)}" height="${h}" viewBox="0 0 40 52" aria-hidden="true"><defs><clipPath id="${id}"><path d="${env}"/></clipPath>
+<clipPath id="${id}t"><rect width="40" height="13"/><rect y="25" width="40" height="14"/></clipPath><clipPath id="${id}m"><rect y="13" width="40" height="12"/></clipPath></defs>
+<path d="M16.6 37.4 17.4 43M23.4 37.4 22.6 43" stroke="#4B3621" stroke-width=".9"/>
+<g clip-path="url(#${id})"><path d="${env}" fill="${s.c}"/>${pat}<ellipse cx="14" cy="11" rx="5" ry="6.5" fill="#fff" opacity=".18"/></g>
+<path d="${env}" fill="none" stroke="rgba(15,23,42,.32)" stroke-width=".8"/>
+<rect x="16" y="43" width="8" height="6.5" rx="1.2" fill="#A0703F" stroke="#5B3A1F" stroke-width=".8"/></svg>`;
 }
-// l'éditeur : genre, peau, cheveux, coupe, haut, bas, accessoire (le profil et le chat s'en servent)
+// l'éditeur (le profil, toucher son nom) : la couleur, le motif
 function lookEditorHTML(L, party) {
-  L = lookOf(ME, L);
-  const row = (lbl, k, items) => `<div class="lkrow"><span>${lbl}</span><div>${items.map(([v, inner, title]) => `<button class="lksw${L[k] === v ? " on" : ""}" data-look="${k}:${v}" aria-label="${esc(title)}" title="${esc(title)}">${inner}</button>`).join("")}</div></div>`;
-  const dot = c => `<i style="background:${c}"></i>`, head = (extra) => `<svg viewBox="4 0 20 18" width="26" height="24">${extra}</svg>`;
-  const cuts = CUTS.map((d, i) => [i, head(`${i === 1 || i === 4 ? `<path d="${d}" fill="${LOOK.hair[L.h]}"/>` : ""}<circle cx="14" cy="10" r="7" fill="${LOOK.skin[L.s]}"/><path d="${d}" fill="${LOOK.hair[L.h]}"/>`), LOOK.cutN[i]]);
-  const accs = LOOK.accN.map((n, i) => [i, i ? head(`<circle cx="14" cy="10" r="7" fill="${LOOK.skin[L.s]}"/><path d="${CUTS[L.c]}" fill="${LOOK.hair[L.h]}"/>${accSVG(Object.assign({}, L, { a: i }), party)}`) : "<em>—</em>", n]);
-  return `<div class="lked"><div class="lkprev">${avatarSVG(L, party, 96)}</div><div class="lkrows">
-    ${row("Je suis", "g", [[0, "<em>Un homme</em>", "Un homme"], [1, "<em>Une femme</em>", "Une femme"]])}
-    ${row("Peau", "s", LOOK.skin.map((c, i) => [i, dot(c), "Peau " + (i + 1)]))}
-    ${row("Cheveux", "h", LOOK.hair.map((c, i) => [i, dot(c), LOOK.hairN[i]]))}
-    ${row("Coupe", "c", cuts)}
-    ${row("Haut", "t", [[-1, dot(PARTIES[party]?.c || "#64748B"), "Couleur de mon parti"], ...LOOK.top.map((c, i) => [i, dot(c), "Haut " + (i + 1)])])}
-    ${row(L.g === 1 ? "Jupe" : "Pantalon", "b", LOOK.bot.map((c, i) => [i, dot(c), (L.g === 1 ? "Jupe " : "Pantalon ") + (i + 1)]))}
-    ${row("En plus", "a", accs)}
+  L = lookOf(ME, L); const S = balloonSpec(L, party), cur = k => k === "a" ? S.p : k === "t" ? (L.t >= 0 && L.t < BAL.col.length ? L.t : -1) : L[k];
+  const row = (lbl, k, items, cls) => `<div class="lkrow"><span>${lbl}</span><div>${items.map(([v, inner, title]) => `<button class="lksw${cls ? " " + cls : ""}${cur(k) === v ? " on" : ""}" data-look="${k}:${v}" aria-label="${esc(title)}" title="${esc(title)}">${inner}</button>`).join("")}</div></div>`;
+  const dot = c => `<i style="background:${c}"></i>`;
+  return `<div class="lked"><div class="lkprev">${balloonSVG(S, 104)}</div><div class="lkrows">
+    ${row("Couleur", "t", [[-1, dot(PARTIES[party]?.c || "#64748B"), "Couleur de mon parti"], ...BAL.col.map((c, i) => [i, dot(c), BAL.colN[i]])])}
+    ${row("Motif", "a", BAL.motN.map((n, i) => [i, balloonSVG(Object.assign({}, S, { p: i }), 30), n]), "mot")}
   </div></div>`;
 }
 // un toucher sur une pastille : on change tout de suite, on enregistre juste après
@@ -93,16 +67,14 @@ function lookPick(btn, root) {
   const [k, v] = btn.dataset.look.split(":"); const L = Object.assign({}, lookOf(ME, p.look), { [k]: +v });
   p.look = L; ST.lookLocal = { L, at: Date.now() }; root.innerHTML = lookEditorHTML(L, p.party);
   const me = meP(); if (me) { me.look = L; window.people3d?.look(me.id, spec3d(me)); renderDock(); }
+  if (typeof salonLook === "function") salonLook(L);
   const pv = $("#p-detail .lkwrap"); if (pv && pv !== root) pv.innerHTML = lookEditorHTML(L, p.party);
   clearTimeout(lookSaveT); lookSaveT = setTimeout(() => rpc("set_look", { p_look: L }).catch(e => toast(e.message, "bad")), 500);
 }
 document.addEventListener("click", e => { const b = e.target.closest("[data-look]"); if (b) { const root = b.closest(".lkwrap"); if (root) lookPick(b, root); } });
 
-// les couleurs du personnage en 3D (models.js)
-function spec3d(p) {
-  const L = lookOf(p.id, p.look);
-  return { g: L.g, skin: LOOK.skin[L.s] || LOOK.skin[0], hair: LOOK.hair[L.h] || LOOK.hair[0], cut: L.c, top: topColor(L, p.party), bot: LOOK.bot[L.b] || LOOK.bot[0], acc: L.a };
-}
+// la montgolfière en 3D de quelqu'un (models.js)
+const spec3d = p => balloonSpec(lookOf(p.id, p.look), p.party);
 
 // ---- les distances ------------------------------------------------------------
 const KXP = 111320 * Math.cos(48.856 * Math.PI / 180), KYP = 110574;   // mètres par degré
@@ -234,6 +206,7 @@ const W = { on: false, starting: false, tries: 0, me: null, admin: false, cfg: n
   last: 0, seen: new Set(), feeding: false, raf: 0, G: null, riding: false, q: [], first: true, stepT: 0,
   opts: [], die: 0, rolling: false, run: null, rolls: 0 };   // le dé : les destinations proposées, le lancer en cours, la course en cours
 const meP = () => W.people.get(W.me);
+const FLY_ALT = 1.1;   // de combien la montgolfière monte en volant (unités du dessin de models.js)
 const kmTxt = km => { const k = Math.round(km * 10) / 10; return k.toLocaleString("fr-FR", { minimumFractionDigits: k % 1 ? 1 : 0, maximumFractionDigits: 1 }) + " km"; };
 const distTxt = m => m < 950 ? Math.max(10, Math.round(m / 10) * 10) + " m" : kmTxt(m / 1000);
 const kE = n => { const a = Math.abs(n); return a >= 9.95e5 ? (a / 1e6).toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " M€" : a >= 1e4 ? Math.round(a / 1e3) + " k€" : a >= 1e3 ? (a / 1e3).toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " k€" : Math.round(a) + " €"; };
@@ -254,14 +227,8 @@ function initWorld() {
   const vv = window.visualViewport;
   if (vv) { const f = () => document.body.style.setProperty("--kb", Math.max(0, innerHeight - vv.height - vv.offsetTop) + "px"); vv.addEventListener("resize", f); vv.addEventListener("scroll", f); }
   $("#b-main")?.addEventListener("click", doRoll);
-  $("#b-say")?.addEventListener("click", () => { if (!canSay()) return; const f = $("#wsay"); return f && !f.hidden ? closeSay() : openSay(); });
+  $("#b-say")?.addEventListener("click", () => openSalon());   // « Parler » : le salon du Champ-de-Mars (salon.js)
   $("#pawnoff")?.addEventListener("click", () => centerOnMe(true));
-  // sur ordinateur, comme dans un jeu : Entrée pour parler, Échap pour fermer
-  document.addEventListener("keydown", e => {
-    if (e.key !== "Enter" || e.repeat || e.isComposing || e.altKey || e.ctrlKey || e.metaKey) return;
-    if (e.target.closest?.("input,textarea,select,button,a,[contenteditable]") || !canSay() || cur() !== "map" || document.querySelector("#plsheet, #onb:not([hidden]), #reveal:not([hidden])")) return;
-    e.preventDefault(); openSay();
-  });
   renderDock();
 }
 // la carte est chargée (map.js) : les personnages en 3D, leurs noms, puis on entre dans Paris
@@ -274,6 +241,7 @@ function worldMapReady() {
   map.on("dragstart", e => { if (e.originalEvent) camOff(true); });
   for (const ev of ["rotatestart", "pitchstart"]) map.on(ev, e => { if (e.originalEvent) CAM.userB = true; });
   map.on("moveend", throttle(() => { updateCells(); updateVisible(); }, 450)); map.on("moveend", layoutChips);
+  initSalon();
   worldStart();
 }
 async function worldStart() {
@@ -346,7 +314,7 @@ function camStep(me, now) {
 let cellQ = 0;
 function queueCells(now) { clearTimeout(cellQ); cellQ = setTimeout(updateCells, now ? 0 : 400); }
 function updateCells() {
-  if (!W.on || !map) return;
+  if (!W.on || !map || W.away) return;   // (au salon : on garde les carrés de là où l'on était)
   const out = new Set(), me = meP(); if (me) out.add(cellOf(me.lon, me.lat));
   if (map.getZoom() >= 14.6 && mode === "all") {   // les carrés de ce qu'on regarde : à 350 m au plus du point visé (9 au plus)
     const c = map.getCenter(), R = 350, b = map.getBounds();
@@ -436,16 +404,10 @@ function worldEvent(e) {
     p.mvKey = key; p.mvAt = performance.now();
     if (d.metro) hop(p, d.lon, d.lat); else walkAlong(p, d.path || [[p.lon, p.lat], [d.lon, d.lat]], d.dur);
   }
-  else if (e.k === "say") {
-    if (id !== W.me && p && !W.chatOff) {
-      say(p, d.t);
-      const me = meP();   // le fil : ceux qu'on voit, ou à moins de 250 m (dans une foule, il ne déborde pas)
-      if (p.vis || (me && mLL([me.lon, me.lat], [p.lon, p.lat]) < 250)) logSay(p, d.t);
-    }
-  }
+  // (« say » : plus aucun mot sur la carte de Paris depuis le 25/10/2026, on parle au salon ; un site d'avant peut encore en envoyer)
   else if (e.k === "look") { if (p) { p.look = d.look; window.people3d?.look(p.id, spec3d(p)); } }
   else if (e.k === "leave") removePerson(id);
-  else if (e.k === "kick" && id === W.me) { W.banned = true; renderDock(); closeSay(); toast(d.h ? `Vous êtes banni du chat pour ${d.h} h` : "Vous êtes banni du chat", "bad"); }
+  else if (e.k === "kick" && id === W.me) { W.banned = true; closeSalon(true); renderDock(); toast(d.h ? `Vous êtes banni du chat pour ${d.h} h` : "Vous êtes banni du chat", "bad"); }
 }
 
 // ---- les gens -----------------------------------------------------------------
@@ -468,7 +430,7 @@ function removePerson(id) {
   if (id === W.me) return; const p = W.people.get(id); if (!p) return;
   clearTimeout(p.bt); p.el?.remove(); window.people3d?.remove(id); W.people.delete(id);
 }
-const pose = p => window.people3d?.pose(p.id, p.lon, p.lat, p.head, p.walk, p.vis && !p.gone);
+const pose = p => window.people3d?.pose(p.id, p.lon, p.lat, p.alt || 0, p.vis && !p.gone && !W.away);   // (W.away : on est au salon)
 // qui on montre : soi toujours ; les autres quand on est assez près (au plus 40, les plus proches du centre)
 function updateVisible() {
   if (!map || !W.on) return;
@@ -492,10 +454,10 @@ function followTrip(p, path, dur, el) {   // un trajet déjà commencé depuis e
   if (el >= dur || cum[cum.length - 1] < .5) { const e = pts[pts.length - 1]; p.lon = e[0]; p.lat = e[1]; stopPerson(p); return; }
   setTrip(p, pts, cum, dur, el);
 }
-function setTrip(p, pts, cum, dur, el) { p.path = pts; p.cum = cum; p.seg = 1; p.dur = Math.max(.2, dur); p.t0 = performance.now() - el * 1000; p.walk = true; p.gone = false; startTick(); }
-function stopPerson(p) { p.path = null; p.walk = false; pose(p); }
+function setTrip(p, pts, cum, dur, el) { p.path = pts; p.cum = cum; p.seg = 1; p.dur = Math.max(.2, dur); p.t0 = performance.now() - el * 1000; p.gone = false; startTick(); }
+function stopPerson(p) { p.path = null; p.alt = 0; pose(p); }
 function hop(p, lon, lat) {   // le métro : on disparaît, on réapparaît là-bas
-  p.path = null; p.walk = false; p.gone = true; pose(p); layoutPeople();
+  p.path = null; p.alt = 0; p.gone = true; pose(p); layoutPeople();
   setTimeout(() => { p.lon = lon; p.lat = lat; p.gone = false; pose(p); updateVisible(); }, 1600);
 }
 function startTick() { if (!W.raf) W.raf = requestAnimationFrame(worldTick); }
@@ -504,19 +466,19 @@ function worldTick() {
   const now = performance.now(); let any = false;
   for (const p of W.people.values()) {
     if (!p.path) continue;
-    // il part vite et ralentit en arrivant (la caméra, qui se rapproche pendant ce temps, ne s'emballe pas à la fin)
-    const f = Math.min(1, (now - p.t0) / (p.dur * 1000)), at = (1 - (1 - f) * (1 - f)) * p.cum[p.cum.length - 1];
+    // la montgolfière part en douceur, glisse et ralentit en arrivant ; elle monte puis redescend (FLY_ALT)
+    const f = Math.min(1, (now - p.t0) / (p.dur * 1000)), at = f * f * (3 - 2 * f) * p.cum[p.cum.length - 1];
     let i = p.seg; if (i < 1 || p.cum[i - 1] > at) i = 1; while (i < p.path.length - 1 && p.cum[i] < at) i++; p.seg = i;
     const a = p.path[i - 1], b = p.path[i], k = (at - p.cum[i - 1]) / ((p.cum[i] - p.cum[i - 1]) || 1);
     p.lon = a[0] + (b[0] - a[0]) * k; p.lat = a[1] + (b[1] - a[1]) * k;
     const dx = (b[0] - a[0]) * KXP, dy = (b[1] - a[1]) * KYP; if (dx * dx + dy * dy > .01) p.head = Math.atan2(dx, dy);
-    if (f >= 1) { p.path = null; p.walk = false; pose(p); if (p.id === W.me) arrived(); continue; }
-    p.walk = Math.min(1, 2 * (1 - f)); pose(p); any = true;   // (ses jambes ralentissent avec lui)
+    if (f >= 1) { p.path = null; p.alt = 0; pose(p); if (p.id === W.me) arrived(); continue; }
+    p.alt = FLY_ALT * Math.sin(Math.PI * f); pose(p); any = true;   // (elle monte, puis redescend sur l'immeuble)
     if (p.id === W.me) meStep(now, i);
   }
   if (any) W.raf = requestAnimationFrame(worldTick);
 }
-// pendant qu'on court : le trajet qui reste, la caméra qui suit
+// pendant qu'on vole : le trajet qui reste, la caméra qui suit
 function meStep(now, i) {
   const me = meP(); camStep(me, now);
   if (now - W.stepT > 220) { W.stepT = now; drawRoute(me.path.slice(i), [me.lon, me.lat]); offMe(); }
@@ -527,7 +489,7 @@ function drawLabel(p) {
   const box = $("#wpl"); if (!box) return;
   if (!p.el) { p.el = document.createElement("button"); p.el.className = "wp" + (p.id === W.me ? " me" : ""); p.el.dataset.id = p.id; p.el.innerHTML = '<span class="bub" hidden></span><span class="nm"></span>'; p.el.style.display = "none"; box.appendChild(p.el); }
   p.el.querySelector(".nm").innerHTML = p.id === W.me ? "Vous" : `<i style="background:${PARTIES[p.party]?.c || "#94A3B8"}"></i>${esc(p.pseudo || "?")}`;
-  p.el.setAttribute("aria-label", p.id === W.me ? "Mon personnage" : (p.pseudo || "Joueur"));
+  p.el.setAttribute("aria-label", p.id === W.me ? "Ma montgolfière" : (p.pseudo || "Joueur"));
 }
 // après chaque image de la carte : le nom suit la tête (calculé comme la 3D), la zone à toucher couvre le personnage
 function layoutPeople() {
@@ -535,7 +497,7 @@ function layoutPeople() {
   const z = map.getZoom(), far = z < 13.6, cw = map.getContainer().clientWidth, ch = map.getContainer().clientHeight;
   for (const p of W.people.values()) {
     const el = p.el; if (!el) continue; const me = p.id === W.me;
-    let show = p.vis && !p.gone && (me || z >= 15), x = 0, y = 0, h = 0;
+    let show = p.vis && !p.gone && !W.away && (me || z >= 15), x = 0, y = 0, h = 0;
     if (show) {
       const s = !far ? window.people3d?.screen(p.id) : null;
       if (s) { x = s.hx; y = s.hy; h = Math.max(10, s.fy - s.hy); }
@@ -579,7 +541,7 @@ function clampBubble(p) {
 function offMe() {
   const el = $("#pawnoff"), me = meP(); if (!el || !me || !W.on || !map) return;
   const hide = () => { if (!el.hidden) el.hidden = true; };   // (n'écrire que si ça change : sinon tout le style de la page est recalculé)
-  if ((panelKind === "land" && innerWidth < 900) || me.gone || cur() !== "map" || mode !== "all") return hide();
+  if ((panelKind === "land" && innerWidth < 900) || me.gone || W.away || cur() !== "map" || mode !== "all") return hide();
   const Wd = map.getContainer().clientWidth, H = map.getContainer().clientHeight, pt = map.project([me.lon, me.lat]);
   const top = 110, bot = H - (($(".mapbottom")?.offsetHeight || 80) + 24), left = 30, right = Wd - 30 - (panelKind === "land" && innerWidth >= 900 ? 400 : 0);
   if (pt.x > left && pt.x < right && pt.y > top && pt.y < bot) return hide();
@@ -640,7 +602,7 @@ async function doRoll() {
   if (W.opts.length) return showOpts(true);   // déjà lancé : on revoit les destinations
   const p = ST.state?.profile; if (!p) return;
   if ((p.rolls ?? 0) <= 0 && rollWait() > 1) return buyRollsSheet();   // (le prochain lancer vient d'arriver : le serveur le sait)
-  W.rolling = true; justBought = null; setMovebar(""); closeSheet(); closeSay(); renderDock(); sfx("dice");
+  W.rolling = true; justBought = null; setMovebar(""); closeSheet(); renderDock(); sfx("dice");
   const anim = animDie();
   let r;
   try { r = await rpc("roll"); await anim; }
@@ -732,14 +694,12 @@ function layoutChips() {
     const svg = el.querySelector("svg"); if (svg) svg.style.transform = `rotate(${ang[i].toFixed(3)}rad)`;
   });
 }
-// toucher une flèche, ou l'immeuble de sa couleur : son personnage y court par les rues (1,2 à 3 s), la caméra suit
+// toucher une flèche, ou l'immeuble de sa couleur : sa montgolfière y vole tout droit, au-dessus des toits (1,2 à 3 s), la caméra suit
 async function pickOpt(g) {
   const o = W.opts.find(x => x.card === g), me = meP();
   if (!o || !me || W.run || W.rolling || W.riding) return;
   hideHint();
-  const to = o.cen, plan = W.G ? planW(W.G, [me.lon, me.lat], to, true) : null;
-  let pts = plan ? plan.pts : [[me.lon, me.lat], to];
-  if (mLL(pts[pts.length - 1], to) > 80) pts = fitPath([...pts, to]);   // (le serveur veut finir devant l'immeuble)
+  const pts = [[me.lon, me.lat], o.cen].map(q => [+q[0].toFixed(6), +q[1].toFixed(6)]);
   const cum = pathLen(pts), dur = runDur(cum[cum.length - 1]);
   const from = { lon: me.lon, lat: me.lat };
   clearOpts(g); moving = true;
@@ -765,7 +725,7 @@ async function pickOpt(g) {
     renderDock(); return null;
   });
 }
-// arrivé au bout de sa course : ce qui s'est passé là (salaire, loyer payé, bonus, carte Chance), sa case s'ouvre
+// posée au bout de son vol : ce qui s'est passé là (salaire, loyer payé, bonus, carte Chance), sa case s'ouvre
 async function arrived() {
   const me = meP(), run = W.run; drawRoute(null); offMe();
   if (!run) return;   // (un trajet repris après un rechargement)
@@ -842,7 +802,7 @@ function renderDock() {
   if (b.getAttribute("aria-label") !== al) b.setAttribute("aria-label", al);
   if (left <= 0 && wait <= 0 && p && !W.rsT) W.rsT = setTimeout(() => { W.rsT = 0; refreshState().then(renderDock).catch(() => { }); }, 2000);   // le lancer est revenu
   const s = $("#b-say"); if (s && s.hidden === canSay()) s.hidden = !canSay();
-  sayBadge();
+  salonBadge();
 }
 
 // ---- les « ? » : une carte Chance en tombant dessus (30 % des stations, jardins, places chaque jour, les mêmes pour tous) ------
@@ -903,83 +863,22 @@ async function ride(from, to) {
   justBought = null; landCredit = null; showLand(null, to);
 }
 
-// ---- parler, couper le chat --------------------------------------------------------
-function openSay() {
-  if (!W.on || W.chatOff || W.banned) return;
-  let f = $("#wsay");
-  if (!f) {   // (21/10/2026, « l'onglet du chat prend une ampleur démesurée ») : une seule petite barre, « envoyer » dedans
-    f = document.createElement("form"); f.id = "wsay"; f.autocomplete = "off"; f.hidden = true;
-    f.innerHTML = `<input id="wsq" maxlength="120" placeholder="Dire quelque chose…" enterkeyhint="send" aria-label="Message"><button class="go" aria-label="Envoyer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg></button>`;
-    document.body.appendChild(f);
-    f.addEventListener("submit", e => { e.preventDefault(); sendSay(); });
-    const q = f.querySelector("#wsq");
-    q.addEventListener("keydown", e => { if (e.key === "Escape") { e.preventDefault(); closeSay(); } });
-    // le clavier se ferme ou l'on touche ailleurs sans avoir rien écrit : la barre s'en va (ce qu'on a écrit, lui, reste)
-    q.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== q && !q.value.trim()) closeSay(); }, 180));
-    f.querySelector(".go").addEventListener("pointerdown", e => e.preventDefault());   // (toucher « envoyer » ne ferme pas le clavier)
-  }
-  f.hidden = false; document.body.classList.add("saying"); $("#wsq").focus(); sayHint();
-  W.unread = 0; renderLog();
-}
-function closeSay() { const f = $("#wsay"); if (f) f.hidden = true; document.body.classList.remove("saying"); $("#wsq")?.blur(); clearTimeout(W.sayHT); renderLog(); }
-// le fil des messages (21/10/2026, choix du propriétaire) : ce que les gens autour ont dit, à relire en ouvrant « Parler » ;
-// une pastille sur « Parler » compte ce qu'on n'a pas encore lu
-function logSay(p, t) {
-  if (!p || !t) return;
-  (W.log = W.log || []).push({ id: p.id, who: p.id === W.me ? "Vous" : p.pseudo || "?", party: p.party, t: String(t).slice(0, 120) });
-  if (W.log.length > 40) W.log.splice(0, W.log.length - 40);
-  if (p.id !== W.me && $("#wsay")?.hidden !== false) W.unread = (W.unread || 0) + 1;
-  renderLog();
-}
-function sayBadge() {
-  const open = $("#wsay")?.hidden === false, n = W.unread || 0, nb = $("#saynb");
-  if (nb) { nb.hidden = !n || open || !canSay(); nb.textContent = n > 9 ? "9+" : n; }
-  return open;
-}
-function renderLog() {   // les 5 derniers messages, seulement s'il y en a d'autres que les siens (les siens sont dans sa bulle)
-  const open = sayBadge();
-  let el = $("#wlog"); const items = (W.log || []).slice(-5);
-  if (!open || !items.some(m => m.id !== W.me)) { if (el) el.hidden = true; return; }
-  if (!el) { el = document.createElement("div"); el.id = "wlog"; el.setAttribute("aria-live", "polite"); document.body.appendChild(el); }
-  el.innerHTML = items.map(m => `<p${m.id === W.me ? ' class="me"' : ""}><b>${m.id === W.me ? "" : `<i style="background:${PARTIES[m.party]?.c || "#94A3B8"}"></i>`}${esc(m.who)}</b>${esc(m.t)}</p>`).join("");
-  el.hidden = false; el.scrollTop = el.scrollHeight;
-}
-// un message par minute (21/10/2026, choix du propriétaire : « less is more ») : la barre affiche le temps qui reste
-const sayWait = () => Math.max(0, Math.ceil(((W.saidAt || 0) + 60000 - Date.now()) / 1000));
-function sayHint() {
-  const q = $("#wsq"); if (!q) return; const s = sayWait();
-  q.placeholder = s ? `Prochain message dans ${s} s` : "Dire quelque chose…";
-  $("#wsay")?.classList.toggle("wait", s > 0);
-  clearTimeout(W.sayHT); if (s && $("#wsay")?.hidden === false) W.sayHT = setTimeout(sayHint, 1000);
-}
-async function sendSay() {
-  const q = $("#wsq"), t = (q?.value || "").replace(/\s+/g, " ").trim(); if (!t) return closeSay();
-  if (sayWait()) return toast(`Doucement : un message par minute (encore ${sayWait()} s).`, "bad");   // (le texte reste dans la barre)
-  q.value = "";
-  try { await rpc("world_say", { p_text: t }); W.saidAt = Date.now(); say(meP(), t.slice(0, 120)); logSay(meP(), t); closeSay(); }   // (son message est dans sa bulle : la barre s'en va)
-  catch (e) {
-    const m = e.message || "";
-    if (/Revenez/.test(m)) { q.value = t; return rejoin(); }
-    if (/banni/i.test(m)) { W.banned = true; renderDock(); closeSay(); }
-    if (/Doucement/.test(m)) { q.value = t; const s = +(m.match(/encore (\d+) s/) || [])[1]; if (s) { W.saidAt = Date.now() - (60 - s) * 1000; sayHint(); } }
-    toast(m, "bad");
-  }
-}
-// le profil : « ne plus voir les messages des joueurs » (on ne parle plus non plus)
+// ---- parler : au salon du Champ-de-Mars (salon.js, 25/10/2026) ; couper le chat --------------------
+// le profil : « ne plus voir les messages des joueurs » (plus de « Parler » : plus de salon)
 async function setChatOff(off) {
   try { await rpc("set_chat_off", { p_off: !!off }); } catch (e) { return toast(e.message, "bad"); }
   W.chatOff = !!off; if (ST.state?.profile) ST.state.profile.chat_off = W.chatOff;
-  if (off) { closeSay(); for (const p of W.people.values()) { clearTimeout(p.bt); p.bt = 0; const b = p.el?.querySelector(".bub"); if (b) b.hidden = true; } }
+  if (off) closeSalon();
   renderDock();
 }
 
-// ---- les fenêtres du monde (qui est-ce, mon personnage, payer des km) ---------------------
+// ---- les fenêtres du monde (qui est-ce, ma montgolfière) ---------------------
 // toucher quelqu'un : son nom, son parti et ce qu'il vend, en petites cartes (21/10/2026, demande du propriétaire : « voir ses biens
 // en vente avec des cartes minimalistes, et un accès vers sa boutique ») ; un toucher ouvre la fiche du bien (acheter l'annonce,
 // proposer de racheter) ; « Voir sa boutique » : ses annonces et sa collection (pages.js, playerShopPage). La fenêtre s'ouvre tout de
 // suite, les cartes arrivent juste après.
 function openWho(id) {
-  const p = W.people.get(id); if (!p) return; const pr = PARTIES[p.party];
+  const p = (S.on && S.people.get(id)) || W.people.get(id); if (!p) return; const pr = PARTIES[p.party];
   sheet(`<div class="plwho">${pr ? emblemSVG(p.party, 40) : ""}<div><b>${esc(p.pseudo || "?")}</b><span>${pr ? esc(pr.n) : "Sans parti"}</span></div></div>
     <div class="whcards" id="whc" hidden></div>
     <button class="btn block light whshop" data-push="pshop" data-arg="${esc(id)}">Voir sa boutique</button>
@@ -1001,7 +900,7 @@ function openWho(id) {
 }
 function openLookSheet() {
   const p = ST.state?.profile; if (!p) return;
-  sheet(`<b class="plst">Mon personnage</b><div class="lkwrap">${lookEditorHTML(lookOf(ME, p.look), p.party)}</div>`);
+  sheet(`<b class="plst">Ma montgolfière</b><div class="lkwrap">${lookEditorHTML(lookOf(ME, p.look), p.party)}</div>`);
 }
 function sheet(html, onClick) {
   closeSheet();

@@ -87,11 +87,39 @@ check("fonctions internes interdites aux joueurs", not any(db.sql("select has_fu
       for f in ["_chat_emit(int,uuid,text,jsonb)", "_chat_person(uuid)", "_chat_ban_until(uuid)"]))
 check("rien n'est ouvert aux visiteurs non connectés", not any(db.sql("select has_function_privilege('anon', %s, 'execute')", f)[0][0]
       for f in ["chat_join(float8,float8)", "chat_say(text)", "chat_count()", "set_look(jsonb)", "chat_ban(uuid,int)"]))
-# nettoyage : la base locale redevient comme la vraie (les migrations d'après, dans l'ordre : set_look et chat_ban ont changé
-# depuis, pour Paris ; sinon l'e2e qui suit teste les anciennes), puis on enlève le faux temps réel et les joueurs de test
+# la base locale redevient comme la vraie : les migrations d'après, dans l'ordre (set_look et chat_ban ont changé depuis, pour
+# Paris ; le salon, le 25/10/2026 : migration_salon.sql) ; sinon l'e2e qui suit teste les anciennes
 mig = [l.strip() for l in open("supabase/migrations.txt") if l.strip() and not l.startswith("#")]
 cur = c0.cursor()
 for f in mig[mig.index("migration_chat_look.sql") + 1:]: cur.execute(open("supabase/" + f).read())
-cur.execute("drop schema realtime cascade"); c0.commit()
+c0.commit()
+# le salon du Champ-de-Mars (25/10/2026, « comme avec le Champ-de-Mars, mais en plus vaste, avec un peu plus de capacité »)
+db.sql("truncate place_people, chat_msg"); db.sql("delete from chat_bans where true")
+Cl, Dn = player("Cle", "valeurs"), player("Dan", "poing")
+j = db.rpc(Cl, "chat_join", p_lon=2.2898, p_lat=48.8612)
+me_c = [p for p in j["people"] if p["id"] == str(Cl)][0]
+check("salon : plus vaste, on peut être au-dessus du Trocadéro (avant : le Champ-de-Mars seul)", abs(me_c["lon"] - 2.2898) < 1e-9 and abs(me_c["lat"] - 48.8612) < 1e-9, (me_c["lon"], me_c["lat"]))
+db.rpc(Cl, "chat_move", p_lon=2.2870, p_lat=48.8630)
+check("salon : on s'y déplace jusqu'au bout du Trocadéro", db.sql("select lon, lat from place_people where user_id=%s", str(Cl))[0] == (2.2870, 48.8630))
+db.rpc(Cl, "chat_say", p_text="Bonjour")
+e1 = err(lambda: db.rpc(Cl, "chat_say", p_text="encore")) or ""
+db.rpc(Cl, "chat_leave"); db.rpc(Cl, "chat_join", p_lon=2.2950, p_lat=48.8580)
+e2 = err(lambda: db.rpc(Cl, "chat_say", p_text="encore")) or ""
+check("salon : un mot par minute (avant : un par seconde), même en sortant et en revenant", "un message par minute" in e1 and "un message par minute" in e2, (e1, e2))
+db.sql("update chat_msg set at = now() - interval '61 seconds' where user_id=%s", str(Cl)); db.sql("update place_people set said_at = now() - interval '61 seconds' where user_id=%s", str(Cl))
+db.rpc(Cl, "chat_say", p_text="Une minute plus tard")
+check("salon : une minute plus tard, on peut reparler", db.sql("select data->>'t' from chat_msg where user_id=%s and kind='say' order by id desc limit 1", str(Cl))[0][0] == "Une minute plus tard")
+db.sql("truncate place_people")
+crowd = [player("R%03d" % i) for i in range(100)]
+for u in crowd[:99]: db.sql("insert into place_people(user_id, room, lon, lat) values (%s, 1, 2.298, 48.855)", str(u))
+check("salon : salles de 100 (avant : 80), la 100e personne y entre encore", db.rpc(Dn, "chat_join", p_lon=2.298, p_lat=48.855)["room"] == 1)
+check("salle pleine (100) : on ouvre le Champ-de-Mars 2", db.rpc(Cl, "chat_join", p_lon=2.298, p_lat=48.855)["room"] == 2)
+db.rpc(ADM, "chat_ban", p_user=str(Dn), p_hours=24)
+check("bannir au salon : il en sort tout de suite, sa salle le sait (« kick »)", not db.sql("select 1 from place_people where user_id=%s", str(Dn))
+      and db.sql("select topic, payload->>'k', payload->>'u' from realtime.sent order by at desc limit 1")[0] == ("place:cdm:1", "kick", str(Dn)))
+check("salon : rien n'est ouvert aux visiteurs non connectés", not any(db.sql("select has_function_privilege('anon', %s, 'execute')", f)[0][0] for f in ["chat_join(float8,float8)", "chat_move(float8,float8)", "chat_say(text)", "chat_ban(uuid,int)"]))
+# nettoyage : on enlève le faux temps réel et les joueurs de test
+cur = c0.cursor(); cur.execute("drop schema realtime cascade"); c0.commit()
+db.sql("delete from chat_bans where true")
 db.sql("truncate place_people, chat_msg, chat_bans")
 print(f"\n{sum(R)}/{len(R)} OK")

@@ -2388,3 +2388,20 @@ body.picking .wp.me .nm{display:none}
 #maphint::after{content:"";position:absolute;left:50%;bottom:-6px;margin-left:-6px;border:6px solid transparent;border-top-color:var(--ink);border-bottom:0}
 @media (min-width:900px){#maphint{bottom:126px!important}}
 body.saying #maphint{display:none}
+/* =====================================================================
+   Le salon du Champ-de-Mars (salon.js, 25/10/2026, choix du propriétaire : plus aucun mot sur la carte de Paris) : le jeu
+   s'efface, la pelouse et les montgolfières restent ; en haut « ← Champ-de-Mars · N joueurs ici » (.plh), en bas la barre
+   pour un petit mot (#wsay) et les derniers mots (#wlog). La pastille verte de « Parler » : combien de joueurs au salon.
+   ===================================================================== */
+body.insalon #bar,body.insalon #credbar,body.insalon .maptop,body.insalon #search,body.insalon .mapside,body.insalon #filter,body.insalon .mapbottom,
+body.insalon #pawnoff,body.insalon #tabs,body.insalon #partyleg,body.insalon #maphint,body.insalon #dchips,body.insalon #wpl,body.insalon .lbub,
+body.insalon #coach,body.insalon .mmark,body.insalon .smark,body.insalon .plabel,body.insalon #stripsum{display:none!important}
+#spl{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:3}
+body:not(.insalon) #spl{display:none}
+body.insalon .plhint{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 70px)}
+.plh .plme .blsvg{margin-top:0}
+#spl .wp.hidenm .nm{visibility:hidden}
+#saynb{background:#16A34A}
+.lksw.mot{width:36px;height:42px;border-radius:12px}
+.lkprev .blsvg{display:block}
+@media (min-width:900px){body.insalon #wsay{bottom:24px}body.insalon #wlog{bottom:80px}body.insalon .plhint{top:76px}}
