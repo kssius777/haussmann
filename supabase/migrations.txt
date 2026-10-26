@@ -44,3 +44,4 @@ migration_course.sql
 migration_salon.sql
 migration_salon_7e.sql
 migration_vol.sql
+migration_viseur.sql

@@ -137,8 +137,7 @@ function buildMap(base) {
     mapReady = true; addArrBorders();
     for (const L of ["bd", "rf"]) {
       map.on("click", L, ev => { const f = ev.features[0]; if (!ev.defaultPrevented && f && f.id != null) { ev.preventDefault(); mapTap(ev, f.id); } });
-      map.on("mouseenter", L, () => map.getCanvas().style.cursor = "pointer"); map.on("mouseleave", L, () => map.getCanvas().style.cursor = "");
-    }
+    }   // (le curseur : la main sur les immeubles, la cible sur le sol — aimMove dans place.js)
     if (window.THREE && window.addMonuments) addMonuments(map, IDX.models);
     map.on("click", "mfill", e => { const f = e.features[0]; if (!e.defaultPrevented && f) { e.preventDefault(); mapTap(e, f.id); } });
     map.on("click", e => { if (!e.defaultPrevented) mapTap(e, null); });
@@ -435,6 +434,7 @@ function stripCount(items) {
 }
 function showStrip(kind) {
   const el = $("#strip"); if (!el) return;
+  if (typeof aimClear === "function") aimClear();
   $$("#filter button").forEach(x => x.setAttribute("aria-selected", x.dataset.m === (kind === "all" ? "all" : kind)));
   if (kind === "all" || kind === stripKind) { stripKind = ""; el.hidden = true; el.innerHTML = ""; setStripPins(null); document.body.classList.remove("mymode", "salemode"); stripByArr = null; $("#stripsum") && ($("#stripsum").hidden = true); applyMode(); renderMarks(); $$("#filter button").forEach(x => x.setAttribute("aria-selected", x.dataset.m === "all")); return; }
   stripKind = kind;

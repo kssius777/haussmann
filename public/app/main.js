@@ -114,7 +114,7 @@ window.addEventListener("unhandledrejection", e => { const m = String(e.reason?.
 //  1 toucher un immeuble libre (en vert, tout près) · 1.5 « Y aller » · 2 la case · 3 après l'achat · 3.5 les km et le péage ·
 //  4 les boosters · 5 les mairies · 99 fini
 // =====================================================================
-let tutShown = "", tutMv = -1, tutG = null;
+let tutShown = "", tutMv = -1, tutG = null, tutLL = null, tutCam = "";
 // un point de la carte (un immeuble) où pointer la bulle ; null s'il n'est pas bien visible à l'écran
 function tutPoint(ll) {
   if (!map || !ll) return null;
@@ -124,21 +124,52 @@ function tutPoint(ll) {
   a.style.cssText = `position:fixed;left:${x - 1}px;top:${y - 1}px;width:2px;height:2px;pointer-events:none`;
   return "#tutpt";
 }
-// le premier immeuble à prendre : un immeuble de logements libre, à l'écran, près de sa montgolfière, en vert
+// le premier immeuble à prendre : un immeuble de logements libre, près de sa montgolfière, en vert, et qu'on voit vraiment
+// (26/10/2026 : la bulle montrait un immeuble caché sous sa propre montgolfière et sous son nom ; le joueur touchait là où
+// pointait la flèche et rien ne se passait) ; la flèche pointe un endroit de l'immeuble qu'on touche vraiment (tutLL)
 function tutMark(g) {
   if (tutG === g) return;
   if (tutG != null && mapReady && (!W.run || W.run.g !== tutG)) map.setFeatureState(Object.assign({ id: tutG }, BLD), { dst: 0 });
   tutG = g; if (g != null && mapReady) map.setFeatureState(Object.assign({ id: g }, BLD), { dst: 2 });
 }
+// ce qui cache la carte autour de sa montgolfière : son nom (en HTML) et la montgolfière elle-même (en 3D, dans la toile)
+function tutAvoid(me) {
+  const out = [], c = map.getContainer().getBoundingClientRect(), q = map.project([me.lon, me.lat]), l = me.el?.getBoundingClientRect();
+  if (l && l.width) out.push({ left: l.left - 8, right: l.right + 8, top: l.top - 8, bottom: l.bottom + 8 });
+  const s = window.people3d?.screen(me.id);
+  if (s) { const w = Math.max(40, Math.abs(s.fy - s.hy) * .55); out.push({ left: c.left + Math.min(s.hx, s.fx) - w, right: c.left + Math.max(s.hx, s.fx) + w, top: c.top + Math.min(s.hy, s.fy) - 10, bottom: c.top + Math.max(q.y, s.fy) + 18 }); }
+  else out.push({ left: c.left + q.x - 50, right: c.left + q.x + 50, top: c.top + q.y - 150, bottom: c.top + q.y + 18 });
+  return out;
+}
+// un endroit de l'écran où l'on touche vraiment cet immeuble (pas derrière un autre, un arbre, sa montgolfière ou un repère)
+function tutSpot(g, avoid) {
+  const c = map.getContainer().getBoundingClientRect(), q = map.project(centerOf(g)), lay = ["bd", "rf", "trees"].filter(l => map.getLayer(l)); let best = null;
+  for (let dy = -36; dy <= 36; dy += 9) for (let dx = -36; dx <= 36; dx += 9) {
+    const x = q.x + dx, y = q.y + dy, X = c.left + x, Y = c.top + y;
+    if (X < 40 || X > innerWidth - 40 || Y < 160 || Y > innerHeight - 230) continue;   // (la bulle doit tenir : tutPoint)
+    if (avoid.some(r => X > r.left && X < r.right && Y > r.top && Y < r.bottom)) continue;
+    const f = map.queryRenderedFeatures([x, y], { layers: lay })[0]; if (!f || f.layer.id === "trees" || f.id !== g) continue;
+    if (document.elementFromPoint(X, Y) !== map.getCanvas()) continue;
+    const d = Math.hypot(dx, dy); if (!best || d < best.d) best = { x, y, d };
+  }
+  return best;
+}
 function tutFree() {
   const me = meP(); if (!me || !mapReady || map.isMoving()) return tutG;
-  if (tutG != null && freeOf(tutG) > 0) return tutG;
-  const q = map.project([me.lon, me.lat]); let best = null, bd = Infinity;
-  for (const f of map.queryRenderedFeatures([[q.x - 170, q.y - 260], [q.x + 170, q.y + 40]], { layers: ["bd"] })) {
-    const g = f.id, c = g != null && card(g); if (!c || c.lk !== "l" || freeOf(g) <= 0) continue;
-    const p = map.project(centerOf(g)), d = Math.hypot(p.x - q.x, p.y - q.y); if (d < 45) continue;
-    if (d < bd) { bd = d; best = g; }
+  const z = map.getCenter(), cam = [z.lng.toFixed(6), z.lat.toFixed(6), map.getZoom().toFixed(2), map.getBearing().toFixed(1), map.getPitch().toFixed(1), me.lon.toFixed(6), me.lat.toFixed(6)].join();
+  if (tutG != null && freeOf(tutG) > 0 && cam === tutCam) return tutG;   // (rien n'a bougé : le même)
+  tutCam = cam;
+  const avoid = tutAvoid(me), q = map.project([me.lon, me.lat]);
+  if (tutG != null && freeOf(tutG) > 0) { const s = tutSpot(tutG, avoid); if (s) { tutLL = map.unproject([s.x, s.y]); return tutG; } }
+  const seen = new Set(), cands = [];
+  for (const f of map.queryRenderedFeatures([[q.x - 180, q.y - 330], [q.x + 180, q.y + 60]], { layers: ["bd"] })) {
+    const g = f.id; if (g == null || seen.has(g)) continue; seen.add(g);
+    const c = card(g); if (!c || c.lk !== "l" || freeOf(g) <= 0) continue;
+    const p = map.project(centerOf(g)), d = Math.hypot(p.x - q.x, p.y - q.y); if (d >= 60) cands.push([d, g]);
   }
+  cands.sort((a, b) => a[0] - b[0]);
+  let best = null; tutLL = null;
+  for (const [, g] of cands.slice(0, 8)) { const s = tutSpot(g, avoid); if (s) { best = g; tutLL = map.unproject([s.x, s.y]); break; } }
   tutMark(best); return best;
 }
 function tutGet() { try { return +(localStorage.getItem("hm_tut") || 99); } catch (e) { return 99; } }
@@ -151,10 +182,10 @@ function tutTick() {
   if ((st === 1 || st === 1.5) && caseOpen) return tutSet(2);
   else if (st === 1 && viewOpen) return tutSet(1.5);
   else if (st === 1 && idle && !panelKind) {
-    const g = tutFree(); anchor = g != null ? tutPoint(centerOf(g)) : null;
-    k = "1"; html = "<b>Touchez un immeuble</b>En vert : il est libre, vous pourrez l'acheter.";
+    const g = tutFree(); anchor = g != null && tutLL ? tutPoint(tutLL) : null;
+    k = g != null ? "1" : "1n"; html = g != null ? "<b>Touchez un immeuble</b>En vert : il est libre, vous pourrez l'acheter." : "<b>Touchez un immeuble</b>";
   }
-  else if (st === 1.5 && viewOpen) { k = "1.5"; anchor = "#movebar [data-lgo]"; html = "<b>Volez-y !</b>Chaque km volé vous rapporte 20 000 €."; }
+  else if (st === 1.5 && viewOpen) { k = "1.5"; anchor = "#movebar [data-lgo]"; html = "<b>Volez-y !</b>Chaque km parcouru vous rapporte 20 000 €."; }
   else if (st === 1.5 && !panelKind && idle) return tutSet(1);
   else if (st === 2 && caseOpen) {
     if (justBought) return tutSet(3);
@@ -165,12 +196,19 @@ function tutTick() {
   }
   else if ((st === 2 || st === 2.5) && !panelKind && idle) return tutSet(3.5);
   else if (st === 2.5 && justBought && caseOpen) return tutSet(3);
-  else if (st === 3 && panelKind === "land") { k = "3"; anchor = ".money"; ok = true; html = "<b>Bravo, c'est votre premier bien !</b>Il vous rapporte des loyers en continu, même quand vous n'êtes pas connecté. Touchez votre argent, ici, pour voir tout l'historique."; }
+  else if (st === 3 && panelKind === "land") { k = "3"; anchor = ".money"; ok = true; html = "<b>Bravo, c'est votre premier bien !</b>Chaque jour, la banque vous verse son loyer, même quand vous n'êtes pas connecté. Touchez votre argent pour voir l'historique."; }
   else if (st === 3 && !panelKind && idle) return tutSet(3.5);
   else if (st === 3.5 && idle && !panelKind) {
     if (tutMv < 0) tutMv = W.flights || 0; else if ((W.flights || 0) > tutMv) return tutSet(4);
-    k = "w"; anchor = "#b-main"; ok = true; html = "<b>Vos km</b>500 m de plus toutes les 30 min. Survoler un immeuble rose (à un autre joueur) coûte le loyer de sa carte.";
+    k = "w"; anchor = "#b-main"; ok = true; html = "<b>Vos km se rechargent</b>+500 m toutes les 30 min. Survoler un immeuble rose (à un autre joueur) coûte un péage : vous le voyez avant de partir.";
   }
+  // (26/10/2026 : ces deux bulles avaient sauté avec le passage au vol ; personne n'apprenait qu'on devient maire)
+  else if (st === 4 && (cur() === "booster" || !$("#reveal").hidden)) return tutSet(5);
+  else if (st === 4 && idle && !panelKind) {
+    if (!packsReady()) return tutSet(5);   // (rien à ouvrir pour l'instant : on passe aux mairies)
+    k = "4"; anchor = "#b-pack"; html = "<b>Ouvrez vos boosters</b>Chacun contient 4 vrais biens de Paris et 1 carte Chance. Vous en avez à ouvrir !";
+  }
+  else if (st === 5 && idle && !panelKind) { k = "5"; anchor = null; ok = true; html = "<b>Dernière chose : devenez maire 👑</b>Le plus gros propriétaire d'un arrondissement en devient le maire et touche 8 % des loyers du quartier. Bonne conquête de Paris !"; }
   // affichage de la bulle
   let el = $("#coach");
   if (!k) { if (el) el.remove(); tutShown = ""; return; }

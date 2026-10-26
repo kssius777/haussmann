@@ -292,17 +292,78 @@ async def main():
         db.sql("insert into lots(card,k,owner) values (%s,0,%s)", pk, ou); db.sql("delete from pay where owner=%s", ou)
         await E(f"refreshMap().then(() => ensureCards([{tg[0]}, {pk}])).then(() => {{ paintAll(); worldTapCard({tg[0]}); return 1; }})"); await W("document.querySelector('#movebar [data-lgo]')", 15000)
         check("un immeuble d'un autre joueur est rose sur la carte", await E(f"stateFor({pk}) === 2"))
+        mp = db.sql("select party from profiles where id=%s", me)[0][0]; want = math.floor(prent * (0.5 if mp == "poing" else 1) * 1.5)   # (Ella est d'extrême droite : +50 %)
+        await W("!document.querySelector('#movebar .gtl').hidden", 10000)
+        check("sa case : « Y aller » dit aussi le péage du vol, avant de partir (fly_quote)",
+              await E(f"document.querySelector('#movebar .gtl').textContent === 'Péage −' + fmtE({want})"), await E("document.querySelector('#movebar [data-lgo]').innerText"))
         await pg.click("#movebar [data-lgo]"); await W("!!W.run && !!W.run.res", 20000)
         hits = await E("W.run.hits")
         await W("!W.run", 60000); await pg.wait_for_timeout(300)
         lab = await E("meP().el.querySelector('.nm').textContent")
         await W("!document.querySelector('#movebar').hidden", 15000); await pg.wait_for_timeout(300)
-        mp = db.sql("select party from profiles where id=%s", me)[0][0]; want = math.floor(prent * (0.5 if mp == "poing" else 1) * 1.5)   # (Ella est d'extrême droite : +50 %)
         check("survoler l'immeuble rose d'un autre joueur : le péage = le loyer écrit sur sa carte, compté sur sa montgolfière, une ligne dans sa case, payé à Ella",
               [h[0] for h in hits] == [pk] and hits[0][1] == want and lab == "−" + await E(f"fmtE({want})") and await E(f"(document.querySelector('#movebar .lns')?.textContent || '').includes('Péage') && (document.querySelector('#movebar .lns')?.textContent || '').includes(fmtE({want}))")
               and int(db.sql("select coalesce(sum(amount),0) from pay where owner=%s", ou)[0][0]) == want, (hits, lab, prent, want, mp))
         await pg.screenshot(path=T + "19e_peage.png", timeout=120000)
         await E("setMovebar(''); 1")
+        # viser puis voler (26/10/2026, « on sait pas trop où on peut cliquer » ; « les gens seront sur téléphone ») : au téléphone,
+        # toucher le sol pose une cible, la ligne du vol et « Y aller · N m » (avec le péage) ; « Y aller » : on part
+        await E("W.touchAim = true; centerOnMe(false); 1"); await pg.wait_for_timeout(1200); await W("!map.isMoving()", 20000)
+        tap2 = await E("""(() => { const m = meP();
+          for (let y = 160; y < innerHeight - 270; y += 19) for (let x = 40; x < innerWidth - 40; x += 19) {
+            const q = map.unproject([x, y]), d = mLL([m.lon, m.lat], [q.lng, q.lat]); if (d < 60 || d > 450) continue;
+            if (map.queryRenderedFeatures([x, y]).some(f => /^(bd|rf|mfill|wq-c)$/.test(f.layer.id))) continue;
+            const el = document.elementFromPoint(x, y); if (!el || el.tagName !== 'CANVAS') continue;
+            return { ll: [q.lng, q.lat], pt: [x, y] }; } return null; })()""")
+        await pg.mouse.click(tap2["pt"][0], tap2["pt"][1]); await pg.wait_for_timeout(700)
+        check("au téléphone, toucher le sol : une cible, la ligne du vol et « Y aller · N m », sans partir",
+              await E("AIM.on && !W.run && /^Y aller · [\\d,]+ k?m$/.test(document.querySelector('.aim .ab').textContent) && document.querySelector('#aimln').style.display !== 'none' && !document.querySelector('.aim').classList.contains('hov')"),
+              await E("document.querySelector('.aim')?.innerText"))
+        await pg.screenshot(path=T + "19f_viser.png", timeout=120000)
+        await pg.click(".aim .ab"); await pg.wait_for_timeout(300)
+        check("… « Y aller » : on part, la cible s'en va", await E("!!W.run && !AIM.on && !document.querySelector('.aim')?.isConnected"))
+        await W("!W.run", 60000); await pg.wait_for_timeout(500)
+        # (d'où l'on est maintenant jusqu'à l'immeuble d'Ella : seul son immeuble à un autre joueur sous le trajet)
+        ax3, ay3 = db.sql("select lon, lat from walkers where user_id=%s", me)[0]; px, py = db.sql("select cx / 1e5, cy / 1e5 from cards where id=%s", pk)[0]
+        for t_ in ("lots", "parts"): db.sql(f"delete from {t_} where owner <> %s and card <> %s and card in (select id from cards where _wsegd(cx / 1e5, cy / 1e5, %s, %s, %s, %s) <= 30)", me, pk, ax3, ay3, px, py)
+        db.sql("delete from toll_seen where user_id=%s", me)
+        await E(f"aimAt({px}, {py}, false); 1"); await W("!document.querySelector('.aim .ap').hidden", 10000)
+        check("viser l'immeuble rose : le péage s'affiche au-dessus de « Y aller »", await E(f"document.querySelector('.aim .ap').textContent === 'Péage −' + fmtE({want})"), await E("document.querySelector('.aim').innerText"))
+        db.sql("update profiles set km_free = 0.05, km_at = now(), km_buy = 0 where id=%s", me); await E("refreshState().then(() => 1)")
+        await E(f"aimAt({ax3}, {ay3 + 400 / 110574}, false); 1"); await pg.wait_for_timeout(300)
+        check("trop loin pour ses km : « Il vous reste … » en gris ; le toucher ouvre ses km", await E("AIM.state === 'km' && document.querySelector('.aim').classList.contains('no') && /^Il vous reste \\d+ m$/.test(document.querySelector('.aim .ab').textContent)"), await E("document.querySelector('.aim .ab').textContent"))
+        await pg.click(".aim .ab"); await W("document.querySelector('#plsheet [data-bkm]')", 5000)
+        await E("closeSheet(); aimClear(); W.touchAim = false; 1")
+        db.sql("update profiles set km_free = 5, km_at = now() where id=%s", me); await E("refreshState().then(() => 1)")
+        # à la souris : la cible suit le curseur sur le sol (viseur), la main sur les immeubles ; un clic vole (plus haut)
+        await E("centerOnMe(false); 1"); await pg.wait_for_timeout(1200); await W("!map.isMoving()", 20000)
+        gp2 = await E("""(() => { const m = meP();
+          for (let y = 160; y < innerHeight - 270; y += 19) for (let x = 40; x < innerWidth - 40; x += 19) {
+            const q = map.unproject([x, y]), d = mLL([m.lon, m.lat], [q.lng, q.lat]); if (d < 30 || d > 700) continue;
+            if (map.queryRenderedFeatures([x, y]).some(f => /^(bd|rf|mfill|wq-c)$/.test(f.layer.id))) continue;
+            const el = document.elementFromPoint(x, y); if (!el || el.tagName !== 'CANVAS') continue;
+            return [x, y]; } return null; })()""")
+        await pg.mouse.move(gp2[0], gp2[1]); await pg.mouse.move(gp2[0] + 2, gp2[1] + 1); await pg.wait_for_timeout(500)
+        hv = await E("({ on: AIM.on, hov: AIM.hov, cur: map.getCanvas().style.cursor })")
+        bpt = await E("""(() => { for (let y = 160; y < innerHeight - 270; y += 13) for (let x = 40; x < innerWidth - 40; x += 13) {
+            const f = map.queryRenderedFeatures([x, y], { layers: ['bd'] })[0]; const el = document.elementFromPoint(x, y);
+            if (f && el && el.tagName === 'CANVAS') return [x, y]; } return null; })()""")
+        await pg.mouse.move(bpt[0], bpt[1]); await pg.mouse.move(bpt[0] + 1, bpt[1] + 1); await pg.wait_for_timeout(500)
+        hb = await E("({ on: AIM.on, cur: map.getCanvas().style.cursor })")
+        check("à la souris : un viseur et la cible qui suit sur le sol, la main sur un immeuble", hv["on"] and hv["hov"] and hv["cur"] == "crosshair" and not hb["on"] and hb["cur"] == "pointer", (hv, hb))
+        await pg.mouse.move(5, 5)
+        # le tutoriel (26/10/2026) : la bulle montre un immeuble libre qu'on voit vraiment (pas caché sous sa montgolfière ni sous
+        # son nom : ce jour-là, le joueur touchait là où pointait la flèche et rien ne se passait) ; les boosters et les mairies reviennent
+        await E("aimClear(); setMovebar(''); centerOnMe(false); localStorage.setItem('hm_tut', '1'); tutTick(); 1"); await pg.wait_for_timeout(1500); await W("!map.isMoving()", 20000)
+        await E("tutCam = ''; tutTick(); 1"); await W("!!document.querySelector('#coach') && !!document.querySelector('#tutpt')", 10000)
+        tp = await E("""(() => { const a = document.querySelector('#tutpt').getBoundingClientRect(), x = a.x + 1, y = a.y + 1, f = map.queryRenderedFeatures([x, y], { layers: ['bd', 'rf'] })[0];
+          return { g: tutG, f: f?.id, canvas: document.elementFromPoint(x, y)?.tagName === 'CANVAS', vert: map.getFeatureState({ id: tutG, source: 'pv', sourceLayer: 'b' }).dst === 2, pt: [x, y] }; })()""")
+        await pg.mouse.click(tp["pt"][0], tp["pt"][1]); await pg.wait_for_timeout(800)
+        check("tutoriel : la flèche montre un immeuble libre en vert, qu'on touche vraiment (sa case s'ouvre)", tp["g"] is not None and tp["f"] == tp["g"] and tp["canvas"] and tp["vert"]
+              and await E(f"panelKind === 'land' && landView && sel === {tp['g']}"), tp)
+        await E("setMovebar(''); localStorage.setItem('hm_tut', '5'); tutTick(); 1"); await pg.wait_for_timeout(300)
+        check("tutoriel : la dernière bulle explique les mairies (elle avait sauté)", "devenez maire" in await E("document.querySelector('#coach')?.innerText || ''"))
+        await E("tutSet(99); 1")
         # faire glisser la carte libère la caméra ; le bouton du milieu la remet sur sa montgolfière ; centrée, il montre ses km
         gp = await E("(() => { for (let y = 250; y < 520; y += 20) for (let x = 40; x < 360; x += 20) { const el = document.elementFromPoint(x, y); if (el && el.tagName === 'CANVAS') return [x, y]; } return [200, 360]; })()")
         await pg.mouse.move(gp[0], gp[1]); await pg.mouse.down(); await pg.mouse.move(gp[0] + 40, gp[1] + 60, steps=8); await pg.mouse.up(); await pg.wait_for_timeout(500)

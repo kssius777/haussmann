@@ -240,6 +240,7 @@ function worldMapReady() {
   map.on("dragstart", e => { if (e.originalEvent) camOff(true); });
   for (const ev of ["rotatestart", "pitchstart"]) map.on(ev, e => { if (e.originalEvent) CAM.userB = true; });
   map.on("moveend", throttle(() => { updateCells(); updateVisible(); }, 450));
+  map.on("mousemove", aimMove); map.on("mouseout", () => { aimEv = null; if (AIM.hov) aimClear(); map.getCanvas().style.cursor = ""; });   // (viser à la souris)
   initSalon();
   worldStart();
 }
@@ -594,8 +595,9 @@ async function flyMe(lon, lat, g) {
   const c = W.cfg || {};
   if (lon < (c.w ?? 2.21) || lon > (c.e ?? 2.48) || lat < (c.s ?? 48.805) || lat > (c.n ?? 48.91)) return toast("Restez dans Paris", "bad");
   const L = mLL([me.lon, me.lat], [lon, lat]);
-  if (L < 3 && g == null) return;
+  if (L < 3 && g == null) return aimClear();
   if (L / 1000 > kmLeft() + .0005) return kmSheet(L);
+  aimClear(); if (typeof LIFE !== "undefined") LIFE.bubble?.end();   // (la bulle « Le saviez-vous ? » partait hors de l'écran avec la caméra)
   const pts = [[me.lon, me.lat], [lon, lat]].map(q => [+q[0].toFixed(6), +q[1].toFixed(6)]);
   const cum = pathLen(pts), dur = runDur(L), from = { lon: me.lon, lat: me.lat };
   justBought = null; landCredit = null; setMovebar(""); closeSheet(); moving = true;
@@ -671,23 +673,119 @@ function tollHint(n) {
 }
 // toucher un immeuble, un monument ou le repère d'une station : sa case, avec « Y aller » (là où l'on s'est posé : sa case d'achat)
 function worldTapAt(g) { if (W.run || W.riding) return; worldTapCard(g); }
-// toucher la carte ailleurs : un « ? » du jour sous le doigt, sa case ; sinon, on y vole (assez zoomé pour voir où)
+// toucher la carte ailleurs : un « ? » du jour sous le doigt, sa case ; sinon, au téléphone, on vise (la cible, « Y aller ») ;
+// à l'ordinateur, la cible suivait déjà la souris : un clic, on part
 function worldGround(e) {
   if (!W.on || !e?.lngLat || mode !== "all" || W.run || W.riding || moving) return;
   const p = e.point, box = [[p.x - 12, p.y - 12], [p.x + 12, p.y + 12]];
   if (map.getLayer("wq-c")) { const f = map.queryRenderedFeatures(box, { layers: ["wq-c"] })[0]; if (f) return worldTapCard(+f.properties.g); }
-  if (map.getZoom() < 13.8) { if (!W.zoomHint) { W.zoomHint = true; toast("Zoomez pour choisir où voler"); } return; }   // (une fois : dézoomé, on regarde)
-  flyMe(e.lngLat.lng, e.lngLat.lat, null);
+  hideHint();
+  if (aimHoverDev()) return flyMe(e.lngLat.lng, e.lngLat.lat, null);
+  aimAt(e.lngLat.lng, e.lngLat.lat, false);
 }
 async function worldTapCard(g) {
+  aimClear();
   await ensureCards([g]); if (!card(g)) return;
   hideHint(); justBought = null; landCredit = null; showLand(null, g);
 }
-// « Y aller » sur une case qu'on regarde : la distance (et assez de km ?)
+// « Y aller » sur une case qu'on regarde : la distance, et le péage du vol (ou ce qu'il reste de km) quand le serveur a répondu
 function goBtn(g) {
   const me = meP(), c = card(g) ? centerOf(g) : null; if (!W.on || !me || !c || (typeof S !== "undefined" && S.on)) return "";
   const d = mLL([me.lon, me.lat], c);
-  return `<button class="btn block buy" data-lgo="${g}"><span>Y aller · ${distTxt(d)}</span></button>`;
+  setTimeout(() => goQuote(g), 0);
+  return `<button class="btn block buy" data-lgo="${g}"><span>Y aller · ${distTxt(d)}</span><small class="gtl" data-gtl="${g}" hidden></small></button>`;
+}
+const GQ = new Map();   // les vols déjà demandés au serveur (immeuble et d'où l'on part → réponse), 20 s
+async function goQuote(g) {
+  const me = meP(); if (!me) return;
+  const key = g + ":" + me.lon.toFixed(5) + "," + me.lat.toFixed(5), hit = GQ.get(key);
+  let q = hit && Date.now() - hit.at < 20000 ? hit.q : null;
+  if (!q) {
+    try { q = await rpc("fly_quote", { p_lon: null, p_lat: null, p_card: g }); } catch (e) { return; }   // (serveur d'avant : rien)
+    GQ.set(key, { at: Date.now(), q }); if (GQ.size > 60) GQ.delete(GQ.keys().next().value);
+  }
+  const el = document.querySelector(`[data-gtl="${g}"]`); if (!el || !q) return;
+  const t = q.ok && q.toll > 0 ? `Péage −${fmtE(q.toll)}` : q.why === "km" ? `Il vous reste ${kmShort(+q.km)}` : "";
+  el.hidden = !t; el.textContent = t; el.classList.toggle("km", q.why === "km");
+}
+
+// ---- viser puis voler (26/10/2026, choix du propriétaire : « c'est un peu galère quand on se déplace, car le curseur ne change
+// pas ; on sait pas trop où on peut cliquer ou pas » ; « les gens seront sur téléphone ») -------------------------------------
+// Téléphone : toucher la carte pose une cible (l'endroit exact), la ligne du vol et « Y aller · 350 m », avec « Péage −12 000 € »
+// quand on survolerait les immeubles d'autres joueurs (fly_quote : le serveur compte comme pour le vrai vol) ; toucher « Y aller »
+// (ou la cible) : on part ; trop loin : « Il vous reste 300 m » (ses km). Ordinateur : la même cible suit la souris, la main sur
+// les immeubles, et un clic suffit.
+const AIM = { on: false, lon: 0, lat: 0, mk: null, el: null, ln: null, seq: 0, qT: 0, hov: false, state: "", L: 0 };
+const aimHoverDev = () => !W.touchAim && matchMedia("(hover: hover) and (pointer: fine)").matches;   // (W.touchAim : les tests jouent « au téléphone »)
+const aimCanFly = () => W.on && !W.run && !W.riding && !moving && mode === "all" && cur() === "map" && !(typeof S !== "undefined" && S.on) && !!meP();
+function aimEls() {
+  if (AIM.el || !map) return;
+  const el = document.createElement("div"); el.className = "aim";
+  el.innerHTML = `<span class="ap" hidden></span><button class="ab" type="button"></button><i class="at" aria-hidden="true"></i>`;
+  el.addEventListener("click", e => { e.stopPropagation(); aimGo(); });
+  AIM.el = el; AIM.mk = new maplibregl.Marker({ element: el, anchor: "bottom", offset: [0, 11] }).setLngLat([0, 0]);
+  const sv = document.createElementNS("http://www.w3.org/2000/svg", "svg"); sv.id = "aimln"; sv.setAttribute("aria-hidden", "true");
+  sv.innerHTML = `<line class="c"/><line class="l"/>`; sv.style.display = "none";
+  map.getCanvasContainer().insertBefore(sv, map.getCanvas().nextSibling); AIM.ln = sv;
+  map.on("render", aimLine);
+}
+// la ligne du vol, de sa montgolfière à la cible, au-dessus des toits (dessinée sur l'écran : une ligne droite au sol reste droite)
+function aimLine() {
+  if (!AIM.on || !AIM.ln) return; const me = meP(); if (!me) return;
+  const a = map.project([me.lon, me.lat]), b = map.project([AIM.lon, AIM.lat]);
+  for (const l of AIM.ln.children) { l.setAttribute("x1", a.x.toFixed(1)); l.setAttribute("y1", a.y.toFixed(1)); l.setAttribute("x2", b.x.toFixed(1)); l.setAttribute("y2", b.y.toFixed(1)); }
+  // « Y aller » reste dans l'écran : décalé près des bords, sous la cible tout en haut (sous les barres)
+  const cw = map.getContainer().clientWidth, half = (AIM.w || 140) / 2 + 10;
+  const dx = b.x - half < 0 ? half - b.x : b.x + half > cw ? cw - half - b.x : 0, dn = b.y < 190;
+  if (AIM.dx !== dx) { AIM.dx = dx; AIM.el.style.setProperty("--dx", Math.round(dx) + "px"); }
+  if (AIM.dn !== dn) { AIM.dn = dn; AIM.el.classList.toggle("dn", dn); }
+}
+function aimAt(lon, lat, hover) {
+  if (!map || !meP()) return; aimEls();
+  AIM.on = true; AIM.lon = lon; AIM.lat = lat; AIM.hov = !!hover;
+  AIM.el.classList.toggle("hov", !!hover); AIM.mk.setLngLat([lon, lat]); if (!AIM.mk._map) AIM.mk.addTo(map);
+  AIM.ln.style.display = ""; aimText(null); aimLine();
+  clearTimeout(AIM.qT); const seq = ++AIM.seq;
+  if (AIM.state !== "ok") return;   // (trop loin, hors de Paris : pas besoin du serveur)
+  AIM.qT = setTimeout(async () => {
+    let q = null; try { q = await rpc("fly_quote", { p_lon: +lon.toFixed(6), p_lat: +lat.toFixed(6), p_card: null }); } catch (e) { return; }
+    if (seq === AIM.seq && AIM.on) aimText(q);
+  }, hover ? 260 : 0);   // (à la souris : quand elle s'arrête)
+}
+function aimText(q) {
+  const me = meP(), c = W.cfg || {}; if (!me) return;
+  const L = mLL([me.lon, me.lat], [AIM.lon, AIM.lat]), left = q?.km != null ? +q.km : kmLeft();
+  const out = AIM.lon < (c.w ?? 2.21) || AIM.lon > (c.e ?? 2.48) || AIM.lat < (c.s ?? 48.805) || AIM.lat > (c.n ?? 48.91);
+  const far = q?.why === "far", short = !out && !far && (q ? q.why === "km" : L / 1000 > left + .0005);
+  AIM.state = out ? "out" : far ? "far" : short ? "km" : "ok"; AIM.L = L;
+  const b = AIM.el.querySelector(".ab"), p = AIM.el.querySelector(".ap");
+  const t = out ? "Hors de Paris" : far ? "Trop loin" : short ? `Il vous reste ${kmShort(left)}` : `Y aller · ${distTxt(L)}`;
+  if (b.textContent !== t) b.textContent = t;
+  AIM.el.classList.toggle("no", AIM.state !== "ok");
+  const toll = AIM.state === "ok" && q?.toll > 0 ? q.toll : 0;
+  p.hidden = !toll; if (toll) p.textContent = `Péage −${fmtE(toll)}`;
+  AIM.w = Math.max(b.offsetWidth, toll ? p.offsetWidth : 0); aimLine();
+}
+function aimGo() {
+  if (!AIM.on || AIM.state === "out" || AIM.state === "far") return;
+  if (AIM.state === "km") return kmSheet(AIM.L);
+  flyMe(AIM.lon, AIM.lat, null);
+}
+function aimClear() {
+  if (!AIM.on) return; AIM.on = false; AIM.hov = false; AIM.seq++; clearTimeout(AIM.qT);
+  AIM.mk?.remove(); if (AIM.ln) AIM.ln.style.display = "none";
+}
+// à la souris : la main sur ce qu'on peut ouvrir (immeubles, « ? »), la cible sur le sol où l'on peut voler
+let aimRaf = 0, aimEv = null;
+function aimMove(e) { aimEv = e; if (!aimRaf) aimRaf = requestAnimationFrame(aimHoverNow); }
+function aimHoverNow() {
+  aimRaf = 0; const e = aimEv; if (!e || !map || !mapReady) return;
+  const cv = map.getCanvas(), set = k => { if (cv.style.cursor !== k) cv.style.cursor = k; };
+  if (e.originalEvent?.buttons || (typeof S !== "undefined" && S.on)) { if (AIM.hov) aimClear(); return set(""); }   // (on fait glisser la carte ; au salon : salon.js)
+  const lay = ["bd", "rf", "wq-c"].filter(l => map.getLayer(l));
+  if (map.queryRenderedFeatures(e.point, { layers: lay }).length) { if (AIM.hov) aimClear(); return set("pointer"); }
+  if (aimHoverDev() && aimCanFly() && panelKind !== "land") { set("crosshair"); aimAt(e.lngLat.lng, e.lngLat.lat, true); }
+  else { if (AIM.hov) aimClear(); set(""); }
 }
 // les boutons de la case : là où l'on s'est posé, une station : « Prendre le métro »
 function worldLandBtns(g, view) {
@@ -704,7 +802,7 @@ function moneyPop(n) {   // « +12 000 € » (le salaire) qui monte sous l'arge
 function kmSheet(need) {
   const left = kmLeft(), price = ST.state?.km_price || W.cfg?.kmPrice || 50000, pack = W.cfg?.kmPack || 2, full = kmFree() >= (W.cfg?.kmMax || 5) - .001;
   const head = need ? `Il faut ${distTxt(need)} : il vous reste ${kmShort(left)}` : `${kmShort(left)} pour voler`;
-  sheet(`<b class="plst">${esc(head)}</b><p class="plp">${full ? `${kmTxt(W.cfg?.kmMax || 5)} : c'est le plein` : "+500 m toutes les 30 min"} · 20 000 € par km volé</p>
+  sheet(`<b class="plst">${esc(head)}</b><p class="plp">${full ? `${kmTxt(W.cfg?.kmMax || 5)} : c'est le plein` : "+500 m toutes les 30 min"} · 20 000 € par km parcouru</p>
     <button class="btn block buy" data-bkm ${liveCash() < price ? "disabled" : ""}><span>+${pack} km · ${fmtE(price)}</span></button>`,
     async b => {
       const x = b.closest("[data-bkm]"); if (!x || x.disabled) return; x.disabled = true;

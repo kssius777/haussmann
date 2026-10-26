@@ -12,6 +12,7 @@ const cur = () => stack.length ? "detail" : tab;
 
 function go(t) {
   if (typeof S !== "undefined" && S.on) closeSalon();   // (une page s'ouvre : on quitte le salon)
+  if (typeof aimClear === "function") aimClear();   // (la cible posée sur la carte s'en va)
   if (t === "chat" || !TABS.includes(t)) t = "map";   // (l'ancien onglet « Balade » : le monde est maintenant la carte)
   stack.length = 0; $("#p-detail").hidden = true;
   tab = t; if (t === "assets") assetMort = false; if (t === "market") marketSell = false;

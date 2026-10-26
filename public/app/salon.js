@@ -61,7 +61,7 @@ async function openSalon() {
   if (W.run || W.riding) return toast("Attendez que votre montgolfière soit posée", "bad");
   if (cur() !== "map") go("map");
   if (panelKind) { justBought = null; setMovebar(""); }
-  closeSheet(); if (!$("#search").hidden) closeSearch(); hidePreview();
+  closeSheet(); if (!$("#search").hidden) closeSearch(); hidePreview(); aimClear();
   S.on = true; S.people.clear(); S.seen.clear(); S.last = 0; S.log = [];
   W.away = true; for (const p of W.people.values()) pose(p); layoutPeople();   // les montgolfières de Paris attendent
   document.body.classList.add("insalon"); document.body.classList.remove("picking");   // (« picking » cache le nom « Vous »)

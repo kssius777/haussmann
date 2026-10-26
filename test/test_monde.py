@@ -110,8 +110,14 @@ for t_ in ("lots", "parts"):   # (les autres tests ont pu acheter près du traje
     db.sql(f"delete from {t_} where card in (select id from cards where cx between %s and %s and cy between %s and %s and _wsegd(cx / 1e5, cy / 1e5, %s, %s, %s, %s) <= 30) and card <> all(%s)",
            int(ax * 1e5) - 60, int(bx * 1e5) + 60, int((ay - .0005) * 1e5), int((ay + .0005) * 1e5), ax, ay, bx, by, [g1, g2, g3, g4])
 put(A, ax, ay); db.sql("update profiles set km_free = 5, km_at = now(), km_buy = 0, cash = 10000000, land = null where id=%s", str(A)); db.sql("delete from toll_seen where user_id=%s", str(A))
-r = db.rpc(A, "fly", p_lon=bx, p_lat=by); tl = r["toll"]
 want = math.floor(r1 + r2 * 1.5 + r3 * .5 + r3 * .5 * 1.5)
+# viser puis voler (26/10/2026, « on sait pas trop où on peut cliquer ») : avant de partir, la distance et le péage, sans rien payer
+q = db.rpc(A, "fly_quote", p_lon=bx, p_lat=by)
+check("viser : fly_quote dit la distance et le péage avant de partir, sans rien payer ni bouger",
+      q["ok"] is True and abs(q["len"] - 700) <= 3 and q["n"] == 3 and abs(q["toll"] - want) <= 2 and cash(A) == 10000000
+      and not db.sql("select 1 from toll_seen where user_id=%s", str(A)) and not db.sql("select 1 from pay where owner in (%s, %s)", str(B), str(Cr)), q)
+r = db.rpc(A, "fly", p_lon=bx, p_lat=by); tl = r["toll"]
+check("… et le vol paie exactement ce qui était annoncé", tl["toll"] == q["toll"], (tl["toll"], q["toll"]))
 check("survoler : le loyer écrit sur la carte de chaque immeuble d'un autre joueur (Extrême droite +50 %, partagé, rien sur un bien hypothéqué)",
       abs(tl["toll"] - want) <= 2 and tl["n"] == 3 and [h[0] for h in tl["hits"]] == [g1, g2, g3], (tl, want, (r1, r2, r3)))
 paid = lambda u: float(db.sql("select coalesce(sum(amount),0) from pay where owner=%s", str(u))[0][0])
@@ -129,6 +135,11 @@ done(A); db.rpc(D, "world_join"); put(D, ax, ay); db.sql("update profiles set km
 check("Extrême gauche : moitié prix", abs(db.rpc(D, "fly", p_lon=bx, p_lat=by)["toll"]["toll"] - want * .5) <= 2)
 db.rpc(D, "world_leave")
 db.sql("update profiles set cash = 10000000 where id=%s", str(A))
+put(A, ax, ay); db.sql("update profiles set km_free = 0.1, km_at = now(), km_buy = 0 where id=%s", str(A))
+q = db.rpc(A, "fly_quote", p_lon=bx, p_lat=by)
+check("viser plus loin que ses km : pas d'accord (why = km) et ce qu'il reste", q["ok"] is False and q["why"] == "km" and abs(q["km"] - 0.1) < 0.01, q)
+check("viser hors de Paris : why = paris", db.rpc(A, "fly_quote", p_lon=2.6, p_lat=48.85)["why"] == "paris")
+db.sql("update profiles set km_free = 5, km_at = now() where id=%s", str(A))
 
 # se poser sur un immeuble : sa case ; libre, on l'achète à la banque (seulement là où l'on s'est posé) ; plus de bonus chez soi
 g = db.sql("select id from cards where arr=15 and lk='l' and lots between 3 and 10 and id not in (select card from lots) order by id limit 1")[0][0]
@@ -248,9 +259,9 @@ check("les fonctions internes sont interdites aux joueurs", not any(db.sql("sele
       ("_world_cfg()", "_wsettle(uuid)", "_wpos(walkers)", "_wemit(int,uuid,text,jsonb)", "_wcell(float8,float8)", "_wsal(float8,text)", "_wchance_on(int,int)",
        "_wlayer(uuid)", "_wg(int)", "_wsend(int,int,int,uuid,text,jsonb)", "_wregroup(int,uuid)", "_dice_opts(uuid,float8,float8,float8,int)",
        "_dice_item(uuid,float8,float8,int)", "_land(uuid,int,int,int[])", "_near_or_fail(uuid,int)",
-       "_ftoll(uuid,float8,float8,float8,float8,int)", "_kmfree(profiles)", "km_price(profiles)")))
+       "_ftoll(uuid,float8,float8,float8,float8,int)", "_ftoll_rows(uuid,float8,float8,float8,float8,int)", "_kmfree(profiles)", "km_price(profiles)")))
 check("un visiteur non connecté ne peut rien appeler", not any(db.sql("select has_function_privilege('anon', %s, 'execute')", f)[0][0] for f in
       ("world_join()", "world_move(float8,float8,float8,jsonb,boolean)", "world_arrive(int)", "world_metro(int)", "world_chance(int)", "world_say(text)", "world_stop()", "set_chat_off(boolean)", "world_look(int[])",
-       "roll()", "dice_go(int,jsonb)", "go_to(int)", "buy_rolls()", "fly(float8,float8,int)", "buy_km()")))
+       "roll()", "dice_go(int,jsonb)", "go_to(int)", "buy_rolls()", "fly(float8,float8,int)", "buy_km()", "fly_quote(float8,float8,int)")))
 print(f"\n{sum(R)}/{len(R)} OK")
 sys.exit(0 if all(R) else 1)

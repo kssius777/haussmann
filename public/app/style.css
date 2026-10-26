@@ -2418,3 +2418,27 @@ body.insalon .plhint{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 70px)}
 @keyframes balUp{to{transform:translateY(-3px)}}
 .wp.me.toll .nm{background:#E11D48;font-variant-numeric:tabular-nums}
 .mpop.bad{background:#E11D48;box-shadow:0 4px 12px rgba(225,29,72,.35)}
+/* viser puis voler (26/10/2026, « on sait pas trop où on peut cliquer ») : la cible posée sur la carte, la ligne du vol au-dessus
+   des toits, « Y aller · 350 m » et le péage du vol ; à la souris, la cible suit le curseur et ne prend pas les clics (.hov) */
+#aimln{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+#aimln line{stroke-linecap:round;fill:none}
+#aimln .c{stroke:#fff;stroke-width:7;stroke-opacity:.85}
+#aimln .l{stroke:var(--act,#2563EB);stroke-width:3.5;stroke-dasharray:6 7}
+.aim{display:grid;justify-items:center;gap:6px;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.aim.hov{pointer-events:none}
+.aim .ab{font:800 15px/1 var(--f);color:#fff;background:var(--act,#2563EB);border:0;border-radius:999px;padding:12px 18px;white-space:nowrap;box-shadow:0 0 0 3px #fff,0 6px 16px rgba(37,99,235,.35);animation:aimIn .16s ease-out}
+.aim.no .ab{background:#64748B;box-shadow:0 0 0 3px #fff,0 6px 14px rgba(15,23,42,.25)}
+.aim .ap{font:800 12.5px/1 var(--f);color:#fff;background:#E11D48;border-radius:999px;padding:6px 10px;white-space:nowrap;box-shadow:0 0 0 2.5px #fff,0 3px 8px rgba(225,29,72,.3)}
+.aim .ap[hidden]{display:none}
+.aim .ab,.aim .ap{translate:var(--dx,0) 0}
+.aim.dn .at{order:-1}
+.aim.dn{translate:0 calc(100% - 22px)}
+.aim .at{position:relative;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 0 0 3px var(--act,#2563EB),0 0 0 6px rgba(255,255,255,.9),0 3px 10px rgba(0,0,0,.3)}
+.aim .at::after{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--act,#2563EB)}
+.aim.no .at{box-shadow:0 0 0 3px #64748B,0 0 0 6px rgba(255,255,255,.9),0 3px 10px rgba(0,0,0,.3)}
+.aim.no .at::after{background:#64748B}
+@keyframes aimIn{from{transform:scale(.88);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.aim .ab{animation:none}}
+.btn .gtl{justify-self:center;display:inline-block;margin-top:3px;padding:4px 9px;border-radius:999px;background:#fff;color:#E11D48;font:800 12px/1 var(--f)}
+.btn .gtl.km{color:#475569}
+.btn .gtl[hidden]{display:none}
