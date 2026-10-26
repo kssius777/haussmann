@@ -9,7 +9,7 @@ def err(f):
 c0 = db.conn(); cur = c0.cursor()
 # Paris et le dé : toutes les migrations depuis migration_monde.sql, dans l'ordre, comme Vercel (avant le 22/10/2026, seulement
 # quelques-unes : la base locale gardait d'anciennes versions de _wcell, world_say… et l'e2e ne voyait plus les autres joueurs)
-mig = [l.strip() for l in open("supabase/migrations.txt") if l.strip() and not l.startswith("#")]
+mig = [l.strip() for l in open("supabase/migrations.txt") if l.strip() and not l.startswith("#") and l.strip() != "reset_lancement.sql"]   # (la remise à zéro du lancement n'est pas une version des règles : la rejouer viderait la base de test)
 cur.execute("""create schema if not exists realtime;
   create table if not exists realtime.sent(payload jsonb, event text, topic text, private boolean, at timestamptz default clock_timestamp());
   create or replace function realtime.send(payload jsonb, event text, topic text, private boolean default true) returns void language sql as

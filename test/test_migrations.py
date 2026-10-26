@@ -58,6 +58,9 @@ else:
         fails, slow = [], []
         for n in names:
             try:
+                if n == "reset_lancement.sql":   # (en production, le compte du propriétaire est admin ; sans admin, la remise à zéro s'annule)
+                    cur.execute("insert into auth.users(id) values ('00000000-0000-0000-0000-00000000ad01') on conflict do nothing")
+                    cur.execute("insert into admins(id) values ('00000000-0000-0000-0000-00000000ad01') on conflict do nothing")
                 r, dt = run(n)
                 if dt > 2: slow.append(f"{n} {dt:.1f} s")
             except Exception as e: fails.append(f"{n} : {str(e).splitlines()[0][:160]}"); break

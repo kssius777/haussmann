@@ -89,7 +89,7 @@ check("rien n'est ouvert aux visiteurs non connectés", not any(db.sql("select h
       for f in ["chat_join(float8,float8)", "chat_say(text)", "chat_count()", "set_look(jsonb)", "chat_ban(uuid,int)"]))
 # la base locale redevient comme la vraie : les migrations d'après, dans l'ordre (set_look et chat_ban ont changé depuis, pour
 # Paris ; le salon, le 25/10/2026 : migration_salon.sql) ; sinon l'e2e qui suit teste les anciennes
-mig = [l.strip() for l in open("supabase/migrations.txt") if l.strip() and not l.startswith("#")]
+mig = [l.strip() for l in open("supabase/migrations.txt") if l.strip() and not l.startswith("#") and l.strip() != "reset_lancement.sql"]   # (la remise à zéro du lancement n'est pas une version des règles : la rejouer viderait la base de test)
 cur = c0.cursor()
 for f in mig[mig.index("migration_chat_look.sql") + 1:]: cur.execute(open("supabase/" + f).read())
 c0.commit()

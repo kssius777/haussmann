@@ -10,9 +10,16 @@
 --  propriétaire dit « go » (on l'ajoute alors à la fin de migrations.txt, et on le
 --  retire juste après pour qu'il ne puisse jamais être rejoué).
 -- =====================================================================
+-- garde-fou : sans compte admin, la remise à zéro effacerait aussi le compte du propriétaire (tous les comptes de connexion)
+do $$ begin
+  if not exists (select 1 from admins a join auth.users u on u.id = a.id) then
+    raise exception 'Remise à zéro annulée : aucun compte admin (elle effacerait tous les comptes)';
+  end if;
+end $$;
 truncate lots, parts, arr_value, arr_state, listings, sales, news, fx, day_event, city_week, pay,
          ledger, offers, gifts, stat_day, active_day,
          walkers, world_people, chance_taken, chat_msg, place_people, chat_bans,   -- (Paris à pied : positions, km du jour, « ? », bulles)
-         map_dirty, arr_dirty restart identity cascade;   -- (ce qui a changé sur la carte, pour map_delta)
+         map_dirty, arr_dirty,   -- (ce qui a changé sur la carte, pour map_delta)
+         toll_seen, load_day, world_cells restart identity cascade;   -- (les péages du jour, les pics de joueurs, les groupes des carrés)
 delete from profiles where true;   -- (« where true » : Supabase refuse un DELETE sans WHERE venant de l'API)
 delete from auth.users where id not in (select id from admins);
