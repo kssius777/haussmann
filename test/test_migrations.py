@@ -16,7 +16,7 @@ auto = names[names.index("migration_ping.sql"):]   # appliquées par Vercel (cel
 
 # 1. lecture : un DELETE / UPDATE sans WHERE (« on conflict … do update », « for update », triggers à part)
 bad = []
-for n in auto + ["reset_lancement.sql"]:   # (la remise à zéro passera aussi par l'API le jour du lancement)
+for n in auto + ["reset_lancement.sql"]:   # (une remise à zéro passe aussi par l'API, comme le 26/10/2026)
     s = re.sub(r"--[^\n]*", "", open("supabase/" + n, encoding="utf8").read())
     for m in re.finditer(r"(?is)\b(delete\s+from|update)\s+([a-z_\.]+)\b(.*?);", s):
         if re.search(r"(?i)\bwhere\b", m.group(0)): continue

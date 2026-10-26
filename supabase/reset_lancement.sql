@@ -9,6 +9,8 @@
 --  Ce fichier n'est PAS dans migrations.txt : il ne s'applique que le jour où le
 --  propriétaire dit « go » (on l'ajoute alors à la fin de migrations.txt, et on le
 --  retire juste après pour qu'il ne puisse jamais être rejoué).
+--  Passée en production le 26/10/2026 (14:49 UTC), puis retirée de migrations.txt. `_migrations` la garde
+--  comme passée : pour une autre remise à zéro un jour, copier ce fichier sous un autre nom (reset_2.sql…).
 -- =====================================================================
 -- garde-fou : sans compte admin, la remise à zéro effacerait aussi le compte du propriétaire (tous les comptes de connexion)
 do $$ begin

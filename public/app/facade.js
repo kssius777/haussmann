@@ -56,14 +56,14 @@ vec3 hmFacade(vec3 c,highp vec4 fa,vec2 fw){
     vec3 zc=mix(c,vec3(dot(c,vec3(0.30,0.59,0.11)))*vec3(0.93,0.98,1.06),0.55);   // le zinc, à peine teinté de la couleur de jeu (le toit la garde)
     o=zc*(0.86+0.14*y);
     o=mix(o,zc*1.12,hmIn(dx,0.20,wu)*hmIn(abs(y-0.46),0.40,fy));
-    o=mix(o,zc*vec3(0.27,0.31,0.37)+vec3(0.02,0.03,0.05),hmIn(dx,0.13,wu)*hmIn(abs(y-0.47),0.29,fy));
+    o=mix(o,zc*vec3(0.6,0.66,0.74)+vec3(0.03,0.05,0.09),hmIn(dx,0.13,wu)*hmIn(abs(y-0.47),0.29,fy));
     o=mix(o,zc*0.55,hmIn(z,0.16,fw.y));   // la gouttière
     return mix(c,o,det);
   }
   float R=mo?3.6:(an?3.3:3.8);float C=mo?0.35:0.5;float fh=mo?2.8:(an?2.6:2.75);
   if(H<R+C+2.0)R=max(H-C,2.2);
   float U=max(H-C-R,0.01);float n=max(1.0,floor(U/fh+0.5));float F=U/n;
-  vec3 gz=c*vec3(0.27,0.31,0.37)+vec3(0.02,0.03,0.05);   // les vitres
+  vec3 gz=c*vec3(0.64,0.70,0.78)+vec3(0.03,0.05,0.09);   // les vitres : claires, un peu de ciel (26/10/2026, maquette B : la grille de vitres presque noires faisait « cheap »)
   o=c;
   if(z<R){   // rez-de-chaussée : vitrines, refends, bandeau
     float sh=hmIn(dx,an?0.24:0.38,wu)*hmIn(abs(z-(R-0.8)*0.5),(R-0.8)*0.5,fw.y);
@@ -71,7 +71,7 @@ vec3 hmFacade(vec3 c,highp vec4 fa,vec2 fw){
     o=mix(o,gz*0.9,sh);
   } else if(z<H-C){   // les étages : fenêtres et leurs encadrements, volets (ancien), balcons filants (2e et dernier étage)
     float zf=(z-R)/F;float fz=fw.y/F;float k=floor(zf);float fy=zf-k;
-    float ww=(an?0.30:(st>3.5?0.46:0.40))+(mod(va,4.0)-1.5)*0.02;
+    float ww=(an?0.27:(st>3.5?0.40:0.33))+(mod(va,4.0)-1.5)*0.02;
     bool bk=!mo&&!an&&(k==1.0||(n>3.5&&k==n-1.0));
     float y0=an?0.26:(bk?0.04:0.17);float y1=an?0.80:0.86;float yh=(y1-y0)*0.5;float dy=abs(fy-y0-yh);
     float wi;

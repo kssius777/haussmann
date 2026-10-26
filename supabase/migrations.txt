@@ -45,4 +45,3 @@ migration_salon.sql
 migration_salon_7e.sql
 migration_vol.sql
 migration_viseur.sql
-reset_lancement.sql

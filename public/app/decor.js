@@ -7,10 +7,10 @@
 const SKY = {
   day: {
     mc: { mine: "#2563EB", mineB: "#BFD2FB", theirs: "#F4B4A5", theirsB: "#FCEDE9", sale: "#F5A524", saleB: "#FCE1AE", sel: "#0B0C10", selB: "#9DB4F7",
-          mute: "#F4EEE3", muteR: "#E3DDD2", stone: "#F5E6CB", zinc: "#DDD6CB", zinc2: "#D5CDC0", zinc3: "#E4DED5", rarM: "#B98AE8", rarMB: "#EBDDF9", rarL: "#E2B23A", rarLB: "#F8E7B8",
-          lit: "#DDD6CB", litB: "#F5E6CB", lit2B: "#F5E6CB" },   // toits : un zinc doré, trois nuances (26/10/2026, « tous les toits me semblent énormément gris »)
+          mute: "#F4EEE3", muteR: "#E3DDD2", stone: "#F5E6CB", zinc: "#8E9DB3", zinc2: "#8697AE", zinc3: "#99A7BC", rarM: "#B98AE8", rarMB: "#EBDDF9", rarL: "#E2B23A", rarLB: "#F8E7B8",
+          lit: "#8E9DB3", litB: "#F5E6CB", lit2B: "#F5E6CB" },   // toits : le zinc de Paris, bleu ardoise, trois nuances (26/10/2026, maquette B : « vas-y B » ; le matin même, un zinc doré)
     g: { bg: "#EEE8DC", parks: "#A8D38C", water: "#6DB3E2", major: "#FFFDF8", majorCase: "#DDD3C1", road: "#FFFDF8", arrline: "#FFFFFF",
-         names: "#5B6270", namesHalo: "#FFFFFF", shadow: "#5A4A30", shadowOp: .14, glow: 0,
+         names: "#5B6270", namesHalo: "#FFFFFF", shadow: "#4A3C28", shadowOp: .22, glow: 0,
          light: { anchor: "viewport", color: "#FFF4E0", intensity: .42, position: [1.15, 220, 55] },
          sky: { "sky-color": "#A9CBEF", "horizon-color": "#FFF3E2", "fog-color": "#F2ECE2", "sky-horizon-blend": .55, "horizon-fog-blend": .6, "fog-ground-blend": .8, "atmosphere-blend": 0 } },
     trees: ["#6FB35A", "#5DA04B", "#7FC066", "#4E9445"]
@@ -114,7 +114,7 @@ function buildTrees() {
   const dx = (E - W) * .35, dy = (N - S) * .35, V = [W - dx, S - dy, E + dx, N + dy]; TREES.box = V;
   const ML = 111320 * Math.cos(48.86 * Math.PI / 180), MA = 110540, hit = bb => bb[2] > V[0] && bb[0] < V[2] && bb[3] > V[1] && bb[1] < V[3];
   if (!TREES.water) TREES.water = BASE.water.map(rs => { const r = decodeRing(rs[0]); return { r, bb: ringBox(r) }; });
-  if (!TREES.major) TREES.major = BASE.major.filter(m => m[0] === 3).map(([k, f]) => { const p = decodeRing(f); return { p, bb: ringBox(p) }; });
+  if (!TREES.major) TREES.major = BASE.major.filter(m => m[0] >= 2).map(([k, f]) => { const p = decodeRing(f); return { p, bb: ringBox(p) }; });
   if (typeof inPark === "function") inPark(0, 0);   // prépare la liste des parcs (life.js)
   const parks = (typeof LPARKS !== "undefined" && LPARKS || []).filter(P => hit(P.bb)), waters = TREES.water.filter(w => hit(w.bb));
   const wet = (x, y) => waters.some(w => x > w.bb[0] && x < w.bb[2] && y > w.bb[1] && y < w.bb[3] && inRing(w.r, x, y));
@@ -133,7 +133,7 @@ function buildTrees() {
       tree(x, y, hash2(gx, gy, 4)); if (feats.length > MAX * 2) break;
     }
   }
-  // alignements d'arbres des grands boulevards, des deux côtés, tous les 13 m
+  // alignements d'arbres des grands boulevards et des avenues (26/10/2026, maquette B), des deux côtés, tous les 13 m
   for (const m of TREES.major) {
     if (feats.length > MAX * 2) break; if (!hit(m.bb)) continue;
     let acc = 0; const p = m.p;
