@@ -101,6 +101,12 @@ me_c = [p for p in j["people"] if p["id"] == str(Cl)][0]
 check("salon : plus vaste, on peut être au-dessus du Trocadéro (avant : le Champ-de-Mars seul)", abs(me_c["lon"] - 2.2898) < 1e-9 and abs(me_c["lat"] - 48.8612) < 1e-9, (me_c["lon"], me_c["lat"]))
 db.rpc(Cl, "chat_move", p_lon=2.2870, p_lat=48.8630)
 check("salon : on s'y déplace jusqu'au bout du Trocadéro", db.sql("select lon, lat from place_people where user_id=%s", str(Cl))[0] == (2.2870, 48.8630))
+# tout le 7e (26/10/2026, « le lieu pour parler est trop petit ») : les Invalides, Orsay ; plus loin, on est ramené au bord
+db.rpc(Cl, "chat_move", p_lon=2.3266, p_lat=48.8600)
+check("salon : tout le 7e, jusqu'au musée d'Orsay (avant : la bande du Champ-de-Mars)", db.sql("select lon, lat from place_people where user_id=%s", str(Cl))[0] == (2.3266, 48.8600))
+db.rpc(Cl, "chat_move", p_lon=2.3600, p_lat=48.8800)
+check("salon : plus loin que le 7e, on reste au bord", db.sql("select lon, lat from place_people where user_id=%s", str(Cl))[0] == (2.3340, 48.8655))
+db.rpc(Cl, "chat_move", p_lon=2.2870, p_lat=48.8630)
 db.rpc(Cl, "chat_say", p_text="Bonjour")
 e1 = err(lambda: db.rpc(Cl, "chat_say", p_text="encore")) or ""
 db.rpc(Cl, "chat_leave"); db.rpc(Cl, "chat_join", p_lon=2.2950, p_lat=48.8580)

@@ -37,6 +37,20 @@ function colorExprs(m) {
   return { roof: facRoof(dst("#EC4899", "#16A34A", "#2563EB", "#7C3AED", "#64748B", ["case", ["==", tg, 2], "#A855F7", ["==", tg, 1], "#FACC15", se, MC.sel, [">=", st, 3], MC.mine, ["==", st, 4], MC.sale, ["==", st, 2], MC.theirs, rarR(lit(zv, zl, zl))])),
            body: facBody(dst("#F9A8D4", "#86EFAC", "#93C5FD", "#C4B5FD", "#CBD5E1", ["case", ["==", tg, 2], "#D8B4FE", ["==", tg, 1], "#FDE68A", se, MC.selB, [">=", st, 3], MC.mineB, ["==", st, 4], MC.saleB, ["==", st, 2], MC.theirsB, rarB(lit(MC.stone, MC.litB, MC.lit2B))])) };
 }
+// les limites des arrondissements quand on dézoome (26/10/2026, « que les arrondissements aient l'air un peu plus délimités à
+// partir d'un certain niveau de zoom ») : des tirets ardoise cerclés de blanc, posés le long des limites et dessinés par-dessus
+// les immeubles (un trait au sol serait caché par la ville en 3D) ; ils s'effacent quand on zoome sur sa montgolfière
+function addArrBorders() {
+  if (map.getLayer("arrsym")) return;
+  const c = document.createElement("canvas"); c.width = 28; c.height = 8; const g = c.getContext("2d");
+  const pill = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.fill(); };
+  g.fillStyle = "rgba(255,255,255,.9)"; pill(0, 0, 28, 8, 4); g.fillStyle = "#475569"; pill(2, 2, 24, 4, 2);
+  map.addImage("arrdash", g.getImageData(0, 0, 28, 8), { pixelRatio: 2 });
+  map.addLayer({ id: "arrsym", type: "symbol", source: "arr", maxzoom: 15,
+    layout: { "symbol-placement": "line", "symbol-spacing": 20, "icon-image": "arrdash", "icon-allow-overlap": true, "icon-ignore-placement": true, "icon-rotation-alignment": "map", "icon-pitch-alignment": "map",
+      "icon-size": ["interpolate", ["linear"], ["zoom"], 11, .7, 13, .9, 14, 1] },
+    paint: { "icon-opacity": ["interpolate", ["linear"], ["zoom"], 14, .95, 14.9, 0] } }, map.getLayer("snames") ? "snames" : undefined);
+}
 function partyFill() {
   return ["match", ["coalesce", ["feature-state", "p"], ""], ...PARTY_ORDER.flatMap(k => [k, PARTIES[k].c]), "#FFFFFF"];
 }
@@ -120,7 +134,7 @@ function buildMap(base) {
   const fitMin = () => { const c = map.cameraForBounds([[2.235, 48.818], [2.455, 48.900]], { padding: 8 }); if (c?.zoom) map.setMinZoom(Math.max(10.5, Math.min(12.6, c.zoom - .15))); };
   addEventListener("resize", () => setTimeout(fitMin, 50));
   map.on("load", () => { fitMin();
-    mapReady = true;
+    mapReady = true; addArrBorders();
     for (const L of ["bd", "rf"]) {
       map.on("click", L, ev => { const f = ev.features[0]; if (!ev.defaultPrevented && f && f.id != null) { ev.preventDefault(); mapTap(ev, f.id); } });
       map.on("mouseenter", L, () => map.getCanvas().style.cursor = "pointer"); map.on("mouseleave", L, () => map.getCanvas().style.cursor = "");

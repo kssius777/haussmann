@@ -307,9 +307,9 @@ async def main():
         # le salon du Champ-de-Mars (25/10/2026) : « Parler » y emmène ; la pastille verte dit combien de joueurs y sont
         db.sql("delete from chat_msg where user_id=%s and kind='say'", ou)
         db.rpc(ou, "chat_join", p_lon=2.2975, p_lat=48.8562); await E("salonCount().then(() => 1)")
-        check("« Parler » : une pastille verte, combien de joueurs sont au salon", await E("!document.querySelector('#saynb').hidden && document.querySelector('#saynb').textContent === '1'"), await E("document.querySelector('#saynb').textContent"))
+        check("« Salon » (« Parler » avant le 26/10/2026) : une pastille verte, combien de joueurs y sont", await E("document.querySelector('#b-say small').textContent === 'Salon' && !document.querySelector('#saynb').hidden && document.querySelector('#saynb').textContent === '1'"), await E("document.querySelector('#saynb').textContent"))
         await pg.click("#b-say"); await W(f"S.on && S.people.has('{ou}') && S.people.has(ME)", 20000); await pg.wait_for_timeout(1500); await W("!map.isMoving()", 20000)
-        check("« Parler » emmène au salon du Champ-de-Mars : les montgolfières de ceux qui sont là, le jeu s'efface", await E(f"""document.body.classList.contains('insalon') && W.away && document.querySelector('#sln').textContent === '2 joueurs ici'
+        check("« Salon » emmène au salon : les montgolfières de ceux qui sont là, le jeu s'efface", await E(f"""document.body.classList.contains('insalon') && W.away && document.querySelector('#sln').textContent === '2 joueurs ici' && document.querySelector('#slt').textContent === 'Salon'
           && !!document.querySelector('#spl .wp[data-id="{ou}"]') && getComputedStyle(document.querySelector('#tabs')).display === 'none' && getComputedStyle(document.querySelector('#wpl')).display === 'none'
           && inStage(S.people.get(ME).lon, S.people.get(ME).lat) && map.getBearing() < -30"""))
         db.rpc(ou, "chat_say", p_text="Bienvenue !")
@@ -327,9 +327,15 @@ async def main():
         await pg.wait_for_timeout(1500)
         pos = db.sql("select lon, lat from place_people where user_id=%s", me)
         check("au salon : toucher la pelouse, sa montgolfière y va", lp and pos and abs(pos[0][0] - lp["ll"][0]) < 2e-5 and abs(pos[0][1] - lp["ll"][1]) < 2e-5, (lp, pos))
+        check("le salon : tout le 7e et le Trocadéro (Orsay, les Invalides, le parvis) ; plus loin, on s'arrête au bord", await E("""inStage(2.3266, 48.8600) && inStage(2.3126, 48.8551) && inStage(2.2870, 48.8628) && !inStage(2.3212, 48.8656) && !inStage(2.2800, 48.8500)
+          && (c => inStage(c[0], c[1]))(stageClamp(2.3212, 48.8656, [2.2945, 48.8584])) && (c => inStage(c[0], c[1]))(stageClamp(2.2700, 48.8400))"""))
         await pg.click("[data-slx]"); await W("!S.on && !map.isMoving()", 20000); await pg.wait_for_timeout(600)
         check("« ← » : retour dans la partie, là où l'on était (le salon le sait)", await E("!document.body.classList.contains('insalon') && !W.away && meP().vis && getComputedStyle(document.querySelector('#tabs')).display !== 'none' && !document.querySelector('#wsay')")
               and not db.sql("select 1 from place_people where user_id=%s", me))
+        # dézoomé (26/10/2026) : « Vous » en petite montgolfière (plus un point bleu comme ses biens) ; les limites des arrondissements
+        await E("camOff(); map.jumpTo({ center: [meP().lon, meP().lat], zoom: 12.6, pitch: 0 }); 1"); await pg.wait_for_timeout(800); await W("!map.isMoving()", 20000)
+        check("dézoomé : « Vous » en petite montgolfière, les arrondissements délimités", await E("(() => { const e = document.querySelector('#wpl .wp.me'); return e.classList.contains('dot') && getComputedStyle(e.querySelector('.bl')).display === 'block' && !!e.querySelector('.bl svg') && !!map.getLayer('arrsym') && map.hasImage('arrdash'); })()"))
+        await E("centerOnMe(false); 1"); await pg.wait_for_timeout(800); await W("!map.isMoving()", 20000)
         # sa montgolfière : toucher son nom
         await E("document.querySelector('#wpl .wp.me').click(); 1"); await W("document.querySelector('#plsheet .lked')")
         await pg.click("#plsheet [data-look='t:5']"); await pg.wait_for_timeout(1200)

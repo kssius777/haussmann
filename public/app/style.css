@@ -2320,6 +2320,11 @@ body.picking .wp.me .nm{display:none}
 .wp.me .nm{background:var(--act);color:#fff;padding:2px 9px}
 .wp.dot{width:18px;height:18px;margin:-9px 0 0 -9px}
 .wp.dot::after{content:"";position:absolute;inset:2px;border-radius:50%;background:var(--act);border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+/* dézoomé, « Vous » : sa montgolfière en petit (ses biens restent des points bleus), son ombre bleue au sol */
+.wp .bl{display:none}
+.wp.me.dot{width:30px;height:40px;margin:-38px 0 0 -15px}
+.wp.me.dot::after{inset:auto auto 0 50%;width:14px;height:5px;margin-left:-7px;border:0;border-radius:50%;background:rgba(37,99,235,.5);box-shadow:none}
+.wp.me.dot .bl{display:block;position:absolute;left:50%;bottom:4px;transform:translateX(-50%);line-height:0;filter:drop-shadow(0 2px 2px rgba(15,23,42,.35))}
 .wp .bub{--dx:0px;position:absolute;left:50%;bottom:calc(100% + 27px);transform:translateX(calc(-50% + var(--dx)));width:max-content;max-width:170px;padding:6px 10px;border-radius:12px;background:#fff;box-shadow:0 3px 12px rgba(15,23,42,.24);font:600 12.5px/1.3 var(--f);color:#0B0C10;text-align:left;white-space:normal;overflow-wrap:anywhere}
 .wp .bub::after{content:"";position:absolute;left:calc(50% - var(--dx));bottom:-5px;margin-left:-5px;border:5px solid transparent;border-top-color:#fff;border-bottom:0}
 .wp .bub[hidden]{display:none}
@@ -2395,7 +2400,7 @@ body.saying #maphint{display:none}
    ===================================================================== */
 body.insalon #bar,body.insalon #credbar,body.insalon .maptop,body.insalon #search,body.insalon .mapside,body.insalon #filter,body.insalon .mapbottom,
 body.insalon #pawnoff,body.insalon #tabs,body.insalon #partyleg,body.insalon #maphint,body.insalon #dchips,body.insalon #wpl,body.insalon .lbub,
-body.insalon #coach,body.insalon .mmark,body.insalon .smark,body.insalon .plabel,body.insalon #stripsum{display:none!important}
+body.insalon #coach,body.insalon .mmark,body.insalon .smark,body.insalon .plabel,body.insalon .amark,body.insalon #stripsum{display:none!important}
 #spl{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:3}
 body:not(.insalon) #spl{display:none}
 body.insalon .plhint{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 70px)}

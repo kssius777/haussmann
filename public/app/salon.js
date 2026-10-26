@@ -1,28 +1,35 @@
 "use strict";
 // =====================================================================
-//  Le salon du Champ-de-Mars (25/10/2026, choix du propriétaire : « si tout le monde voit la map de Paris avec des mots partout,
-//  ça va être n'importe quoi » ; « un salon chat comme avec le Champ-de-Mars, mais en plus vaste, avec un peu plus de capacité »).
-//  Sur la carte de Paris, plus aucun mot. « Parler » emmène au salon : le ciel du Trocadéro à l'École militaire, par-dessus la
-//  Seine et le Champ-de-Mars (avant, le 20/10 : le Champ-de-Mars seul), les montgolfières de ceux qui sont là (salles de 100,
-//  avant 80), leurs petits mots en bulle (un par minute, 120 caractères) et les 5 derniers au-dessus de la barre. On arrive
-//  autour de la tour Eiffel ; on fait glisser et on zoome (sans tourner ni pencher) ; toucher la carte : sa montgolfière y va.
-//  « ← » ramène là où l'on était dans la partie. La pastille verte sur « Parler » : combien de joueurs sont au salon.
+//  Le salon (25/10/2026, choix du propriétaire : « si tout le monde voit la map de Paris avec des mots partout, ça va être
+//  n'importe quoi » ; « un salon chat comme avec le Champ-de-Mars, mais en plus vaste, avec un peu plus de capacité »).
+//  Sur la carte de Paris, plus aucun mot. Le bouton « Salon » (« Parler » jusqu'au 26/10/2026) y emmène : le ciel de tout le
+//  7e arrondissement et du Trocadéro (26/10/2026, « le lieu pour parler est trop petit » ; avant : du Trocadéro à l'École
+//  militaire ; le 20/10 : le Champ-de-Mars seul), les montgolfières de ceux qui sont là (salles de 100, avant 80), leurs petits
+//  mots en bulle (un par minute, 120 caractères) et les 5 derniers au-dessus de la barre. On arrive autour de la tour Eiffel ;
+//  on fait glisser et on zoome (sans tourner ni pencher) ; toucher la carte : sa montgolfière y va.
+//  « ← » ramène là où l'on était dans la partie. La pastille verte sur « Salon » : combien de joueurs y sont.
 //  Serveur : migration_chat.sql (chat_join, chat_move, chat_say, chat_feed, chat_people, chat_ping, chat_leave, chat_count),
-//  migration_salon.sql (plus vaste, salles de 100, un mot par minute, bannir). Les montgolfières : models.js (« s:» + id).
+//  migration_salon.sql (salles de 100, un mot par minute, bannir), migration_salon_7e.sql (tout le 7e). Les montgolfières :
+//  models.js (« s:» + id).
 // =====================================================================
 
-// le salon : une bande de 220 m sur l'axe Trocadéro – tour Eiffel – Champ-de-Mars (1,2 km), vue depuis l'École militaire :
-// haut-gauche, haut-droite (le Trocadéro), bas-droite, bas-gauche (l'École militaire)
-const STAGE = [[2.289499, 48.860658], [2.291770, 48.861962], [2.302233, 48.853962], [2.299963, 48.852659]];
-const SALON_BOUNDS = [[2.2850, 48.8500], [2.3065, 48.8640]];
+// le salon (26/10/2026, « le lieu pour parler est trop petit » ; choix du propriétaire : « tout le 7e ») : tout le 7e
+// arrondissement (la tour Eiffel, le Champ-de-Mars, les Invalides, Orsay) et, de l'autre côté du pont d'Iéna, les jardins et le
+// parvis du Trocadéro ; on arrive autour de la tour Eiffel (la bande du Champ-de-Mars, le salon d'avant : SPAWN, haut-gauche,
+// haut-droite côté Trocadéro, bas-droite, bas-gauche côté École militaire)
+const SPAWN = [[2.289499, 48.860658], [2.291770, 48.861962], [2.302233, 48.853962], [2.299963, 48.852659]];
+const TROCA = [[2.2920, 48.8596], [2.2958, 48.8615], [2.2898, 48.8650], [2.2850, 48.8627]];
+let SALON_P = null;
+const salonPolys = () => SALON_P || (SALON_P = [(() => { const a = IDX.arr.find(x => x.n === 7); return a ? decodeRing(a.outline[0]) : SPAWN; })(), TROCA]);
+const SALON_BOUNDS = [[2.2660, 48.8360], [2.3520, 48.8750]];   // (la caméra : le salon et autour, pour le voir en entier dézoomé)
 const lerpLL = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
-const stageAt = (u, v) => lerpLL(lerpLL(STAGE[0], STAGE[1], u), lerpLL(STAGE[3], STAGE[2], u), v);
-const inStage = (x, y) => inPolyLL(STAGE, x, y);
-function stageClamp(x, y) {   // le point du salon le plus proche (le salon est un rectangle : u le long du haut, v vers le bas)
-  const T0 = STAGE[0], e1 = [(STAGE[1][0] - T0[0]) * KXP, (STAGE[1][1] - T0[1]) * KYP], e2 = [(STAGE[3][0] - T0[0]) * KXP, (STAGE[3][1] - T0[1]) * KYP];
-  const d = [(x - T0[0]) * KXP, (y - T0[1]) * KYP], det = e1[0] * e2[1] - e1[1] * e2[0];
-  const u = (d[0] * e2[1] - d[1] * e2[0]) / det, v = (e1[0] * d[1] - e1[1] * d[0]) / det, c = t => Math.max(.02, Math.min(.98, t));
-  return stageAt(c(u), c(v));
+const stageAt = (u, v) => lerpLL(lerpLL(SPAWN[0], SPAWN[1], u), lerpLL(SPAWN[3], SPAWN[2], u), v);
+const inStage = (x, y) => salonPolys().some(P => inPolyLL(P, x, y));
+// toucher plus loin que le salon : sa montgolfière va dans cette direction et s'arrête au bord (depuis où elle est, sinon la tour)
+function stageClamp(x, y, from) {
+  const o = from && inStage(from[0], from[1]) ? from : [2.2945, 48.8584]; let a = 0, b = 1;
+  for (let i = 0; i < 20; i++) { const m = (a + b) / 2; if (inStage(o[0] + (x - o[0]) * m, o[1] + (y - o[1]) * m)) a = m; else b = m; }
+  const m = a * .995; return [o[0] + (x - o[0]) * m, o[1] + (y - o[1]) * m];
 }
 // la caméra : depuis l'École militaire, la tour Eiffel au milieu, le Trocadéro au fond
 const salonCam = () => ({ center: [2.29555, 48.85755], zoom: innerWidth < 700 ? 15.6 : innerWidth < 900 ? 15.8 : 16.05, pitch: 50, bearing: -41, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
@@ -41,7 +48,7 @@ function lockMap(on, prev) {
   if (on) {
     const was = { lim: { min: map.getMinZoom(), max: map.getMaxZoom(), b: map.getMaxBounds() } };
     for (const k of MAPI) { const h = map[k]; if (!h) continue; was[k] = h.isEnabled(); if (["dragPan", "scrollZoom", "touchZoomRotate"].includes(k)) h.enable(); else h.disable(); }
-    map.touchZoomRotate?.disableRotation(); map.setMinZoom(salonCam().zoom - 1); map.setMaxZoom(18.2);
+    map.touchZoomRotate?.disableRotation(); map.setMinZoom(innerWidth < 700 ? 13.6 : 14); map.setMaxZoom(18.2);   // (dézoomé : tout le 7e, les montgolfières encore en 3D)
     return was;
   }
   for (const k of MAPI) { const h = map[k]; if (h && (!prev || prev[k])) h.enable(); else if (h && prev && !prev[k]) h.disable(); }
@@ -153,7 +160,7 @@ function salonEvent(e) {
 }
 
 // ---- les montgolfières du salon ------------------------------------------------
-// chacune flotte à sa hauteur (toujours la même pour chacun) : le ciel du Champ-de-Mars a de la profondeur
+// chacune flotte à sa hauteur (toujours la même pour chacun) : le ciel du salon a de la profondeur
 const salonAlt = id => { let h = 3; for (const ch of String(id)) h = (h * 33 + ch.charCodeAt(0)) >>> 0; return .3 + (h % 100) / 100 * 1.5; };
 function salonSync(list) {
   const ids = new Set((list || []).map(p => p.id));
@@ -238,7 +245,7 @@ function salonDeclutter() {
 function salonTap(e) {
   const ll = e?.lngLat; if (!ll) return;
   const me = S.people.get(S.me); if (!me) return;
-  const [lo, la] = inStage(ll.lng, ll.lat) ? [ll.lng, ll.lat] : stageClamp(ll.lng, ll.lat);
+  const [lo, la] = inStage(ll.lng, ll.lat) ? [ll.lng, ll.lat] : stageClamp(ll.lng, ll.lat, [me.tl, me.tla]);
   salonGo(me, lo, la); $("#place .plhint")?.remove(); try { localStorage.setItem("hm_slhint", "1"); } catch (er) { }
   S.pend = [lo, la]; if (!S.busy) salonMove();
 }
@@ -248,12 +255,12 @@ async function salonMove() {
   S.busy = false;
 }
 
-// ---- l'écran : en haut « ← Champ-de-Mars · N joueurs », en bas la barre pour un petit mot et les derniers mots --------------
+// ---- l'écran : en haut « ← Salon · N joueurs », en bas la barre pour un petit mot et les derniers mots --------------
 function buildSalonUI() {
   for (const id of ["#place", "#wsay", "#wlog"]) $(id)?.remove();
   const el = document.createElement("div"); el.id = "place";
   let hint = ""; try { if (!localStorage.getItem("hm_slhint")) hint = '<div class="plhint">Touchez la carte pour y aller</div>'; } catch (e) { }
-  el.innerHTML = `<header class="plh"><button class="plx" data-slx aria-label="Revenir dans la partie">${ICON.back}</button><div><b id="slt">Champ-de-Mars</b><small><i></i><span id="sln">…</span></small></div>
+  el.innerHTML = `<header class="plh"><button class="plx" data-slx aria-label="Revenir dans la partie">${ICON.back}</button><div><b id="slt">Salon</b><small><i></i><span id="sln">…</span></small></div>
     <button class="plme" data-sllook aria-label="Ma montgolfière"></button></header>${hint}`;
   document.body.appendChild(el);
   el.addEventListener("click", e => {
@@ -271,7 +278,7 @@ function buildSalonUI() {
 function salonHead() {
   const n = $("#sln"), t = $("#slt"); if (!n) return;
   const k = S.people.size; n.textContent = `${k} joueur${k > 1 ? "s" : ""} ici`;
-  t.textContent = "Champ-de-Mars" + (S.room > 1 ? " " + S.room : "");
+  t.textContent = "Salon" + (S.room > 1 ? " " + S.room : "");
   const b = $("#place .plme"), p = ST.state?.profile; if (b && p) b.innerHTML = balloonSVG(balloonSpec(lookOf(ME, p.look), p.party), 30);
 }
 // sa couleur ou son motif changent (« Ma montgolfière ») : au salon aussi
@@ -318,7 +325,7 @@ function salonLogRender() {
   el.hidden = false; el.scrollTop = el.scrollHeight;
 }
 
-// ---- la pastille verte sur « Parler » : combien de joueurs au salon -------------------------
+// ---- la pastille verte sur « Salon » : combien de joueurs y sont -------------------------
 async function salonCount() {
   if (!W.on || S.on || document.hidden || !ST.state?.profile) return;
   try { S.n = (await rpc("chat_count")) | 0; } catch (e) { return; }

@@ -66,7 +66,7 @@ function lookPick(btn, root) {
   const p = ST.state?.profile; if (!p) return;
   const [k, v] = btn.dataset.look.split(":"); const L = Object.assign({}, lookOf(ME, p.look), { [k]: +v });
   p.look = L; ST.lookLocal = { L, at: Date.now() }; root.innerHTML = lookEditorHTML(L, p.party);
-  const me = meP(); if (me) { me.look = L; window.people3d?.look(me.id, spec3d(me)); renderDock(); }
+  const me = meP(); if (me) { me.look = L; window.people3d?.look(me.id, spec3d(me)); drawLabel(me); renderDock(); }
   if (typeof salonLook === "function") salonLook(L);
   const pv = $("#p-detail .lkwrap"); if (pv && pv !== root) pv.innerHTML = lookEditorHTML(L, p.party);
   clearTimeout(lookSaveT); lookSaveT = setTimeout(() => rpc("set_look", { p_look: L }).catch(e => toast(e.message, "bad")), 500);
@@ -405,7 +405,7 @@ function worldEvent(e) {
     if (d.metro) hop(p, d.lon, d.lat); else walkAlong(p, d.path || [[p.lon, p.lat], [d.lon, d.lat]], d.dur);
   }
   // (« say » : plus aucun mot sur la carte de Paris depuis le 25/10/2026, on parle au salon ; un site d'avant peut encore en envoyer)
-  else if (e.k === "look") { if (p) { p.look = d.look; window.people3d?.look(p.id, spec3d(p)); } }
+  else if (e.k === "look") { if (p) { p.look = d.look; window.people3d?.look(p.id, spec3d(p)); drawLabel(p); } }
   else if (e.k === "leave") removePerson(id);
   else if (e.k === "kick" && id === W.me) { W.banned = true; closeSalon(true); renderDock(); toast(d.h ? `Vous êtes banni du chat pour ${d.h} h` : "Vous êtes banni du chat", "bad"); }
 }
@@ -487,9 +487,13 @@ function meStep(now, i) {
 // ---- les noms au-dessus des têtes, les bulles --------------------------------------
 function drawLabel(p) {
   const box = $("#wpl"); if (!box) return;
-  if (!p.el) { p.el = document.createElement("button"); p.el.className = "wp" + (p.id === W.me ? " me" : ""); p.el.dataset.id = p.id; p.el.innerHTML = '<span class="bub" hidden></span><span class="nm"></span>'; p.el.style.display = "none"; box.appendChild(p.el); }
-  p.el.querySelector(".nm").innerHTML = p.id === W.me ? "Vous" : `<i style="background:${PARTIES[p.party]?.c || "#94A3B8"}"></i>${esc(p.pseudo || "?")}`;
-  p.el.setAttribute("aria-label", p.id === W.me ? "Ma montgolfière" : (p.pseudo || "Joueur"));
+  const me = p.id === W.me;
+  if (!p.el) { p.el = document.createElement("button"); p.el.className = "wp" + (me ? " me" : ""); p.el.dataset.id = p.id; p.el.innerHTML = '<span class="bub" hidden></span><span class="nm"></span>' + (me ? '<span class="bl"></span>' : ""); p.el.style.display = "none"; box.appendChild(p.el); }
+  p.el.querySelector(".nm").innerHTML = me ? "Vous" : `<i style="background:${PARTIES[p.party]?.c || "#94A3B8"}"></i>${esc(p.pseudo || "?")}`;
+  p.el.setAttribute("aria-label", me ? "Ma montgolfière" : (p.pseudo || "Joueur"));
+  // dézoomé (26/10/2026, « au lieu de voir “vous” comme les autres trucs, un minimum de différenciation ») : sa montgolfière en
+  // petit, à ses couleurs, à la place d'un point bleu comme ceux de ses biens
+  if (me) { const sp = spec3d(p), k = JSON.stringify(sp); if (p.blk !== k) { p.blk = k; p.el.querySelector(".bl").innerHTML = balloonSVG(sp, 34); } }
 }
 // après chaque image de la carte : le nom suit la tête (calculé comme la 3D), la zone à toucher couvre le personnage
 function layoutPeople() {
@@ -792,7 +796,7 @@ const canSay = () => W.on && !W.chatOff && !W.banned;
 function renderDock() {
   const b = $("#b-main"); if (!b) return;
   const p = ST.state?.profile, me = meP();
-  if (me && p && (me.party !== p.party || me.pseudo !== p.pseudo)) { me.party = p.party; me.pseudo = p.pseudo; window.people3d?.look(me.id, spec3d(me)); }
+  if (me && p && (me.party !== p.party || me.pseudo !== p.pseudo)) { me.party = p.party; me.pseudo = p.pseudo; window.people3d?.look(me.id, spec3d(me)); drawLabel(me); }
   const left = p?.rolls ?? 0, pick = W.opts.length > 0, wait = rollWait();
   if (!W.rolling) { const face = W.die || 5, k = "d" + face; if (b.dataset.k !== k) { b.dataset.k = k; $("#mainico").innerHTML = dieSVG(face, 46); } }
   const n = $("#rollsn"), t = left > 0 ? String(left) : wait > 0 ? Math.max(1, Math.ceil(wait / 60)) + " min" : "…";
