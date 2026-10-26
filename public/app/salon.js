@@ -35,7 +35,7 @@ function stageClamp(x, y, from) {
 const salonCam = () => ({ center: [2.29555, 48.85755], zoom: innerWidth < 700 ? 15.6 : innerWidth < 900 ? 15.8 : 16.05, pitch: 50, bearing: -41, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
 
 const S = { on: false, room: 0, me: null, admin: false, people: new Map(), last: 0, seen: new Set(), ch: null, rt: false, poll: 0, ping: 0, list: 0,
-  raf: 0, t0: 0, ctl: null, pend: null, busy: false, feeding: false, log: [], saidAt: 0, hintT: 0, n: 0, bear: 0, dcT: 0 };
+  raf: 0, t0: 0, ctl: null, pend: null, busy: false, feeding: false, log: [], saidAt: 0, hintT: 0, n: 0, bear: 0, dcT: 0, outT: 0 };
 // au salon, la carte de la partie s'efface : les « ? » du jour, le trajet
 const SALON_HIDE = ["wq-c", "wq-t", "dst-c", "wroute-c", "wroute", "wroute-e"];
 function salonLayers(on) {
@@ -239,11 +239,15 @@ function salonDeclutter() {
     if (p.el.classList.contains("hidenm") !== hit) p.el.classList.toggle("hidenm", hit);
   }
 }
-// toucher la carte : sa montgolfière y va (au bord du salon si l'on touche plus loin ; le serveur suit, une demande à la fois)
+// toucher la carte : sa montgolfière y va (au bord du salon si l'on touche plus loin, et un message le dit : 26/10/2026, demande du
+// propriétaire, « sinon personne va comprendre que c'est interdit » ; le serveur suit, une demande à la fois)
+const SALON_OUT = "Le salon s'arrête ici : le 7e et le Trocadéro.";
 function salonTap(e) {
   const ll = e?.lngLat; if (!ll) return;
   const me = S.people.get(S.me); if (!me) return;
-  const [lo, la] = inStage(ll.lng, ll.lat) ? [ll.lng, ll.lat] : stageClamp(ll.lng, ll.lat, [me.tl, me.tla]);
+  const out = !inStage(ll.lng, ll.lat);
+  if (out && Date.now() - S.outT > 2500) { S.outT = Date.now(); toast(SALON_OUT, "bad"); }
+  const [lo, la] = out ? stageClamp(ll.lng, ll.lat, [me.tl, me.tla]) : [ll.lng, ll.lat];
   salonGo(me, lo, la); $("#place .plhint")?.remove(); try { localStorage.setItem("hm_slhint", "1"); } catch (er) { }
   S.pend = [lo, la]; if (!S.busy) salonMove();
 }

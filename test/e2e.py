@@ -396,6 +396,16 @@ async def main():
         await pg.wait_for_timeout(1500)
         pos = db.sql("select lon, lat from place_people where user_id=%s", me)
         check("au salon : toucher la pelouse, sa montgolfière y va", lp and pos and abs(pos[0][0] - lp["ll"][0]) < 2e-5 and abs(pos[0][1] - lp["ll"][1]) < 2e-5, (lp, pos))
+        # toucher plus loin que le salon (26/10/2026, « sinon personne va comprendre que c'est interdit ») : un message, et elle s'arrête au bord
+        op = await E("""(() => { const c = map.getCanvas(), r = map.getContainer().getBoundingClientRect();
+            for (const [u, v] of [[.12, .18], [.88, .18], [.1, .3], [.9, .3], [.5, .12], [.15, .6], [.85, .6]]) { const x = c.clientWidth * u, y = c.clientHeight * v, ll = map.unproject([x, y]);
+              const el = document.elementFromPoint(r.left + x, r.top + y); if (!inStage(ll.lng, ll.lat) && el && el.tagName === 'CANVAS') return [r.left + x, r.top + y]; } return null; })()""")
+        if op: await pg.mouse.click(op[0], op[1])
+        await pg.wait_for_timeout(1200)
+        pos2 = db.sql("select lon, lat from place_people where user_id=%s", me)
+        tst = await E("[document.querySelector('#toast').textContent, document.querySelector('#toast').className]")
+        check("au salon : toucher plus loin, « Le salon s'arrête ici… » et sa montgolfière s'arrête au bord", bool(op and pos2 and tst[0] == "Le salon s'arrête ici : le 7e et le Trocadéro." and "bad" in tst[1]
+              and await E(f"inStage({pos2[0][0]}, {pos2[0][1]})")), (op, pos2, tst))
         check("le salon : tout le 7e et le Trocadéro (Orsay, les Invalides, le parvis) ; plus loin, on s'arrête au bord", await E("""inStage(2.3266, 48.8600) && inStage(2.3126, 48.8551) && inStage(2.2870, 48.8628) && !inStage(2.3212, 48.8656) && !inStage(2.2800, 48.8500)
           && (c => inStage(c[0], c[1]))(stageClamp(2.3212, 48.8656, [2.2945, 48.8584])) && (c => inStage(c[0], c[1]))(stageClamp(2.2700, 48.8400))"""))
         await pg.click("[data-slx]"); await W("!S.on && !map.isMoving()", 20000); await pg.wait_for_timeout(600)
