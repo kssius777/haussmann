@@ -4,13 +4,13 @@
 // =====================================================================
 let map = null, mapReady = false, mode = "all", sel = null, tapGuard = 0;
 const hideSet = new Set(), lastState = new Map(); let painted = new Set();
-// Palette « Paris » : pierre de taille et toits en zinc
-// (les toits sont un gris chaud clair : un Paris beige, pas bleu ; les immeubles des autres joueurs sont en terre cuite)
+// Palette « Paris » : pierre de taille et toits en zinc doré (26/10/2026, maquette C choisie par le propriétaire : « tous les toits me
+// semblent énormément gris ») : trois nuances d'un immeuble à l'autre ; les immeubles des autres joueurs restent en rose
 // thème « Blanc pur » : Paris en maquette blanche, seules les infos de jeu sont en couleur
 // Couleurs des immeubles et du sol : « Pierre & zinc » le jour ; decor.js les fait varier avec l'heure réelle à Paris (coucher de soleil, nuit)
 const MC = { mine: "#2563EB", mineB: "#BFD2FB", theirs: "#F4B4A5", theirsB: "#FCEDE9", sale: "#F5A524", saleB: "#FCE1AE",
-  sel: "#0B0C10", selB: "#9DB4F7", mute: "#F4EEE3", muteR: "#E3DDD2", stone: "#F5E6CB", zinc: "#A9B4C4",
-  rarM: "#B98AE8", rarMB: "#EBDDF9", rarL: "#E2B23A", rarLB: "#F8E7B8", lit: "#A9B4C4", litB: "#F5E6CB", lit2B: "#F5E6CB" };
+  sel: "#0B0C10", selB: "#9DB4F7", mute: "#F4EEE3", muteR: "#E3DDD2", stone: "#F5E6CB", zinc: "#DDD6CB", zinc2: "#D5CDC0", zinc3: "#E4DED5",
+  rarM: "#B98AE8", rarMB: "#EBDDF9", rarL: "#E2B23A", rarLB: "#F8E7B8", lit: "#DDD6CB", litB: "#F5E6CB", lit2B: "#F5E6CB" };
 const GROUND = { bg: "#EEE8DC", parks: "#A8D38C", water: "#6DB3E2", major: "#FFFDF8", majorCase: "#DDD3C1", road: "#FFFDF8", arrline: "#FFFFFF",
   names: "#5B6270", namesHalo: "#FFFFFF", shadow: "#5A4A30", shadowOp: .14, glow: 0,
   light: { anchor: "viewport", color: "#FFF4E0", intensity: .42, position: [1.15, 220, 55] },
@@ -28,12 +28,13 @@ function colorExprs(m) {
   const st = ["coalesce", ["feature-state", "s"], 0], se = ["boolean", ["feature-state", "sel"], false], tg = ["coalesce", ["feature-state", "tgt"], 0], ds = ["coalesce", ["feature-state", "dst"], 0];
   const rarR = d => ["match", ["get", "r"], "M", MC.rarM, "L", MC.rarL, d], rarB = d => ["match", ["get", "r"], "M", MC.rarMB, "L", MC.rarLB, d];
   const lit = (d, a, b) => ["case", ["==", ["%", ["id"], 5], 0], a, ["==", ["%", ["id"], 7], 1], b, d];   // la nuit, des fenêtres allumées
+  const zv = ["match", ["%", ["id"], 3], 0, MC.zinc, 1, MC.zinc2, MC.zinc3], zl = MC.lit === MC.zinc ? zv : MC.lit;   // trois nuances de toits (le jour)
   if (m === "mine") return { roof: ["case", se, MC.sel, [">=", st, 3], MC.mine, MC.muteR], body: ["case", se, MC.selB, [">=", st, 3], MC.mineB, MC.mute] };
   if (m === "sale") return { roof: ["case", se, MC.sel, ["==", st, 4], MC.sale, MC.muteR], body: ["case", se, MC.selB, ["==", st, 4], MC.saleB, MC.mute] };
   // (avec la façade que la carte graphique dessine sur les murs : facade.js) ; les destinations du dé de la couleur de leur flèche
   // (place.js : 1 on paie le loyer, 2 libre, 3 chez soi, 4 un « ? », 5 déjà pris)
   const dst = (a, b, c, d, e, x) => ["case", ["==", ds, 1], a, ["==", ds, 2], b, ["==", ds, 3], c, ["==", ds, 4], d, ["==", ds, 5], e, x];
-  return { roof: facRoof(dst("#EC4899", "#16A34A", "#2563EB", "#7C3AED", "#64748B", ["case", ["==", tg, 2], "#A855F7", ["==", tg, 1], "#FACC15", se, MC.sel, [">=", st, 3], MC.mine, ["==", st, 4], MC.sale, ["==", st, 2], MC.theirs, rarR(lit(MC.zinc, MC.lit, MC.lit))])),
+  return { roof: facRoof(dst("#EC4899", "#16A34A", "#2563EB", "#7C3AED", "#64748B", ["case", ["==", tg, 2], "#A855F7", ["==", tg, 1], "#FACC15", se, MC.sel, [">=", st, 3], MC.mine, ["==", st, 4], MC.sale, ["==", st, 2], MC.theirs, rarR(lit(zv, zl, zl))])),
            body: facBody(dst("#F9A8D4", "#86EFAC", "#93C5FD", "#C4B5FD", "#CBD5E1", ["case", ["==", tg, 2], "#D8B4FE", ["==", tg, 1], "#FDE68A", se, MC.selB, [">=", st, 3], MC.mineB, ["==", st, 4], MC.saleB, ["==", st, 2], MC.theirsB, rarB(lit(MC.stone, MC.litB, MC.lit2B))])) };
 }
 function partyFill() {

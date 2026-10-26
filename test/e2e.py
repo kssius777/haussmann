@@ -101,11 +101,13 @@ async def main():
         check("pendant le choix, toucher un autre immeuble ne fait rien (on choisit une flèche)", ob and await E("W.opts.length > 0 && document.querySelector('#movebar').hidden && !W.run"))
         # une flèche verte (libre) : sa montgolfière y vole, elle s'y pose, sa case s'ouvre ; libre : on l'achète en glissant
         i = await E("Math.max(0, W.opts.findIndex(o => o.k[0] === 'free'))"); gch = await E(f"W.opts[{i}].card"); free_ok = await E(f"W.opts[{i}].k[0] === 'free'")
-        await E("window.__altMax = 0; window.__altStop = false; (function rec() { const m = meP(); if (m && m.alt > __altMax) __altMax = m.alt; if (!__altStop) requestAnimationFrame(rec); })(); 1")
         await pg.click(f"#dchips .dchip >> nth={i}"); await pg.wait_for_timeout(200)
         check("toucher une flèche : sa montgolfière y vole tout droit (trajet dessiné, 1,2 à 3 s), les flèches s'en vont", await E("!!W.run && meP().path?.length === 2 && !!map.getSource('wroute') && !document.querySelectorAll('#dchips .dchip').length && W.run.dur >= 1.19 && W.run.dur <= 3.01"))
+        # au milieu du vol (on y avance la montgolfière : le rendu logiciel est trop lent pour tomber dessus à coup sûr), elle est montée
+        mid = await E("""new Promise(r => { const m = meP(); if (!m.path) return r(-1); const d0 = m.dur; m.dur = 30; m.t0 = performance.now() - 15000;
+          requestAnimationFrame(() => requestAnimationFrame(() => { const a = m.alt || 0; m.dur = d0; m.t0 = performance.now() - d0 * 500; r(a); })); })""")
         await W("!W.run", 60000); await W("!document.querySelector('#movebar').hidden", 15000); await pg.wait_for_timeout(600)
-        check("… en volant, elle monte au-dessus des toits, puis redescend sur l'immeuble", await E("__altStop = true; __altMax > .5 && !meP().alt"), await E("__altMax"))
+        check("… en volant, elle monte au-dessus des toits, puis redescend sur l'immeuble", mid > .8 and await E("!meP().alt"), mid)
         cam = await E("(() => ({ on: CAM.on, z: +map.getZoom().toFixed(1), pitch: +map.getPitch().toFixed(0) }))()")
         check("posée : la caméra proche et inclinée sur sa montgolfière (« derrière le perso »), elle est redescendue", cam["on"] and cam["z"] >= 16.5 and cam["pitch"] >= 55 and await E("!meP().alt"), cam)
         check("il y tombe : sa case s'ouvre, le salaire du lancer est versé", await E(f"ST.state.profile.land === {gch} && panelKind === 'land' && !landView")

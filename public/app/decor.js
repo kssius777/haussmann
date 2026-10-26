@@ -7,8 +7,8 @@
 const SKY = {
   day: {
     mc: { mine: "#2563EB", mineB: "#BFD2FB", theirs: "#F4B4A5", theirsB: "#FCEDE9", sale: "#F5A524", saleB: "#FCE1AE", sel: "#0B0C10", selB: "#9DB4F7",
-          mute: "#F4EEE3", muteR: "#E3DDD2", stone: "#F5E6CB", zinc: "#A9B4C4", rarM: "#B98AE8", rarMB: "#EBDDF9", rarL: "#E2B23A", rarLB: "#F8E7B8",
-          lit: "#A9B4C4", litB: "#F5E6CB", lit2B: "#F5E6CB" },
+          mute: "#F4EEE3", muteR: "#E3DDD2", stone: "#F5E6CB", zinc: "#DDD6CB", zinc2: "#D5CDC0", zinc3: "#E4DED5", rarM: "#B98AE8", rarMB: "#EBDDF9", rarL: "#E2B23A", rarLB: "#F8E7B8",
+          lit: "#DDD6CB", litB: "#F5E6CB", lit2B: "#F5E6CB" },   // toits : un zinc doré, trois nuances (26/10/2026, « tous les toits me semblent énormément gris »)
     g: { bg: "#EEE8DC", parks: "#A8D38C", water: "#6DB3E2", major: "#FFFDF8", majorCase: "#DDD3C1", road: "#FFFDF8", arrline: "#FFFFFF",
          names: "#5B6270", namesHalo: "#FFFFFF", shadow: "#5A4A30", shadowOp: .14, glow: 0,
          light: { anchor: "viewport", color: "#FFF4E0", intensity: .42, position: [1.15, 220, 55] },
@@ -17,7 +17,7 @@ const SKY = {
   },
   dusk: {   // coucher (et lever) du soleil : la pierre se réchauffe, tout reste lumineux
     mc: { mine: "#2563EB", mineB: "#BCCBF2", theirs: "#F2AA98", theirsB: "#F9E1D6", sale: "#F59E1B", saleB: "#F8D8A4", sel: "#0B0C10", selB: "#9DB4F7",
-          mute: "#F3E6D5", muteR: "#E5D6C6", stone: "#F8E4CB", zinc: "#B3AFB8", rarM: "#B488DD", rarMB: "#E8D6F2", rarL: "#E2AC38", rarLB: "#F6DFAE",
+          mute: "#F3E6D5", muteR: "#E5D6C6", stone: "#F8E4CB", zinc: "#D9C6B2", zinc2: "#D0BCA6", zinc3: "#E0CFBD", rarM: "#B488DD", rarMB: "#E8D6F2", rarL: "#E2AC38", rarLB: "#F6DFAE",
           lit: "#C9A77E", litB: "#F8DDB4", lit2B: "#F8E4CB" },
     g: { bg: "#F1E4D3", parks: "#A9C98A", water: "#68A9CF", major: "#FFF5E8", majorCase: "#E5D1B6", road: "#FFF5E8", arrline: "#FFF8EF",
          names: "#6A5038", namesHalo: "#FFF7EC", shadow: "#6B3B1C", shadowOp: .16, glow: 0,
@@ -27,7 +27,7 @@ const SKY = {
   },
   night: {
     mc: { mine: "#3B82F6", mineB: "#1E3F8F", theirs: "#C98F84", theirsB: "#3E2C2A", sale: "#F5A524", saleB: "#6A4815", sel: "#F8FAFC", selB: "#5B74C9",
-          mute: "#1A202C", muteR: "#232A37", stone: "#1E2534", zinc: "#29313F", rarM: "#7C5AAE", rarMB: "#3A2F52", rarL: "#B08A2E", rarLB: "#4F4123",
+          mute: "#1A202C", muteR: "#232A37", stone: "#1E2534", zinc: "#29313F", zinc2: "#262E3B", zinc3: "#2D3544", rarM: "#7C5AAE", rarMB: "#3A2F52", rarL: "#B08A2E", rarLB: "#4F4123",
           lit: "#6B5A33", litB: "#5A4A2A", lit2B: "#4A4030" },
     g: { bg: "#0E1420", parks: "#13261B", water: "#0B2238", major: "#F2B655", majorCase: "#2E2A1F", road: "#283244", arrline: "#2E3B55",
          names: "#AAB4C8", namesHalo: "#0E1420", shadow: "#000000", shadowOp: 0, glow: 1,
