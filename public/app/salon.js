@@ -36,11 +36,10 @@ const salonCam = () => ({ center: [2.29555, 48.85755], zoom: innerWidth < 700 ? 
 
 const S = { on: false, room: 0, me: null, admin: false, people: new Map(), last: 0, seen: new Set(), ch: null, rt: false, poll: 0, ping: 0, list: 0,
   raf: 0, t0: 0, ctl: null, pend: null, busy: false, feeding: false, log: [], saidAt: 0, hintT: 0, n: 0, bear: 0, dcT: 0 };
-// au salon, la carte de la partie s'efface : les « ? » du jour, les destinations du dé, le trajet
+// au salon, la carte de la partie s'efface : les « ? » du jour, le trajet
 const SALON_HIDE = ["wq-c", "wq-t", "dst-c", "wroute-c", "wroute", "wroute-e"];
 function salonLayers(on) {
   for (const l of SALON_HIDE) if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", on ? "none" : "visible");
-  if (!on) drawDst();   // (pendant le choix du dé, les « ? » restent cachés : drawDst le sait)
 }
 // au salon, on fait glisser et on zoome (sans tourner ni pencher), sans sortir du salon
 const MAPI = ["dragPan", "scrollZoom", "boxZoom", "dragRotate", "keyboard", "doubleClickZoom", "touchZoomRotate", "touchPitch"];
@@ -59,7 +58,7 @@ function lockMap(on, prev) {
 // ---- entrer, sortir -----------------------------------------------------------
 async function openSalon() {
   if (S.on || !W.on || !map || !mapReady || !canSay()) return;
-  if (W.run || W.rolling || W.riding) return toast("Attendez que votre montgolfière soit posée", "bad");
+  if (W.run || W.riding) return toast("Attendez que votre montgolfière soit posée", "bad");
   if (cur() !== "map") go("map");
   if (panelKind) { justBought = null; setMovebar(""); }
   closeSheet(); if (!$("#search").hidden) closeSearch(); hidePreview();
@@ -91,13 +90,12 @@ function closeSalon(noLeave) {
   S.people.clear(); S.seen.clear(); S.log = [];
   for (const id of ["#place", "#spl", "#wsay", "#wlog"]) $(id)?.remove();
   closeSheet();
-  document.body.classList.remove("insalon"); if (W.opts.length) document.body.classList.add("picking");
+  document.body.classList.remove("insalon");
   lockMap(false, S.ctl); S.ctl = null; salonLayers(false);
   W.away = false; for (const p of W.people.values()) pose(p); updateVisible();
-  // retour dans la partie, avec le cap d'avant : un dé lancé avant le salon, ses destinations ; sinon sa montgolfière
+  // retour dans la partie, avec le cap d'avant, sur sa montgolfière
   const me = meP(); CAM.on = true; CAM.userB = false;
-  if (W.opts.length) { map.jumpTo({ bearing: S.bear }); showOpts(true); }
-  else if (me) { const v = worldView(); map.flyTo({ center: [me.lon, me.lat], zoom: v.zoom, pitch: v.pitch, padding: v.padding, bearing: S.bear, duration: 1200, essential: true }); }
+  if (me) { const v = worldView(); map.flyTo({ center: [me.lon, me.lat], zoom: v.zoom, pitch: v.pitch, padding: v.padding, bearing: S.bear, duration: 1200, essential: true }); }
   renderDock(); left.then(salonCount);
 }
 async function salonRejoin() {

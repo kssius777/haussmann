@@ -1,15 +1,14 @@
 "use strict";
 // =====================================================================
-//  Paris : le jeu (20/10/2026 : tout Paris ; 21/10/2026, choix du propriétaire : « on peut remettre le dé pour se déplacer »,
-//  « 4 destinations au choix », « des flèches minimalistes qui prennent pas trop de place », « on supprime la marche libre »).
-//  · Le bouton du milieu : le dé. Il propose jusqu'à 4 immeubles autour de soi (~100 m par point, un par direction) : une
-//    petite flèche de couleur autour de sa montgolfière pour chacun (rose : on paie le loyer · vert : libre · bleu : chez soi ·
-//    violet : un « ? »), l'immeuble de la même couleur sur la carte. On touche l'un ou l'autre : sa montgolfière y vole tout
-//    droit (25/10/2026 ; avant : un personnage qui courait par les rues), et y tombe (salaire, loyer, bonus, carte Chance) ;
-//    sa case s'ouvre : libre, on l'achète.
-//  · Le métro depuis une station où l'on est tombé ; les gens autour (par carrés d'environ 500 m), sans un mot : on parle au
-//    salon du Champ-de-Mars (salon.js), « Parler » à côté du dé (on peut couper le chat dans le profil).
-//  Serveur : migration_monde_paris.sql, migration_de.sql. Les montgolfières en 3D : models.js (people3d).
+//  Paris : le jeu (20/10/2026 : tout Paris ; du 21 au 26/10/2026 : le dé ; 26/10/2026, choix du propriétaire : « en cliquant, on
+//  va se déplacer là où on veut, pile poil », la montgolfière vole où l'on veut).
+//  · Toucher la carte : sa montgolfière y vole tout droit, au-dessus des toits ; toucher un immeuble : sa case avec « Y aller ».
+//    Le vol use des km (le bouton du milieu : ce qu'il en reste ; 5 au plus, +500 m toutes les 30 min, 20 000 € par km volé),
+//    le péage des immeubles roses survolés (le loyer écrit sur leur carte, une fois par jour chacun) ; posé sur un immeuble, sa
+//    case s'ouvre : libre, on l'achète ; un « ? » du jour : une carte Chance.
+//  · Le métro depuis une station où l'on s'est posé ; les gens autour (par carrés d'environ 500 m), sans un mot : on parle au
+//    salon (salon.js), « Salon » à côté du bouton du milieu (on peut couper le chat dans le profil).
+//  Serveur : migration_monde_paris.sql, migration_vol.sql. Les montgolfières en 3D : models.js (people3d).
 // =====================================================================
 
 // ---- la montgolfière (25/10/2026, choix du propriétaire ; avant : un personnage) ----------------
@@ -204,7 +203,7 @@ function fitPath(pts) { for (const tol of [1.2, 3, 6, 12, 25, 50, 100]) { const 
 const W = { on: false, starting: false, tries: 0, me: null, admin: false, cfg: null, w: null, day: 0, taken: new Set(), chatOff: false, banned: false,
   people: new Map(), cells: new Set(), cellKey: "", chans: new Map(), chSt: new Map(), cg: new Map(), lay: 0, authed: false, feedEvery: 0, feedT: 0, listT: 0,
   last: 0, seen: new Set(), feeding: false, raf: 0, G: null, riding: false, q: [], first: true, stepT: 0,
-  opts: [], die: 0, rolling: false, run: null, rolls: 0 };   // le dé : les destinations proposées, le lancer en cours, la course en cours
+  run: null, kmT: 0, tlT: 0 };   // run : le vol en cours
 const meP = () => W.people.get(W.me);
 const FLY_ALT = 1.1;   // de combien la montgolfière monte en volant (unités du dessin de models.js)
 const kmTxt = km => { const k = Math.round(km * 10) / 10; return k.toLocaleString("fr-FR", { minimumFractionDigits: k % 1 ? 1 : 0, maximumFractionDigits: 1 }) + " km"; };
@@ -226,8 +225,8 @@ function initWorld() {
   });
   const vv = window.visualViewport;
   if (vv) { const f = () => document.body.style.setProperty("--kb", Math.max(0, innerHeight - vv.height - vv.offsetTop) + "px"); vv.addEventListener("resize", f); vv.addEventListener("scroll", f); }
-  $("#b-main")?.addEventListener("click", doRoll);
-  $("#b-say")?.addEventListener("click", () => openSalon());   // « Parler » : le salon du Champ-de-Mars (salon.js)
+  $("#b-main")?.addEventListener("click", mainBtn);   // sa montgolfière : y revenir, ou ses km
+  $("#b-say")?.addEventListener("click", () => openSalon());   // « Salon » : le salon (salon.js)
   $("#pawnoff")?.addEventListener("click", () => centerOnMe(true));
   renderDock();
 }
@@ -240,7 +239,7 @@ function worldMapReady() {
   // la caméra derrière le perso : faire glisser la carte la libère ; la tourner ou l'incliner garde ce cap jusqu'au prochain trajet
   map.on("dragstart", e => { if (e.originalEvent) camOff(true); });
   for (const ev of ["rotatestart", "pitchstart"]) map.on(ev, e => { if (e.originalEvent) CAM.userB = true; });
-  map.on("moveend", throttle(() => { updateCells(); updateVisible(); }, 450)); map.on("moveend", layoutChips);
+  map.on("moveend", throttle(() => { updateCells(); updateVisible(); }, 450));
   initSalon();
   worldStart();
 }
@@ -252,7 +251,6 @@ async function worldStart() {
     renderQ(); updateVisible(); renderDock();
     queueCells(true); clearInterval(W.listT); W.listT = setInterval(refreshPeople, 60000);
     if (W.first) { W.first = false; centerOnMe(false); }
-    if (ST.state?.profile?.pend?.length) resumeRoll();   // un dé lancé, pas encore joué (page rechargée) : les mêmes destinations
   } catch (e) {
     console.warn("monde", e); W.on = false;
     if (/does not exist|Could not find the function/i.test(e.message || "")) toast("Le jeu est en cours de mise à jour : réessayez dans quelques minutes.", "bad");
@@ -266,10 +264,10 @@ function applyJoin(j) {
   me.vis = true;
   if (j.trip?.path?.length >= 2) followTrip(me, j.trip.path, j.trip.dur, j.trip.el);
   else { me.lon = +j.pos[0]; me.lat = +j.pos[1]; stopPerson(me); }
-  window.people3d?.ring(0, 0, 0, false);   // (l'anneau « à portée pour acheter » de la marche : plus utile avec le dé)
+  window.people3d?.ring(0, 0, 0, false);   // (l'anneau « à portée pour acheter » de la marche : plus utile)
 }
 async function rejoin() {
-  if (W.run || W.riding || W.rolling) return;
+  if (W.run || W.riding) return;
   try { applyJoin(await rpc("world_join")); W.cellKey = ""; queueCells(true); renderQ(); renderDock(); } catch (e) { }
 }
 // la caméra « derrière le perso » (21/10/2026, choix du propriétaire : « voir la map comme un monde open world ») : proche, basse,
@@ -292,9 +290,9 @@ function centerOnMe(quick, keepZoom) {   // keepZoom : on revient sur lui sans c
   const z = keepZoom || (quick && map.getZoom() >= 15.2) ? map.getZoom() : v.zoom;
   map.flyTo({ center: [me.lon, me.lat], zoom: z, pitch: keepZoom ? map.getPitch() : camPitch(z), padding: v.padding, duration: quick ? 600 : 1200, essential: true });
 }
-// Elle suit son personnage image par image quand il court ; partie de la vue d'ensemble des destinations du dé, elle revient
-// en douceur, pendant la course, à la vue « derrière le perso » (proche, inclinée ; le cap ne change pas : la course est
-// rapide). Faire glisser la carte la libère (on regarde ailleurs) ; la flèche « Vous » ou un nouveau lancer la remettent sur lui.
+// Elle suit sa montgolfière image par image quand elle vole et revient en douceur, pendant le vol, à la vue « derrière le perso »
+// (proche, inclinée ; le cap ne change pas : le vol est rapide) ; un long vol prend de la hauteur au milieu (arc). Faire glisser la
+// carte la libère (on regarde ailleurs) ; le bouton du milieu, la flèche « Vous » ou un vol la remettent sur elle.
 const CAM = { on: true, userB: false };
 function camOff(keep) {   // keep : la carte reste où elle est (on la fait glisser) ; sinon on va ailleurs : le décalage du haut s'en va
   CAM.on = false; if (!keep && map) map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
@@ -305,7 +303,7 @@ function camStep(me, now) {
   const r = W.run, v = { center: [me.lon, me.lat] };
   if (r && r.z0 != null) {
     const f = Math.min(1, (now - r.t0) / (r.dur * 1000)), e = f * f * (3 - 2 * f), L = (a, b) => a + (b - a) * e;
-    v.zoom = L(r.z0, r.z1); v.pitch = L(r.p0, r.p1); v.padding = { top: L(r.pad0.top || 0, r.pad1.top), bottom: L(r.pad0.bottom || 0, 0), left: L(r.pad0.left || 0, 0), right: L(r.pad0.right || 0, 0) };
+    v.zoom = L(r.z0, r.z1) - (r.arc || 0) * Math.sin(Math.PI * f); v.pitch = L(r.p0, r.p1); v.padding = { top: L(r.pad0.top || 0, r.pad1.top), bottom: L(r.pad0.bottom || 0, 0), left: L(r.pad0.left || 0, 0), right: L(r.pad0.right || 0, 0) };
   }
   map.jumpTo(v);
 }
@@ -481,6 +479,7 @@ function worldTick() {
 // pendant qu'on vole : le trajet qui reste, la caméra qui suit
 function meStep(now, i) {
   const me = meP(); camStep(me, now);
+  if (W.run?.hits) tollStep(W.run, Math.min(1, (now - me.t0) / (me.dur * 1000)));
   if (now - W.stepT > 220) { W.stepT = now; drawRoute(me.path.slice(i), [me.lon, me.lat]); offMe(); }
 }
 
@@ -515,7 +514,7 @@ function layoutPeople() {
     el.style.zIndex = 10 + Math.round(y + h);
     if (p.bt) clampBubble(p);
   }
-  declutterMe(); layoutChips();
+  declutterMe();
 }
 // un nom de lieu posé sur son personnage s'efface (on doit toujours se voir)
 let dmT = 0;
@@ -571,240 +570,178 @@ function drawRoute(pts, head, metro) {
   map.addLayer({ id: "wroute-e", type: "circle", source: "wroute", filter: ["==", ["get", "k"], "e"], paint: { "circle-radius": 7, "circle-color": "#2563EB", "circle-stroke-color": "#fff", "circle-stroke-width": 3 } }, before);
 }
 
-// ---- le dé (21/10/2026) : lancer, choisir où aller (une petite flèche par destination), y courir, y tomber -------------
-// le dé : un cube blanc vu de biais (le même que du temps du plateau), la face du dessus = le résultat
-const PIPXY = { 1: [[.5, .5]], 2: [[.27, .27], [.73, .73]], 3: [[.27, .27], [.5, .5], [.73, .73]], 4: [[.27, .27], [.73, .27], [.27, .73], [.73, .73]], 5: [[.27, .27], [.73, .27], [.5, .5], [.27, .73], [.73, .73]], 6: [[.27, .25], [.73, .25], [.27, .5], [.73, .5], [.27, .75], [.73, .75]] };
-const DSIDE = { 1: [2, 3], 2: [1, 3], 3: [1, 2], 4: [1, 5], 5: [1, 3], 6: [2, 4] };
-function dieSVG(top, size) {
-  const [l, r] = DSIDE[top] || [1, 3];
-  const face = (m, fill, n) => `<g transform="matrix(${m})"><rect x=".02" y=".02" width=".96" height=".96" rx=".2" fill="${fill}"/>${PIPXY[n].map(([x, y]) => `<circle cx="${x}" cy="${y}" r=".095" fill="#0B0C10"/>`).join("")}</g>`;
-  return `<svg class="dsvg" viewBox="7 1.5 26 32" width="${size}" height="${size}" aria-hidden="true"><ellipse cx="20" cy="31" rx="10" ry="2" fill="rgba(0,0,0,.18)"/>${face("10.4,6,-10.4,6,20,4", "#FFFFFF", top)}${face("10.4,6,0,12,9.6,10", "#E4E9F3", l)}${face("10.4,-6,0,12,20,16", "#C9D3E6", r)}</svg>`;
+// ---- la montgolfière vole où l'on veut (26/10/2026, choix du propriétaire : « le système du dé, c'est un peu galère parce que
+// c'est dur d'arriver exactement là où on veut ; en cliquant, on va se déplacer là où on veut, pile poil ») ---------------------
+// Toucher la carte : elle y vole tout droit (zoomé assez pour voir où l'on va). Toucher un immeuble ou un lieu : sa case, avec
+// « Y aller · 650 m » (on ne gaspille pas de km en regardant). Le vol use des km : 5 au plus, +500 m toutes les 30 min, 20 000 €
+// de salaire par km (Gauche ×2) ; des km en plus contre l'argent du jeu. En survolant l'immeuble d'un autre joueur (rose), on lui
+// paie le loyer écrit sur sa carte, une fois par jour par immeuble (le serveur compte : migration_vol.sql) : un seul compteur sur
+// sa montgolfière, les immeubles survolés clignotent, rien d'écrit sur la carte.
+// les km : ceux qui se rechargent (comme _kmfree côté serveur, depuis le dernier état reçu) et ceux qu'on a achetés
+function kmFree() {
+  const s = ST.state; if (!s || s.km_free == null) return 0; const c = W.cfg || {};
+  const el = Math.max(0, (performance.now() - (ST.stAt || performance.now())) / 1000);
+  return Math.min(c.kmMax || 5, +s.km_free + el / ((c.kmEvery || 30) * 60) * (c.kmStep || .5));
 }
-// ce qui attend sur une destination : [sorte, texte de la flèche] (rose : on paie le loyer · vert : libre · bleu : chez soi · violet : « ? »)
-function optKind(o) {
-  if (o.chance) return ["q", o.pay > 0 ? "? −" + kE(o.pay) : "?"];
-  if (o.pay > 0) return ["pay", "−" + kE(o.pay)];
-  if (o.mine > 0) return ["mine", o.bonus > 0 ? "+" + kE(o.bonus) : "Chez vous"];
-  if (o.free > 0) return ["free", "Libre"];
-  return ["none", "Pris"];
-}
-const DST = { pay: 1, free: 2, mine: 3, q: 4, none: 5 };   // l'état « dst » des immeubles (map.js : leur couleur)
-function optLabel(o) {
-  const c = card(o.card), n = c ? title(c) : "Immeuble";
-  return o.k[0] === "q" ? `${n} : carte Chance` : o.k[0] === "pay" ? `${n} : loyer à payer, ${fmtE(o.pay)}` : o.k[0] === "mine" ? `${n} : chez vous, bonus ${fmtE(o.bonus)}` : o.k[0] === "free" ? `${n} : libre, à acheter` : `${n} : déjà pris`;
-}
-let dieT = 0;
-function animDie() {   // le dé roule dans le bouton (les faces changent), puis se pose
-  const b = $("#b-main"), ico = $("#mainico"); b?.classList.add("rolling");
-  return new Promise(res => { const t0 = performance.now(); clearInterval(dieT);
-    dieT = setInterval(() => { if (ico) ico.innerHTML = dieSVG(1 + Math.floor(Math.random() * 6), 46); if (performance.now() - t0 > 640) { clearInterval(dieT); res(); } }, 80); });
-}
-function stopDie() { clearInterval(dieT); $("#b-main")?.classList.remove("rolling"); if ($("#b-main")) $("#b-main").dataset.k = ""; }
-async function doRoll() {
-  if (!W.on || W.rolling || W.run || W.riding || moving) return;
+const kmLeft = () => kmFree() + (+ST.state?.km_buy || 0);
+const kmShort = km => km >= .95 ? kmTxt(km) : Math.max(0, Math.floor(km * 100) * 10) + " m";   // (sous 1 km : en mètres, arrondi en dessous)
+// voler : jusqu'à un immeuble (g : on s'y pose, sa case s'ouvre) ou un point de la carte ; la caméra suit, et prend de la hauteur
+// pour un long vol
+async function flyMe(lon, lat, g) {
+  const me = meP(); if (!me || !W.on || W.run || W.riding || moving) return;
   hideHint();
-  if (W.opts.length) return showOpts(true);   // déjà lancé : on revoit les destinations
-  const p = ST.state?.profile; if (!p) return;
-  if ((p.rolls ?? 0) <= 0 && rollWait() > 1) return buyRollsSheet();   // (le prochain lancer vient d'arriver : le serveur le sait)
-  W.rolling = true; justBought = null; setMovebar(""); closeSheet(); renderDock(); sfx("dice");
-  const anim = animDie();
-  let r;
-  try { r = await rpc("roll"); await anim; }
-  catch (e) {
-    W.rolling = false; stopDie(); renderDock(); const m = e.message || "";
-    if (/Plus de lancers/.test(m)) { await refreshState().catch(() => { }); renderDock(); return buyRollsSheet(); }
-    if (/Revenez/.test(m)) rejoin();
-    return toast(m, "bad");
-  }
-  setState(r.state); W.rolling = false; stopDie(); W.die = r.die; W.rolls = (W.rolls || 0) + 1;
-  await ensureCards(r.options.map(o => o.card)).catch(() => { });
-  setOpts(r.die, r.options); renderWallet();
-}
-async function resumeRoll() {   // un dé lancé mais pas encore joué (page rechargée, métro refusé…) : les mêmes destinations
-  if (!W.on || W.rolling || W.run || W.opts.length) return;
-  try { const r = await rpc("roll"); setState(r.state); W.die = r.die; await ensureCards(r.options.map(o => o.card)).catch(() => { }); setOpts(r.die, r.options); renderWallet(); } catch (e) { }
-}
-function setOpts(die, opts) {
-  clearOpts(); W.die = die; W.opts = opts.filter(o => card(o.card)).map(o => Object.assign({}, o, { k: optKind(o), cen: centerOf(o.card) }));
-  if (!W.opts.length) return renderDock();
-  document.body.classList.add("picking");
-  if (mapReady) for (const o of W.opts) map.setFeatureState(Object.assign({ id: o.card }, BLD), { dst: DST[o.k[0]] });   // l'immeuble de la couleur de sa flèche
-  let box = $("#dchips");
-  if (!box) {
-    box = document.createElement("div"); box.id = "dchips"; map.getContainer().appendChild(box);
-    box.addEventListener("click", e => { const b = e.target.closest("[data-dgo]"); if (b) { e.stopPropagation(); pickOpt(+b.dataset.dgo); } });
-  }
-  // (le bouton se place autour du personnage ; la pastille dedans apparaît en grandissant : sa taille ne déplace pas le bouton)
-  box.innerHTML = W.opts.map((o, i) => `<button class="dchip d-${o.k[0]}" data-dgo="${o.card}" style="--i:${i}" aria-label="${esc(optLabel(o))}"><span class="dcp"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M2.5 8h9.5M8 3.5 12.5 8 8 12.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><b>${esc(o.k[1])}</b></span></button>`).join("");
-  box.hidden = false; drawDst();
-  renderDock(); showOpts(false); layoutChips();
-  if (typeof tutTick === "function") tutTick();
-}
-function clearOpts(keep) {   // keep : la destination choisie reste en couleur jusqu'à l'arrivée
-  if (mapReady) for (const o of W.opts) if (o.card !== keep) map.setFeatureState(Object.assign({ id: o.card }, BLD), { dst: 0 });
-  W.opts = []; const box = $("#dchips"); if (box) { box.innerHTML = ""; box.hidden = true; }
-  document.body.classList.remove("picking"); drawDst();
-}
-// les destinations sur la carte : un point de la couleur de leur flèche (on les voit aussi de loin) ; pendant le choix, les autres
-// « ? » du jour s'effacent (le violet est celui de la flèche « ? »)
-function drawDst() {
-  if (!map || !mapReady) return;
-  const data = FC(W.opts.map(o => ({ type: "Feature", properties: { g: o.card, k: o.k[0] }, geometry: { type: "Point", coordinates: o.cen } })));
-  for (const l of ["wq-c", "wq-t"]) if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", W.opts.length ? "none" : "visible");
-  const src = map.getSource("dst"); if (src) return src.setData(data);
-  map.addSource("dst", { type: "geojson", data });
-  map.addLayer({ id: "dst-c", type: "circle", source: "dst", paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 6, 16, 9, 18, 12],
-    "circle-color": ["match", ["get", "k"], "pay", "#E2557A", "free", "#16A34A", "mine", "#2563EB", "q", "#7C3AED", "#64748B"], "circle-stroke-color": "#fff", "circle-stroke-width": 3, "circle-pitch-alignment": "viewport" } },
-    map.getLayer("people") ? "people" : undefined);
-}
-// la vue pour choisir : son personnage au milieu de la zone libre (entre les barres du haut et le dock), un peu dézoomé et moins
-// incliné, assez pour voir les immeubles proposés (pas plus loin que le zoom 15 : les flèches disent où ils sont)
-function freeBand() {
-  const c = map.getContainer().getBoundingClientRect(), mid = c.top + c.height / 2;
-  const rs = s => [...document.querySelectorAll(s)].map(e => e.getBoundingClientRect()).filter(r => r.height > 0 && r.width > 0);
-  const top = Math.max(c.top + 50, ...rs("#bar,#credbar,#filter,.maptop>*").filter(r => r.bottom < mid).map(r => r.bottom)) - c.top;
-  const bot = Math.min(c.bottom - 50, ...rs("#dicebar,#tabs").filter(r => r.top > mid).map(r => r.top)) - c.top;
-  return { top, bot, w: c.width, h: c.height };
-}
-function showOpts(again) {
-  const me = meP(); if (!me || !W.opts.length || !map) return;
-  const b = freeBand(), P = b.top + b.bot - b.h;   // le point visé au milieu de la bande libre
-  const R = Math.max(90, ...W.opts.map(o => mLL([me.lon, me.lat], o.cen)));
-  const half = Math.max(80, Math.min(b.w / 2 - 40, (b.bot - b.top) / 2 - 46));
-  const z = Math.log2(40075016.686 * Math.cos(me.lat * Math.PI / 180) / (512 * R * 1.3 / half));
-  CAM.on = true; hidePreviewOnly();
-  map.easeTo({ center: [me.lon, me.lat], zoom: Math.max(15, Math.min(camZoom(), z)), pitch: 40, padding: { top: Math.max(0, P), bottom: Math.max(0, -P), left: 0, right: 0 }, duration: again ? 450 : 750, essential: true });
-}
-// les flèches autour de son personnage, chacune vers son immeuble (à l'écran) ; deux flèches trop proches s'écartent
-function layoutChips() {
-  const box = $("#dchips"); if (!box || box.hidden || !W.opts.length || !map) return;
-  const me = meP(); if (!me) return;
-  const s = window.people3d?.screen(me.id), q0 = map.project([me.lon, me.lat]);
-  const cx = s ? s.hx : q0.x, cy = s ? (s.hy + s.fy) / 2 : q0.y - 14, h = s ? s.fy - s.hy : 28;
-  const R = Math.max(innerWidth < 700 ? 54 : 62, h / 2 + 26), RX = R + 14;
-  const ang = W.opts.map(o => { const q = map.project(o.cen); return Math.atan2(q.y - cy, q.x - cx); });
-  const pos = ang.slice(), n = pos.length, MIN = .9;   // (radians, ~52°)
-  for (let it = 0; it < 12; it++) {
-    const ord = pos.map((a, i) => i).sort((i, j) => pos[i] - pos[j]); let moved = false;
-    for (let k = 0; k < n; k++) {
-      const i = ord[k], j = ord[(k + 1) % n]; let d = pos[j] - pos[i]; if (k === n - 1) d += 2 * Math.PI;
-      if (n > 1 && d < MIN) { const m = (MIN - d) / 2; pos[i] -= m; pos[j] += m; moved = true; }
-    }
-    if (!moved) break;
-  }
-  [...box.children].forEach((el, i) => {
-    const a = pos[i]; if (a == null) return;
-    el.style.transform = `translate(${(cx + Math.cos(a) * RX).toFixed(1)}px,${(cy + Math.sin(a) * R).toFixed(1)}px) translate(-50%,-50%)`;
-    const svg = el.querySelector("svg"); if (svg) svg.style.transform = `rotate(${ang[i].toFixed(3)}rad)`;
-  });
-}
-// toucher une flèche, ou l'immeuble de sa couleur : sa montgolfière y vole tout droit, au-dessus des toits (1,2 à 3 s), la caméra suit
-async function pickOpt(g) {
-  const o = W.opts.find(x => x.card === g), me = meP();
-  if (!o || !me || W.run || W.rolling || W.riding) return;
-  hideHint();
-  const pts = [[me.lon, me.lat], o.cen].map(q => [+q[0].toFixed(6), +q[1].toFixed(6)]);
-  const cum = pathLen(pts), dur = runDur(cum[cum.length - 1]);
-  const from = { lon: me.lon, lat: me.lat };
-  clearOpts(g); moving = true;
-  W.run = { g, t0: performance.now(), dur, z0: map.getZoom(), z1: camZoom(), p0: map.getPitch(), p1: camPitch(camZoom()), pad0: map.getPadding(), pad1: camPad() };
+  if (g != null) { const c = card(g) ? centerOf(g) : null; if (!c) return; lon = c[0]; lat = c[1]; }
+  const c = W.cfg || {};
+  if (lon < (c.w ?? 2.21) || lon > (c.e ?? 2.48) || lat < (c.s ?? 48.805) || lat > (c.n ?? 48.91)) return toast("Restez dans Paris", "bad");
+  const L = mLL([me.lon, me.lat], [lon, lat]);
+  if (L < 3 && g == null) return;
+  if (L / 1000 > kmLeft() + .0005) return kmSheet(L);
+  const pts = [[me.lon, me.lat], [lon, lat]].map(q => [+q[0].toFixed(6), +q[1].toFixed(6)]);
+  const cum = pathLen(pts), dur = runDur(L), from = { lon: me.lon, lat: me.lat };
+  justBought = null; landCredit = null; setMovebar(""); closeSheet(); moving = true;
+  W.run = { g, t0: performance.now(), dur, z0: map.getZoom(), z1: camZoom(), p0: map.getPitch(), p1: camPitch(camZoom()), pad0: map.getPadding(), pad1: camPad(),
+    arc: Math.max(0, Math.min(2.2, Math.log2(L / 500))), hits: null, hi: 0, sum: 0 };
+  if (g != null && mapReady) map.setFeatureState(Object.assign({ id: g }, BLD), { dst: 2 });   // l'immeuble visé, en vert
   CAM.on = true; map.stop();
   setTrip(me, pts, cum, dur, 0); drawRoute(pts); renderDock();
   const run = W.run;
-  run.wait = rpc("dice_go", { p_card: g, p_path: pts }).then(r => {
-    run.res = r;
-    // le serveur a pris un autre trajet (tout droit) ou une autre durée : on suit le sien à partir d'ici
-    if (W.run === run && me.path && (r.path?.length !== pts.length || Math.abs(r.dur - dur) > .05)) {
-      const el = (performance.now() - run.t0) / 1000, left = Math.max(.4, r.dur - el);
-      if (r.path?.length !== pts.length) walkAlong(me, r.path, left); else { const f = Math.min(1, el / dur); me.dur = r.dur; me.t0 = performance.now() - f * r.dur * 1000; }
-      run.dur = Math.max(run.dur, el + left);
+  run.wait = rpc("fly", g != null ? { p_lon: null, p_lat: null, p_card: g } : { p_lon: pts[1][0], p_lat: pts[1][1], p_card: null }).then(r => {
+    run.res = r; run.hits = r.toll?.hits || [];
+    // le serveur a compté une autre durée : on suit la sienne à partir d'ici
+    if (W.run === run && me.path && Math.abs(r.dur - run.dur) > .05) {
+      const f = Math.min(1, (performance.now() - run.t0) / 1000 / run.dur); me.dur = r.dur; me.t0 = performance.now() - f * r.dur * 1000; run.t0 = me.t0; run.dur = r.dur;
     }
     return r;
   }).catch(e => {
     if (W.run !== run) return null;
-    W.run = null; moving = false; me.lon = from.lon; me.lat = from.lat; stopPerson(me); drawRoute(null);
-    if (mapReady) map.setFeatureState(Object.assign({ id: g }, BLD), { dst: 0 });
+    W.run = null; moving = false; me.lon = from.lon; me.lat = from.lat; stopPerson(me); drawRoute(null); tollLabel(0);
+    if (g != null && mapReady) map.setFeatureState(Object.assign({ id: g }, BLD), { dst: 0 });
     const m = e.message || ""; toast(m, "bad");
-    if (/Revenez/.test(m)) rejoin(); else resumeRoll();
+    if (/Revenez/.test(m)) rejoin(); else if (/km/.test(m)) refreshState().then(renderDock).catch(() => { });
     renderDock(); return null;
   });
 }
-// posée au bout de son vol : ce qui s'est passé là (salaire, loyer payé, bonus, carte Chance), sa case s'ouvre
+// pendant le vol : le péage des immeubles survolés (le serveur les rend dans l'ordre du vol) — le compteur sur sa montgolfière
+// monte, l'immeuble clignote en rose ; à l'arrivée, les derniers
+function tollStep(run, f) {
+  const H = run.hits; if (!H) return;
+  while (run.hi < H.length && H[run.hi][2] <= f + .02) {
+    const [g, a] = H[run.hi++]; run.sum += a; tollLabel(run.sum);
+    if (mapReady && g !== run.g) { map.setFeatureState(Object.assign({ id: g }, BLD), { dst: 1 }); setTimeout(() => { if (mapReady && (!W.run || W.run.g !== g)) map.setFeatureState(Object.assign({ id: g }, BLD), { dst: 0 }); }, 750); }
+  }
+}
+function tollLabel(n) {
+  const el = meP()?.el?.querySelector(".nm"); if (!el) return;
+  const t = n > 0 ? "−" + fmtE(n) : "Vous"; if (el.textContent !== t) el.textContent = t;
+  el.parentElement.classList.toggle("toll", n > 0);
+}
+// posée au bout de son vol : le salaire, le péage, et sa case (un immeuble : libre, on l'achète ; un « ? » : une carte Chance)
 async function arrived() {
   const me = meP(), run = W.run; drawRoute(null); offMe();
-  if (!run) return;   // (un trajet repris après un rechargement)
+  if (!run) return;   // (un vol repris après un rechargement)
   if (CAM.on && map && cur() === "map" && !map.isMoving()) map.jumpTo({ center: [me.lon, me.lat], zoom: run.z1, pitch: run.p1, padding: run.pad1 });
   const r = run.res || await run.wait;
   if (W.run !== run) return;
+  if (r) tollStep(run, 1);
   W.run = null; moving = false;
-  if (mapReady) map.setFeatureState(Object.assign({ id: run.g }, BLD), { dst: 0 });
+  if (run.g != null && mapReady) map.setFeatureState(Object.assign({ id: run.g }, BLD), { dst: 0 });
   renderDock(); queueCells(true);
-  if (!r) return;
-  setState(r.state); renderWallet();
-  const L = r.landing; lastLanding = L; justBought = null; landCredit = null;
-  if (L.chance) { W.taken.add(L.card); renderQ(); }
-  if (L.salary > 0) moneyPop(L.salary);
-  sfx(L.toll > 0 ? "bad" : "coin");
-  await ensureCards([L.card]).catch(() => { });
-  showLand(L);
-  if (L.chance?.extra || ["booster", "bonne", "cle"].includes(L.chance?.k)) Promise.all([refreshHold(), refreshMap()]).then(() => { paintAll(); if (panelKind === "land") showLand(L); }).catch(() => { });
+  if (!r) return tollLabel(0);
+  W.flights = (W.flights || 0) + 1;
+  setState(r.state); renderWallet(); renderDock();
+  const toll = r.toll?.toll || 0;
+  if (r.salary > 0) moneyPop(r.salary);
+  if (toll > 0) { setTimeout(() => moneyPop(-toll), 700); tollHint(toll); }
+  clearTimeout(W.tlT); W.tlT = setTimeout(() => { if (!W.run) tollLabel(0); }, toll > 0 ? 2600 : 0);
+  sfx(toll > 0 ? "bad" : "coin");
+  const L = r.landing;
+  if (L) {
+    lastLanding = L; justBought = null; landCredit = null;
+    if (L.chance) { W.taken.add(L.card); renderQ(); }
+    await ensureCards([L.card]).catch(() => { });
+    showLand(L);
+    if (L.chance?.extra || ["booster", "bonne", "cle"].includes(L.chance?.k)) Promise.all([refreshHold(), refreshMap()]).then(() => { paintAll(); if (panelKind === "land") showLand(L); }).catch(() => { });
+  }
   if (typeof tutTick === "function") tutTick();
 }
-// toucher un immeuble, un monument ou le repère d'une station : une destination du dé, on y va ; sinon sa case (on regarde)
-function worldTapAt(g) {
-  if (W.opts.some(o => o.card === g)) return pickOpt(g);
-  if (W.opts.length || W.run || W.rolling) return;   // (en train de choisir : on choisit une flèche)
-  worldTapCard(g);
+// le premier péage (une fois, nouveaux et anciens joueurs) : une phrase pour comprendre
+function tollHint(n) {
+  try { if (localStorage.getItem("hm_tollhint")) return; localStorage.setItem("hm_tollhint", "1"); } catch (e) { return; }
+  toast(`Péage −${fmtE(n)} : vous avez survolé l'immeuble d'un autre joueur (en rose). Une fois par jour par immeuble.`, "bad");
 }
-// toucher la carte ailleurs : le point d'une destination du dé, on y va ; sinon rien (plus de marche libre)
-function worldMapClick(e) {
-  if (!W.on || !W.opts.length || !map.getLayer("dst-c")) return false;
-  const p = e.point, box = [[p.x - 10, p.y - 10], [p.x + 10, p.y + 10]];   // (un peu plus large que le point : on le touche au doigt)
-  const q = map.queryRenderedFeatures(box, { layers: ["dst-c"] }).map(f => +f.properties.g).find(g => W.opts.some(o => o.card === g));
-  if (q != null) { pickOpt(q); return true; }
-  return false;
+// toucher un immeuble, un monument ou le repère d'une station : sa case, avec « Y aller » (là où l'on s'est posé : sa case d'achat)
+function worldTapAt(g) { if (W.run || W.riding) return; worldTapCard(g); }
+// toucher la carte ailleurs : un « ? » du jour sous le doigt, sa case ; sinon, on y vole (assez zoomé pour voir où)
+function worldGround(e) {
+  if (!W.on || !e?.lngLat || mode !== "all" || W.run || W.riding || moving) return;
+  const p = e.point, box = [[p.x - 12, p.y - 12], [p.x + 12, p.y + 12]];
+  if (map.getLayer("wq-c")) { const f = map.queryRenderedFeatures(box, { layers: ["wq-c"] })[0]; if (f) return worldTapCard(+f.properties.g); }
+  if (map.getZoom() < 13.8) { if (!W.zoomHint) { W.zoomHint = true; toast("Zoomez pour choisir où voler"); } return; }   // (une fois : dézoomé, on regarde)
+  flyMe(e.lngLat.lng, e.lngLat.lat, null);
 }
 async function worldTapCard(g) {
   await ensureCards([g]); if (!card(g)) return;
   hideHint(); justBought = null; landCredit = null; showLand(null, g);
 }
-// les boutons de la case : là où l'on est tombé, une station : « Prendre le métro »
+// « Y aller » sur une case qu'on regarde : la distance (et assez de km ?)
+function goBtn(g) {
+  const me = meP(), c = card(g) ? centerOf(g) : null; if (!W.on || !me || !c || (typeof S !== "undefined" && S.on)) return "";
+  const d = mLL([me.lon, me.lat], c);
+  return `<button class="btn block buy" data-lgo="${g}"><span>Y aller · ${distTxt(d)}</span></button>`;
+}
+// les boutons de la case : là où l'on s'est posé, une station : « Prendre le métro »
 function worldLandBtns(g, view) {
   if (!W.on || !W.G || view) return "";
   return W.G.st.has(g) ? `<button class="btn block light" data-wmetro="${g}">🚇 Prendre le métro</button>` : "";
 }
-function moneyPop(n) {   // « +20 000 € » qui monte sous l'argent : le salaire du lancer
+function moneyPop(n) {   // « +12 000 € » (le salaire) qui monte sous l'argent ; « −2 000 € » (le péage) en rouge, juste dessous
   const m = $("#bar .money"); if (!m || !n) return; const r = m.getBoundingClientRect(); if (!r.width) return;
-  const el = document.createElement("div"); el.className = "mpop num"; el.textContent = "+" + fmtE(n);
-  el.style.left = (r.left + r.width / 2) + "px"; el.style.top = (r.bottom + 2) + "px"; document.body.appendChild(el);
-  setTimeout(() => el.remove(), 1700);
+  const el = document.createElement("div"); el.className = "mpop num" + (n < 0 ? " bad" : ""); el.textContent = (n < 0 ? "−" : "+") + fmtE(Math.abs(n));
+  el.style.left = (r.left + r.width / 2) + "px"; el.style.top = (r.bottom + 2 + (n < 0 ? 20 : 0)) + "px"; document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1900);
 }
-// plus de lancers : le prochain dans combien de temps, ou 5 de plus contre l'argent du jeu
-const rollWait = () => Math.max(0, (ST.state?.roll_in || 0) - (performance.now() - ST.stAt) / 1000);
-function buyRollsSheet() {
-  const price = ST.state?.rolls_price || 50000, m = Math.max(1, Math.ceil(rollWait() / 60));
-  sheet(`<b class="plst">🎲 Plus de lancers</b><p class="plp">Le prochain dans ${m} min</p><button class="btn block buy" data-brolls ${liveCash() < price ? "disabled" : ""}><span>5 lancers · ${fmtE(price)}</span></button>`,
+// ses km : combien il en reste, ce qui revient, en acheter (need : la distance d'un vol trop long)
+function kmSheet(need) {
+  const left = kmLeft(), price = ST.state?.km_price || W.cfg?.kmPrice || 50000, pack = W.cfg?.kmPack || 2, full = kmFree() >= (W.cfg?.kmMax || 5) - .001;
+  const head = need ? `Il faut ${distTxt(need)} : il vous reste ${kmShort(left)}` : `${kmShort(left)} pour voler`;
+  sheet(`<b class="plst">${esc(head)}</b><p class="plp">${full ? `${kmTxt(W.cfg?.kmMax || 5)} : c'est le plein` : "+500 m toutes les 30 min"} · 20 000 € par km volé</p>
+    <button class="btn block buy" data-bkm ${liveCash() < price ? "disabled" : ""}><span>+${pack} km · ${fmtE(price)}</span></button>`,
     async b => {
-      const x = b.closest("[data-brolls]"); if (!x || x.disabled) return; x.disabled = true;
-      try { setState(await rpc("buy_rolls")); closeSheet(); renderWallet(); toast("5 lancers en plus !", "good"); sfx("coin"); }
+      const x = b.closest("[data-bkm]"); if (!x || x.disabled) return; x.disabled = true;
+      try { setState(await rpc("buy_km")); closeSheet(); renderWallet(); renderDock(); toast(`+${pack} km !`, "good"); sfx("coin"); }
       catch (e) { x.disabled = false; toast(e.message, "bad"); }
     });
 }
+// le bouton du milieu : sa montgolfière (26/10/2026, choix du propriétaire : « au lieu du dé, ça affiche plutôt le nombre de mètres
+// qui nous restent » ; « même si la montgolfière est un peu à gauche, on doit pouvoir recentrer dessus simplement ») : la caméra
+// n'est pas sur elle, on y revient ; sinon, ses km
+function mainBtn() {
+  const me = meP(); if (!W.on || !me) return;
+  hideHint();
+  if (W.run) return centerOnMe(true);
+  const q = map ? map.project([me.lon, me.lat]) : null, cw = map?.getContainer().clientWidth || 0, ch = map?.getContainer().clientHeight || 0;
+  const off = !CAM.on || !q || Math.abs(q.x - cw / 2) > cw * .18 || q.y < ch * .2 || q.y > ch * .85 || map.getZoom() < 15.2 || cur() !== "map";
+  if (cur() !== "map") go("map");
+  if (off) return centerOnMe(true);
+  kmSheet();
+}
+const BALLOON_ICO = `<svg viewBox="0 0 40 52" width="40" height="52" aria-hidden="true"><path d="M20 3C29.6 3 36 10.2 36 18.8c0 7.3-5.2 11.9-9 15.7-.9.9-1.8 1.9-3 1.9h-8c-1.2 0-2.1-1-3-1.9C9.2 30.7 4 26.1 4 18.8 4 10.2 10.4 3 20 3z" fill="#fff"/><path d="M20 3c-4.6 4.6-6 10.4-6 15.8 0 6.6 2.6 12.4 6 17.6 3.4-5.2 6-11 6-17.6C26 13.4 24.6 7.6 20 3z" fill="#BFD2FB"/><path d="M16.6 36.6 17.3 42M23.4 36.6 22.7 42" stroke="#fff" stroke-width="1.4"/><rect x="15.5" y="42" width="9" height="7" rx="1.6" fill="#fff"/></svg>`;
 
-// ---- le bas de l'écran : le dé au milieu (choix du propriétaire, 21/10/2026), « Parler » à côté, les boosters de l'autre côté ----
+// ---- le bas de l'écran : sa montgolfière au milieu et ses km dessous (26/10/2026 ; du 21 au 26/10 : le dé), « Salon » à côté,
+// les boosters de l'autre côté ----
 const canSay = () => W.on && !W.chatOff && !W.banned;
 function renderDock() {
   const b = $("#b-main"); if (!b) return;
   const p = ST.state?.profile, me = meP();
   if (me && p && (me.party !== p.party || me.pseudo !== p.pseudo)) { me.party = p.party; me.pseudo = p.pseudo; window.people3d?.look(me.id, spec3d(me)); drawLabel(me); }
-  const left = p?.rolls ?? 0, pick = W.opts.length > 0, wait = rollWait();
-  if (!W.rolling) { const face = W.die || 5, k = "d" + face; if (b.dataset.k !== k) { b.dataset.k = k; $("#mainico").innerHTML = dieSVG(face, 46); } }
-  const n = $("#rollsn"), t = left > 0 ? String(left) : wait > 0 ? Math.max(1, Math.ceil(wait / 60)) + " min" : "…";
+  if (b.dataset.k !== "bal") { b.dataset.k = "bal"; $("#mainico").innerHTML = BALLOON_ICO; }
+  const km = kmLeft(), n = $("#rollsn"), t = ST.state?.km_free == null ? "…" : kmShort(km);
   if (n && n.textContent !== t) n.textContent = t;
-  b.classList.toggle("empty", left <= 0 && !pick); b.classList.toggle("pick", pick); b.classList.toggle("busy", !!W.run);
-  const al = pick ? "Revoir les destinations" : left > 0 ? `Lancer le dé (${left} lancer${left > 1 ? "s" : ""})` : `Plus de lancers : le prochain dans ${Math.max(1, Math.ceil(wait / 60))} min`;
+  b.classList.toggle("empty", km < .01); b.classList.toggle("busy", !!W.run); b.classList.remove("pick");
+  const al = `Ma montgolfière : ${t} pour voler`;
   if (b.getAttribute("aria-label") !== al) b.setAttribute("aria-label", al);
-  if (left <= 0 && wait <= 0 && p && !W.rsT) W.rsT = setTimeout(() => { W.rsT = 0; refreshState().then(renderDock).catch(() => { }); }, 2000);   // le lancer est revenu
+  // les km se rechargent : on remet le chiffre à jour de temps en temps (pas besoin du serveur)
+  clearTimeout(W.kmT); if (km < (W.cfg?.kmMax || 5) + (+ST.state?.km_buy || 0) - .001) W.kmT = setTimeout(renderDock, 9000);
   const s = $("#b-say"); if (s && s.hidden === canSay()) s.hidden = !canSay();
   salonBadge();
 }
@@ -853,7 +790,6 @@ async function ride(from, to) {
   const me = meP(); if (!me || W.riding || W.run) return;
   W.riding = true; moving = true;
   let r; try { r = await rpc("world_metro", { p_to: to }); } catch (e) { W.riding = false; moving = false; return toast(e.message, "bad"); }
-  clearOpts();   // un dé lancé et pas joué : le serveur le rend (ses destinations étaient autour de l'ancienne station)
   setState(r.state); W.w = r.w || W.w; renderWallet(); renderDock();
   if (panelKind) { justBought = null; setMovebar(""); }
   const stops = metroPath(from, to); await ensureCards(stops.concat([to]));

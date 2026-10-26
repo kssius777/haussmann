@@ -31,8 +31,8 @@ function colorExprs(m) {
   const zv = ["match", ["%", ["id"], 3], 0, MC.zinc, 1, MC.zinc2, MC.zinc3], zl = MC.lit === MC.zinc ? zv : MC.lit;   // trois nuances de toits (le jour)
   if (m === "mine") return { roof: ["case", se, MC.sel, [">=", st, 3], MC.mine, MC.muteR], body: ["case", se, MC.selB, [">=", st, 3], MC.mineB, MC.mute] };
   if (m === "sale") return { roof: ["case", se, MC.sel, ["==", st, 4], MC.sale, MC.muteR], body: ["case", se, MC.selB, ["==", st, 4], MC.saleB, MC.mute] };
-  // (avec la façade que la carte graphique dessine sur les murs : facade.js) ; les destinations du dé de la couleur de leur flèche
-  // (place.js : 1 on paie le loyer, 2 libre, 3 chez soi, 4 un « ? », 5 déjà pris)
+  // (avec la façade que la carte graphique dessine sur les murs : facade.js) ; l'état « dst » (place.js) : 1 un immeuble survolé
+  // dont on paie le péage (il clignote en rose), 2 l'immeuble où l'on vole (vert) ; 3 à 5 servaient au dé (jusqu'au 26/10/2026)
   const dst = (a, b, c, d, e, x) => ["case", ["==", ds, 1], a, ["==", ds, 2], b, ["==", ds, 3], c, ["==", ds, 4], d, ["==", ds, 5], e, x];
   return { roof: facRoof(dst("#EC4899", "#16A34A", "#2563EB", "#7C3AED", "#64748B", ["case", ["==", tg, 2], "#A855F7", ["==", tg, 1], "#FACC15", se, MC.sel, [">=", st, 3], MC.mine, ["==", st, 4], MC.sale, ["==", st, 2], MC.theirs, rarR(lit(zv, zl, zl))])),
            body: facBody(dst("#F9A8D4", "#86EFAC", "#93C5FD", "#C4B5FD", "#CBD5E1", ["case", ["==", tg, 2], "#D8B4FE", ["==", tg, 1], "#FDE68A", se, MC.selB, [">=", st, 3], MC.mineB, ["==", st, 4], MC.saleB, ["==", st, 2], MC.theirsB, rarB(lit(MC.stone, MC.litB, MC.lit2B))])) };
@@ -97,7 +97,7 @@ function buildMap(base) {
   const ev = ST.state?.event, BLD_SRC = { source: "pv", "source-layer": "b" };
   map = new maplibregl.Map({
     container: "map", attributionControl: false, center: [2.3440, 48.8566], zoom: 14.2, pitch: 55, bearing: 0, maxPitch: 75, minZoom: 10.8,
-    doubleClickZoom: false,   // un clic choisit une destination du dé : un double clic ne zoome pas en plus (on zoome à la molette, en pinçant)
+    doubleClickZoom: false,   // un clic fait voler sa montgolfière : un double clic ne zoome pas en plus (on zoome à la molette, en pinçant)
     maxBounds: [[2.16, 48.77], [2.54, 48.95]], fadeDuration: 0, maxTileCacheSize: 48,   // peu de tuiles gardées en mémoire (téléphones) dragRotate: true, touchPitch: true, pitchWithRotate: true,
     style: { version: 8, glyphs: "/fonts/{fontstack}/{range}.pbf",
       light: GROUND.light, sky: GROUND.sky,
@@ -358,22 +358,23 @@ function flyTo(g) { if (!map || !mapReady) return; camOff(); const m = IDX.model
 function showOnMap(g) { go("map"); setTimeout(() => { flyTo(g); previewBuilding(g); }, 80); }
 
 // aperçu d'un immeuble : le même panneau que la case (à droite sur ordinateur, en bas sur téléphone)
-async function previewBuilding(g) {   // là où le dé l'a fait tomber : on peut l'acheter ; ailleurs : sa case, pour regarder (place.js)
+async function previewBuilding(g) {   // là où l'on s'est posé : on peut l'acheter ; ailleurs : sa case, avec « Y aller » (place.js)
   await ensureCards([g]); if (!card(g)) return; closeSearch(); hideHint();
   if (g === landPos()) { landView = false; showLand(); } else worldTapCard(g);
 }
 function hidePreview() { if (!moving && (panelKind !== "land" || landView)) setMovebar(""); const pv = $("#preview"); if (pv && !pv.hidden) { pv.hidden = true; sel = null; paintAll(); if (false) $("#strip").hidden = false; } }
 function closeSearch() { $("#search").hidden = true; }
-// un toucher sur la carte (g : l'immeuble ou le monument touché) : une destination du dé, on y va ; un autre immeuble, sa case
+// un toucher sur la carte (g : l'immeuble ou le monument touché) : sa case (« Y aller ») ; ailleurs : sa montgolfière y vole
 // (place.js). Une case ouverte : sur téléphone, le toucher la ferme seulement (sans bouger la carte) ; sur ordinateur, où elle est sur
-// le côté, il la ferme et vaut aussi pour ce qu'on touche. La recherche ouverte : le toucher la ferme seulement.
+// le côté, il la ferme et ouvre l'immeuble touché, mais ne fait pas voler (on ne dépense pas de km en fermant une case). La
+// recherche ouverte : le toucher la ferme seulement.
 function mapTap(e, g) {
   if (typeof S !== "undefined" && S.on) { if (document.activeElement?.id === "wsq") document.activeElement.blur(); else salonTap(e); return; }   // au salon : toucher la pelouse (le clavier ouvert : on le ferme seulement)
-  if (panelKind === "land" && !moving) { justBought = null; setMovebar(""); closeSearch(); if (innerWidth < 900) return; }
+  if (panelKind === "land" && !moving) { justBought = null; setMovebar(""); closeSearch(); if (innerWidth < 900 || g == null) return; }
   if (!$("#search").hidden || performance.now() - tapGuard < 700) { closeSearch(); return; }   // ce toucher fermait la recherche : rien d'autre
   hidePreview();
-  if (worldMapClick(e)) return;   // un « ? » proposé par le dé
   if (g != null) return onBuildingTap(g);
+  worldGround(e);   // (place.js : un « ? » du jour, sa case ; sinon on y vole)
 }
 
 function initMapUI() {
@@ -411,9 +412,9 @@ function initMapUI() {
 }
 
 // petit message d'aide sur la carte, jusqu'au premier achat ou aperçu
-// (20/10/2026 : pour ceux qui jouaient avec le dé, une fois) on se promène maintenant
-function showHint() { try { if (localStorage.getItem("hm_hint3") || +(localStorage.getItem("hm_tut") || 99) < 99) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "<b>Le dé revient 🎲</b>"; h.onclick = hideHint; $("#p-map").appendChild(h); }
-function hideHint() { if (!$("#maphint")) return; $("#maphint").remove(); try { localStorage.setItem("hm_hint3", "1"); } catch (e) { } }
+// (26/10/2026 : pour ceux qui jouaient avec le dé, une fois) le dé s'en va, on vole où l'on veut
+function showHint() { try { if (localStorage.getItem("hm_hint4") || +(localStorage.getItem("hm_tut") || 99) < 99) return; } catch (e) { } if ($("#maphint")) return; const h = document.createElement("div"); h.id = "maphint"; h.innerHTML = "<b>Fini le dé : touchez la carte pour voler</b>"; h.onclick = hideHint; $("#p-map").appendChild(h); }
+function hideHint() { if (!$("#maphint")) return; $("#maphint").remove(); try { localStorage.setItem("hm_hint4", "1"); } catch (e) { } }
 function celebrate(c) { toast(`Félicitations ! ${title(c)} est à vous. Loyer : +${fmtE(c.rent)}/jour`, "good"); if (window.confetti) confetti("#0EA5A0", 30); }
 
 // ---- rangée de cartes en bas de la carte : mes biens / à vendre ----------------------------
@@ -439,7 +440,7 @@ function showStrip(kind) {
   stripKind = kind;
   const items = kind === "mine" ? holdings().sort((a, b) => b.c.v * unitsOf(b) - a.c.v * unitsOf(a)).map(h => ({ g: h.g, c: h.c, item: { t: "own", ks: h.ks, n: h.n } }))
     : [...ST.sale].map(g => ({ g, c: card(g) })).filter(x => x.c);
-  if (!items.length) { stripKind = kind; showStrip("all"); return toast(kind === "mine" ? "Vous n'avez encore aucun bien : lancez le dé ou ouvrez un booster !" : "Rien à vendre en ce moment."); }
+  if (!items.length) { stripKind = kind; showStrip("all"); return toast(kind === "mine" ? "Vous n'avez encore aucun bien : volez vers un immeuble libre ou ouvrez un booster !" : "Rien à vendre en ce moment."); }
   // pas de rangée de cartes : seulement les points sur la carte (demande du propriétaire)
   el.hidden = true; setStripPins(items); document.body.classList.add("mymode"); document.body.classList.toggle("salemode", kind === "sale"); map.setPaintProperty("arrfill", "fill-opacity", 0);
   stripCount(items); renderMarks();

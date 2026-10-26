@@ -5,16 +5,26 @@ def player(name, party, cash=50_000_000):
     u = uuid.uuid4(); db.sql("insert into auth.users(id) values (%s)", str(u)); db.rpc(u, "join_game", p_pseudo=name + str(u)[:4], p_party=party)
     db.sql("update profiles set cash=%s where id=%s", cash, str(u)); return u
 cash = lambda u: db.sql("select cash from profiles where id=%s", str(u))[0][0]
-land = lambda u, t: db.sql("select _land(%s, %s, 1, array[%s])::text", str(u), t, t)[0][0]
-t, rent = db.sql("select id, rent from cards where lk='l' and lots between 2 and 6 and rent > 1000 and id not in (select card from lots) limit 1")[0]
+# les pouvoirs des partis avec la montgolfière (26/10/2026, migration_vol.sql ; avant : avec le dé) : Gauche, salaire doublé (40 000 €
+# le km) ; le péage (survoler l'immeuble d'un autre joueur = le loyer écrit sur sa carte) : Extrême gauche paie moitié prix,
+# un propriétaire d'Extrême droite encaisse 50 % de plus
+t, rent = db.sql("""select id, rent from cards c where lk='l' and lots between 2 and 6 and rent > 1000 and id not in (select card from lots)
+  and not exists (select 1 from lots l join cards k on k.id = l.card where abs(k.cx - c.cx) < 120 and abs(k.cy - c.cy) < 120)
+  and not exists (select 1 from parts l join cards k on k.id = l.card where abs(k.cx - c.cx) < 120 and abs(k.cy - c.cy) < 120) limit 1""")[0]
+tx, ty = map(float, db.sql("select cx / 1e5, cy / 1e5 from cards where id=%s", t)[0])
 N, Pg, Rp, Gu, Jm, Dl = player("Neutre", None), player("Poing", "poing"), player("Remp", "rempart"), player("Gauche", "tendue"), player("Milieu", "milieu"), player("Droite", "valeurs")
 db.sql("insert into lots(card,k,owner) values (%s,0,%s)", t, str(N))
-def toll(payer): c0 = cash(payer); L = json.loads(land(payer, t))["landing"]; return L
-L = toll(Gu); check("Gauche : salaire doublé à chaque lancer (40 000 €)", L["salary"] == 40000, L["salary"])
-L = toll(Dl); check("loyer de passage normal : une journée de loyer", abs(L["toll"] - rent) <= 1 and L["salary"] == 20000, (L["toll"], rent))
-L = toll(Pg); check("Extrême gauche : paie 50 % de loyer en moins", abs(L["toll"] - rent * .5) <= 1 and L["perk"] == "poing", (L["toll"], rent))
+def toll(payer):   # survoler l'immeuble t (un vol qui passe juste au-dessus)
+    db.sql("delete from toll_seen where user_id=%s", str(payer))
+    return json.loads(db.sql("select _ftoll(%s, %s, %s, %s, %s, null)::text", str(payer), tx - .0004, ty, tx + .0004, ty)[0][0])
+db.rpc(Gu, "world_join"); db.sql("update walkers set lon=%s, lat=%s, lon0=%s, lat0=%s, dur=0, path=null, settled=true, t0 = now() - interval '1 minute' where user_id=%s", tx, ty, tx, ty, str(Gu))
+db.sql("update profiles set km_free = 5, km_at = now() where id=%s", str(Gu))
+r = db.rpc(Gu, "fly", p_lon=tx + 1000 / 73240, p_lat=ty); db.rpc(Gu, "world_leave")
+check("Gauche : salaire doublé (40 000 € le km volé)", abs(r["salary"] - 40000) <= 2, r["salary"])
+L = toll(Dl); check("péage normal : le loyer écrit sur la carte", abs(L["toll"] - rent) <= 1 and L["n"] == 1, (L["toll"], rent))
+L = toll(Pg); check("Extrême gauche : paie 50 % de péage en moins", abs(L["toll"] - rent * .5) <= 1 and L["perk"] == "poing", (L["toll"], rent))
 db.sql("update lots set owner=%s where card=%s and k=0", str(Rp), t)
-L = toll(Dl); check("Extrême droite : encaisse 50 % de plus", abs(L["toll"] - rent * 1.5) <= 1 and L["perk"] == "rempart", (L["toll"], rent))
+L = toll(Dl); check("Extrême droite : encaisse 50 % de plus", abs(L["toll"] - rent * 1.5) <= 1, (L["toll"], rent))
 L = toll(Pg); check("Extrême gauche chez l'extrême droite : les deux s'appliquent (× 0,75)", abs(L["toll"] - rent * .75) <= 1, (L["toll"], rent))
 # Droite : apport 5 % et +50 % de capacité d'emprunt (sans les biens qu'une carte Chance a pu leur donner plus haut)
 for u in (N, Dl): db.sql("delete from lots where owner=%s", str(u)); db.sql("delete from parts where owner=%s", str(u))

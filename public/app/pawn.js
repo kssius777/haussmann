@@ -1,11 +1,11 @@
 "use strict";
 // =====================================================================
 //  La case d'un immeuble (le panneau du bas sur téléphone, à droite sur ordinateur) : ce qu'il y a, et l'achat.
-//  On achète à la banque l'immeuble sur lequel le dé l'a fait tomber (21/10/2026 : le dé revient, place.js).
+//  On achète à la banque l'immeuble sur lequel sa montgolfière s'est posée (26/10/2026 : elle vole où l'on veut, place.js).
 // =====================================================================
-let moving = false, panelKind = "", lastLanding = null, landPainted = null;   // moving : pendant une course (le dé) ou un trajet en métro
-const landPos = () => ST.state?.profile?.land ?? null;   // l'immeuble où le dé l'a fait tomber : celui qu'on peut acheter
-// vrai si on ne peut pas acheter cet immeuble à la banque (on n'y est pas tombé)
+let moving = false, panelKind = "", lastLanding = null, landPainted = null;   // moving : pendant un vol ou un trajet en métro
+const landPos = () => ST.state?.profile?.land ?? null;   // l'immeuble où l'on s'est posé : celui qu'on peut acheter
+// vrai si on ne peut pas acheter cet immeuble à la banque (on ne s'y est pas posé)
 const notLanded = g => landPos() !== g;
 const fmtDist = d => d >= 1000 ? (d / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " km" : Math.round(d / 10) * 10 + " m";
 const FC = f => ({ type: "FeatureCollection", features: f });
@@ -16,7 +16,7 @@ function paintTargets() {
   if (landPainted != null && landPainted !== g) map.setFeatureState(Object.assign({ id: landPainted }, BLD), { tgt: 0 });
   if (g != null) { map.setFeatureState(Object.assign({ id: g }, BLD), { tgt: 1 }); landPainted = g; }
 }
-function onBuildingTap(g) { if (!moving) worldTapAt(g); }   // une destination du dé : on y va ; sinon sa case (place.js)
+function onBuildingTap(g) { if (!moving) worldTapAt(g); }   // sa case, avec « Y aller » (place.js)
 
 // centres des immeubles (pour les maquettes des cartes)
 const CEN = [];
@@ -51,8 +51,8 @@ function fitLand() {
   });
 }
 addEventListener("resize", () => { if (panelKind === "land") fitLand(); });
-// ---- la case où l'on tombe -----------------------------------------------------------
-// L : ce que le serveur a renvoyé à l'arrivée (loyer payé, bonus, Chance) ; sans L, on réaffiche la case actuelle
+// ---- la case où l'on se pose -----------------------------------------------------------
+// L : ce que le serveur a renvoyé à l'arrivée (péage, Chance) ; sans L, on réaffiche la case actuelle
 // gv : afficher un autre immeuble que la case (clic sur la carte, sur un monument…) — même panneau, mais on ne peut pas l'acheter à la banque
 let landView = false;
 function showLand(L, gv) {
@@ -70,15 +70,13 @@ function showLand(L, gv) {
   const jb = !view && justBought && justBought.g === g;
   if (view) { head = mine > 0 ? (free > 0 ? "À vous en partie" : "À vous") : free > 0 ? (isP ? "Parts disponibles" : "Libre") : owners.length ? "Déjà pris" : "Tout est vendu"; cls = mine > 0 ? "home" : free > 0 ? "free" : ""; }
   else if (jb) { head = (justBought.whole ? "✓ Tout l'immeuble acheté" : "✓ Acheté") + (justBought.credit ? " à crédit !" : " comptant !"); cls = "home"; }
-  else if (L?.toll > 0) { head = `Chez ${L.payees.map(p => esc(p.pseudo)).join(", ")}`; cls = "bad"; }
   else if (mine > 0 && free > 0) { head = "Vous êtes chez vous"; cls = "home"; }
   else if (mine > 0) { head = "Tout l'immeuble est à vous"; cls = "home"; }
   else if (free > 0) { head = !isP && tot > 1 ? `Libre : ${tot} ${word(tot)} à vendre` : "Libre, à vendre !"; cls = "free"; }
   else { head = "Tout est déjà pris"; cls = ""; }
-  // ce qui s'est passé à l'arrivée (on n'affiche que ce qui compte : loyer payé, bonus, Chance)
+  // ce qui s'est passé pendant le vol et à l'arrivée (on n'affiche que ce qui compte : le péage, la Chance)
   const lines = [];
-  if (L?.toll > 0) lines.push(`<span class="ln bad">Vous payez son loyer · <b>−${fmtE(L.toll)}</b>${L.perk === "poing" ? " <small>(−50 % : vous êtes d'extrême gauche)</small>" : L.perk === "rempart" ? " <small>(+50 % : propriétaire d'extrême droite)</small>" : ""}</span>`);
-  if (L?.bonus > 0) lines.push(`<span class="ln good">Bonus chez vous · <b>+${fmtE(L.bonus)}</b></span>`);
+  if (L?.toll > 0) lines.push(`<span class="ln bad">Péage · <b>−${fmtE(L.toll)}</b></span>`);
   if (L?.chance) { const ch = L.chance; const [nm] = CHANCE[ch.k] || ["Chance"]; lines.push(`<span class="ln ${BAD.has(ch.k) ? "bad" : "good"}"><small>Case Chance${BAD.has(ch.k) ? " · pas de chance" : ""}</small>🃏 <b>${esc(nm)}</b> : ${esc(chanceText(ch))}</span>`); }
   // le plan des logements ; immeuble entièrement libre : juste les cases vides (on voit tout de suite combien il y en a)
   const occ = mine || others ? occHTML(c, mine, others, free) : !isP && tot > 1 && tot <= 40 ? `<div class="occ mini"><div class="oc">${"<i></i>".repeat(tot)}</div></div>` : "";
@@ -99,11 +97,11 @@ function showLand(L, gv) {
     }
     landCreditNow = cr;
   }
-  if (view) {   // on n'y est pas tombé : la fiche (on n'achète à la banque que là où le dé l'a fait tomber)
-    const listed = ST.sale.has(g);
-    btns = `<button class="btn block ${listed ? "buy" : "light"}" data-lopen="${g}"><span>${listed ? "En vente au Marché · voir l'offre" : isP ? "Voir la fiche" : "Voir la fiche de l'immeuble"}</span></button>`;
+  if (view) {   // on ne s'y est pas posé : « Y aller », et la fiche (on n'achète à la banque que là où l'on s'est posé)
+    const listed = ST.sale.has(g), go = goBtn(g);
+    btns = go + `<button class="btn block ${listed && !go ? "buy" : "light"}" data-lopen="${g}"><span>${listed ? "En vente au Marché · voir l'offre" : isP ? "Voir la fiche" : "Voir la fiche de l'immeuble"}</span></button>`;
   }
-  if (!view) btns += worldLandBtns(g, false);   // tombé sur une station : le métro
+  if (!view) btns += worldLandBtns(g, false);   // posé sur une station : le métro
   // racheter à un autre joueur : faire une offre (pas pendant l'écran « Acheté ! »)
   if (!jb && others > 0 && !isP && !ST.sale.has(g)) btns += `<button class="btn block light" data-lofr="${g}">🤝 Proposer de racheter ${owners.length === 1 ? "au propriétaire" : "à un propriétaire"}</button>`;
   if (jb) {   // juste acheté : ce qui a été payé, ce que ça rapporte ; s'il reste des logements libres, on peut continuer à acheter ici
@@ -160,6 +158,7 @@ function initPawnUI() {
   $("#minipack").innerHTML = packHTML("mini"); initSlides($("#movebar"));
   $("#movebar").addEventListener("click", async e => {
     if (e.target.closest("[data-mvclose]")) { justBought = null; setMovebar(""); return; }   // croix ou « Continuer » : la carte ne bouge pas
+    const lg = e.target.closest("[data-lgo]"); if (lg) return flyMe(null, null, +lg.dataset.lgo);   // « Y aller » : sa montgolfière y vole
     const pm = e.target.closest("[data-paymode]"); if (pm) { landCredit = pm.dataset.paymode === "1"; return showLand(); }
     const lb = e.target.closest("[data-lbuy],[data-lbuild]"); if (lb) {
       if (lb.classList.contains("slide") && !lb.dataset.ok && e.detail !== 0) return;   // un simple toucher ne suffit pas : il faut pousser jusqu'au bout (au clavier, Entrée suffit)

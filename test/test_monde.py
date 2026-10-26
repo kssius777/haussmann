@@ -1,6 +1,7 @@
-"""Paris (migration_monde.sql, migration_monde_paris.sql, puis migration_de.sql : le dé revient le 21/10/2026) : entrer,
-voir les gens par carrés, le dé (4 destinations au choix, on y court, on y tombe : salaire, loyer, bonus, Chance, achat),
-plus de marche libre, les lancers (10, un toutes les 30 min, en acheter), le métro, parler, couper le chat, les groupes."""
+"""Paris (migration_monde.sql, migration_monde_paris.sql, migration_de.sql, puis migration_vol.sql : le 26/10/2026, la
+montgolfière vole où l'on veut) : entrer, voir les gens par carrés, voler (tout droit, des km qui se rechargent, un salaire par km,
+en acheter), le péage (le loyer écrit sur la carte, une fois par jour par immeuble), se poser (sa case, l'achat, les « ? »),
+le métro, parler, couper le chat, les groupes."""
 import sys, uuid, json, math; sys.path.insert(0, 'test'); import db
 R = []
 def check(n, ok, info=""): R.append(bool(ok)); print(("PASS " if ok else "FAIL ") + n + (f"  · {info}" if info != "" else ""), flush=True)
@@ -16,10 +17,10 @@ cur.execute("""create schema if not exists realtime;
   $$ insert into realtime.sent(payload, event, topic, private) values (payload, event, topic, private) $$;
   truncate realtime.sent;""")
 for f in ["migration_admin.sql", "migration_chat.sql", "migration_chat_look.sql", "migration_metro.sql", "migration_lieux.sql",
-          "migration_monde.sql", "migration_monde_paris.sql", "migration_monde_paris.sql", "migration_vitesse.sql", "migration_temps_reel.sql", "migration_chat_minute.sql", "migration_vitesse2.sql", "migration_groupes.sql", "migration_groupes.sql", "migration_depart.sql", "migration_depart.sql", "migration_de.sql", "migration_de.sql", "migration_course.sql", "migration_course.sql"]:
+          "migration_monde.sql", "migration_monde_paris.sql", "migration_monde_paris.sql", "migration_vitesse.sql", "migration_temps_reel.sql", "migration_chat_minute.sql", "migration_vitesse2.sql", "migration_groupes.sql", "migration_groupes.sql", "migration_depart.sql", "migration_depart.sql", "migration_de.sql", "migration_de.sql", "migration_course.sql", "migration_course.sql", "migration_vol.sql", "migration_vol.sql"]:
     cur.execute(open("supabase/" + f).read())   # la dernière 2 fois : rejouable
 c0.commit()
-db.sql("truncate place_people, chat_msg, chat_bans, walkers, world_people, chance_taken")
+db.sql("truncate place_people, chat_msg, chat_bans, walkers, world_people, chance_taken, toll_seen")
 A, B, C = player("Ana", "valeurs"), player("Ben", "valeurs"), player("Cyd", "poing")
 cfg = db.sql("select _world_cfg()")[0][0]
 M = lambda a, b: math.hypot((a[0] - b[0]) * 73240, (a[1] - b[1]) * 110574)
@@ -52,122 +53,133 @@ check("un ancien joueur du temps du dé : il commence là où était son pion", 
 for u in news + [old_p]: db.rpc(u, "world_leave")
 db.sql("delete from walkers where user_id = any(%s::uuid[])", [str(u) for u in news + [old_p]])
 
-# le dé (21/10/2026, choix du propriétaire : « on peut remettre le dé pour se déplacer », « 4 destinations au choix »,
-# « on supprime la marche libre »)
-x0, y0 = j["pos"]
-check("plus de marche libre : on avance au dé", "Lancez le dé" in (err(lambda: db.rpc(A, "world_move", p_lon=x0 + 0.001, p_lat=y0, p_len=10)) or ""))
-rolls = lambda u: db.sql("select rolls from profiles where id=%s", str(u))[0][0]
-pend = lambda u, g, die=3: db.sql("update profiles set pend = array[%s]::int[], pend_die = %s where id=%s", g, die, str(u))   # (comme si le dé venait de proposer g)
-x0, y0 = 2.3640, 48.8670; put(A, x0, y0)   # (place de la République : des immeubles dans toutes les directions)
-db.sql("update profiles set rolls = 10, rolls_at = now(), pend = null, pend_die = null, land = null where id=%s", str(A))
-r = db.rpc(A, "roll"); d, opts = r["die"], r["options"]
-quad = lambda o: int(((math.degrees(math.atan2((cardxy(o["card"])[0] - x0) * 73240, (cardxy(o["card"])[1] - y0) * 110574)) + 405) % 360) // 90)
-check("lancer : un dé de 1 à 6 et 4 destinations au choix, une par direction (nord, est, sud, ouest)", 1 <= d <= 6 and len(opts) == 4 and len({quad(o) for o in opts}) == 4, (d, [o["dist"] for o in opts]))
-check("à environ 100 m par point du dé", all(abs(o["dist"] - d * 100) <= d * 100 * 0.25 + 1 for o in opts), (d, [o["dist"] for o in opts]))
-check("chaque destination dit ce qui l'attend (libre, à qui, loyer à payer, bonus, « ? »)", all({"card", "free", "mine", "owners", "pay", "bonus", "chance", "dist"} <= set(o) for o in opts))
-check("un lancer en moins (10 → 9)", rolls(A) == 9 and r["state"]["profile"]["rolls"] == 9)
-r2 = db.rpc(A, "roll")
-check("relancer avant d'avoir choisi : les mêmes destinations, aucun lancer en moins", r2["die"] == d and [o["card"] for o in r2["options"]] == [o["card"] for o in opts] and rolls(A) == 9)
-other = db.sql("select id from cards where lk='l' and id <> all(%s) order by abs(cx - %s) + abs(cy - %s) limit 1", [o["card"] for o in opts], int(x0 * 1e5), int(y0 * 1e5))[0][0]
-check("aller ailleurs que sur une des destinations : refusé", "Lancez d'abord" in (err(lambda: db.rpc(A, "dice_go", p_card=other)) or ""))
-o = next(o for o in opts if not o["chance"]); gx, gy = cardxy(o["card"])
-pth = [[x0, y0], [gx, y0], [gx, gy]]; plen = M(pth[0], pth[1]) + M(pth[1], pth[2])
-c1 = cash(A); res = db.rpc(A, "dice_go", p_card=o["card"], p_path=pth)
-want_dur = min(cfg["runMax"], max(cfg["runMin"], plen / cfg["runSpeed"]))
-check("choisir une destination : on y court par les rues (1,2 à 3 s, 22/10/2026) et on y tombe", (cfg["runSpeed"], cfg["runMin"], cfg["runMax"]) == (180, 1.2, 3) and abs(res["dur"] - want_dur) < .01 and res["path"] == pth and res["landing"]["card"] == o["card"]
-      and db.sql("select land, pos from profiles where id=%s", str(A))[0] == (o["card"], o["card"]), (res["dur"], want_dur))
-check("un salaire à chaque lancer : 20 000 €", res["landing"]["salary"] == 20000 and cash(A) == c1 + 20000 - res["landing"]["toll"]
-      and db.sql("select label from ledger where owner=%s and kind='salary' order by at desc, id desc limit 1", str(A))[0][0] == "Salaire du lancer", (cash(A) - c1, res["landing"]))
+# la montgolfière vole où l'on veut (26/10/2026, choix du propriétaire : « en cliquant, on va se déplacer là où on veut, pile
+# poil » ; le dé s'en va) : des km qui se rechargent, un salaire par km volé
+x0, y0 = 2.3640, 48.8670; put(A, x0, y0)
+km = lambda u: db.rpc(u, "state")
+db.sql("update profiles set km_free = 5, km_at = now(), km_buy = 0, land = null, cash = 10000000 where id=%s", str(A))
+check("le dé s'en va : roll, dice_go, buy_rolls refusés (sites d'avant : « rechargez la page »)", all("rechargez la page" in (err(f) or "") for f in
+      (lambda: db.rpc(A, "roll"), lambda: db.rpc(A, "dice_go", p_card=1), lambda: db.rpc(A, "buy_rolls"), lambda: db.rpc(A, "world_move", p_lon=x0 + 0.001, p_lat=y0, p_len=10))))
+st = km(A)
+check("5 km dans la réserve (le prix de 2 km de plus : 50 000 €)", abs(st["km_free"] - 5) < 1e-6 and st["km_buy"] == 0 and st["km_price"] == 50000 and cfg["kmMax"] == 5, (st["km_free"], st["km_price"]))
+tx, ty = x0 + 600 / 73240, y0; c1 = cash(A); r = db.rpc(A, "fly", p_lon=tx, p_lat=ty)
+Lm = M((x0, y0), (tx, ty)); want_dur = min(cfg["runMax"], max(cfg["runMin"], Lm / cfg["runSpeed"]))
+check("toucher la carte : on y vole tout droit (1,2 à 3 s), on ne s'y pose sur aucun immeuble", r["path"] == [[x0, y0], [tx, ty]] and abs(r["dur"] - want_dur) < .01 and r["landing"] is None
+      and db.sql("select land from profiles where id=%s", str(A))[0][0] is None, (r["dur"], want_dur))
+check("un salaire par km volé : 20 000 € le km", r["salary"] == math.floor(Lm / 1000 * 20000) and cash(A) == c1 + r["salary"] - r["toll"]["toll"]
+      and db.sql("select label from ledger where owner=%s and kind='salary' order by at desc, id desc limit 1", str(A))[0][0] == "Salaire · 0,6 km", (r["salary"], cash(A) - c1))
+check("… et autant de km en moins dans la réserve", abs(km(A)["km_free"] - (5 - Lm / 1000)) < 0.002 and abs(r["km"] - (5 - Lm / 1000)) < 0.002, km(A)["km_free"])
 t, ev = last_ev()
-check("les gens autour voient la course (le trajet et sa durée)", ev["k"] == "move" and ev["d"]["path"] == pth and abs(ev["d"]["dur"] - want_dur) < .01, ev["k"])
-check("pendant la course : pas de nouveau lancer", "Attendez" in (err(lambda: db.rpc(A, "roll")) or ""))
+check("les gens autour voient le vol", ev["k"] == "move" and ev["d"]["path"] == [[x0, y0], [tx, ty]] and abs(ev["d"]["dur"] - want_dur) < .01, ev["k"])
+check("pendant le vol : pas de nouveau vol", "Attendez" in (err(lambda: db.rpc(A, "fly", p_lon=x0, p_lat=y0)) or ""))
 done(A)
-check("arrivé : plus rien en attente, son personnage est devant l'immeuble", db.sql("select pend from profiles where id=%s", str(A))[0][0] is None and M(W(A)[:2], (gx, gy)) < 1)
-check("recharger la page : la case où l'on est tombé reste la sienne", db.rpc(A, "world_join")["land"] == o["card"])
-p0 = W(A)[:2]; g1 = other; g1x, g1y = cardxy(g1); pend(A, g1)
-res = db.rpc(A, "dice_go", p_card=g1, p_path=[[p0[0] - 0.01, p0[1]], [g1x, g1y]])
-check("un trajet qui ne part pas d'où l'on est : ignoré (tout droit)", res["path"] == [list(p0), [g1x, g1y]] or M(res["path"][0], p0) < .01, res["path"])
-done(A); p0 = W(A)[:2]; pend(A, o["card"])
-res = db.rpc(A, "dice_go", p_card=o["card"], p_path=[[p0[0], p0[1]], [p0[0] + 0.05, p0[1]], [gx, gy]])
-check("… ou qui fait un détour énorme (plus de 4 km) : tout droit aussi", len(res["path"]) == 2, res["path"])
+check("arrivé : sa montgolfière est là où l'on a touché", M(W(A)[:2], (tx, ty)) < 1)
+check("hors de Paris : refusé", "Restez dans Paris" in (err(lambda: db.rpc(A, "fly", p_lon=2.1, p_lat=48.86)) or ""))
+db.sql("update profiles set km_free = 0.2, km_at = now(), km_buy = 0 where id=%s", str(A))
+check("pas assez de km : refusé, le serveur dit combien il en reste", "il vous en reste 0,2" in (err(lambda: db.rpc(A, "fly", p_lon=tx + 0.01, p_lat=ty)) or ""), err(lambda: db.rpc(A, "fly", p_lon=tx + 0.01, p_lat=ty)))
+db.sql("update profiles set km_free = 0, km_at = now() - interval '60 minutes' where id=%s", str(A))
+check("la réserve se recharge : +500 m toutes les 30 min", abs(km(A)["km_free"] - 1.0) < 0.01, km(A)["km_free"])
+db.sql("update profiles set km_at = now() - interval '24 hours' where id=%s", str(A))
+check("… 5 km au plus", abs(km(A)["km_free"] - 5) < 1e-6)
+db.sql("update profiles set km_free = 0, km_at = now(), km_buy = 0, rb_n = 0, rb_day = null where id=%s", str(A)); c2 = cash(A)
+db.rpc(A, "buy_km"); st = db.rpc(A, "buy_km")
+check("acheter 2 km : 50 000 €, puis le prix double dans la journée", abs(st["km_buy"] - 4) < 1e-6 and c2 - cash(A) == 150000 and st["km_price"] == 200000
+      and db.sql("select count(*) from ledger where owner=%s and kind='km' and label='Achat de 2 km'", str(A))[0][0] == 2, (st["km_buy"], c2 - cash(A)))
+r = db.rpc(A, "fly", p_lon=x0, p_lat=y0)
+check("les km achetés ne donnent pas de salaire (sinon on achèterait de l'argent)", r["salary"] <= 20 and abs(km(A)["km_buy"] - (4 - Lm / 1000)) < 0.002, (r["salary"], km(A)["km_buy"]))
 done(A)
+G = player("Gil", "tendue"); db.rpc(G, "world_join"); put(G, x0, y0); db.sql("update profiles set km_free = 5, km_at = now() where id=%s", str(G))
+check("Gauche : salaire doublé (40 000 € le km)", db.rpc(G, "fly", p_lon=tx, p_lat=ty)["salary"] == math.floor(Lm / 1000 * 40000))
+db.rpc(G, "world_leave")
 
-# tomber chez les autres : une journée de loyer (pouvoirs des partis, au plus 20 % de sa trésorerie)
-g = db.sql("select id from cards where arr=15 and lk='l' and lots between 3 and 10 and rent > 3000 and id not in (select card from lots) order by id limit 1")[0][0]
-gx, gy = cardxy(g); rent = db.sql("select rent from cards where id=%s", g)[0][0]
-db.sql("insert into lots(card,k,owner) select %s, k, %s from generate_series(0,1) k", g, str(B))
-db.sql("update profiles set cash = 10000000 where id=%s", str(A)); put(A, gx + 0.003, gy); pend(A, g)
-opt = db.rpc(A, "roll")["options"]
-check("la destination dit le loyer qu'on y paierait et à qui", len(opt) == 1 and opt[0]["pay"] == 2 * rent and len(opt[0]["owners"]) == 1 and opt[0]["owners"][0].startswith("Ben"), opt)
-c4 = cash(A); L = db.rpc(A, "dice_go", p_card=g)["landing"]
-check("chez un autre joueur : on lui paie une journée de loyer de ses logements", L["toll"] == 2 * rent and cash(A) == c4 + 20000 - 2 * rent
-      and db.sql("select coalesce(sum(amount),0) from pay where owner=%s", str(B))[0][0] == 2 * rent and L["payees"][0]["amount"] == 2 * rent, (L, rent))
-check("… une ligne dans « Mon argent », et dans le fil d'actu", db.sql("select kind, label from ledger where owner=%s and kind='toll_paid' order by at desc, id desc limit 1", str(A))[0] == ("toll_paid", "Loyer de passage payé")
-      and db.sql("select count(*) from news where kind='toll' and card=%s and actor=%s", g, str(A))[0][0] == 1)
-done(A); db.rpc(C, "world_join"); put(C, gx + 0.003, gy); db.sql("update profiles set cash = 10000000 where id=%s", str(C)); pend(C, g)
-check("Extrême gauche : moitié moins de loyer", db.rpc(C, "dice_go", p_card=g)["landing"]["toll"] == rent)
-db.sql("update profiles set party='rempart' where id=%s", str(B)); pend(A, g)
-check("Extrême droite : on lui paie 50 % de plus", db.rpc(A, "dice_go", p_card=g)["landing"]["toll"] == 3 * rent)
-db.sql("update profiles set party='valeurs' where id=%s", str(B)); done(A)
-db.sql("update profiles set cash = 1000 where id=%s", str(A)); pend(A, g)
-L = db.rpc(A, "dice_go", p_card=g)["landing"]
-check("loyer plafonné à 20 % de la trésorerie (après le salaire)", L["toll"] == math.floor((1000 + 20000) * 0.2), L)
-db.sql("update profiles set cash = 1000000000 where id=%s", str(A)); done(A)
+# le péage (26/10/2026, choix du propriétaire : « le loyer affiché ») : survoler l'immeuble d'un autre joueur = lui payer le loyer
+# écrit sur sa carte (un logement), une fois par jour par immeuble ; à plusieurs propriétaires, chacun sa part
+ax, ay = 2.3700, 48.8590; bx, by = ax + 700 / 73240, ay
+near = db.sql("""select id, rent from cards where lk = 'l' and lots >= 2 and id not in (select card from lots) and id not in (select card from parts)
+  and cx between %s and %s and cy between %s and %s and _wsegd(cx / 1e5, cy / 1e5, %s, %s, %s, %s) <= 18 order by cx limit 4""",
+  int(ax * 1e5), int(bx * 1e5), int((ay - .0003) * 1e5), int((ay + .0003) * 1e5), ax, ay, bx, by)
+check("(4 immeubles sous le trajet de test)", len(near) == 4, near)
+(g1, r1), (g2, r2), (g3, r3), (g4, r4) = near
+Cr = player("Cyr", "rempart"); D = player("Dom", "poing")
+db.sql("insert into lots(card,k,owner) values (%s,0,%s),(%s,1,%s)", g1, str(B), g1, str(B))     # Ben : 2 logements (on paie un loyer)
+db.sql("insert into lots(card,k,owner) values (%s,0,%s)", g2, str(Cr))                            # Cyr (Extrême droite) : +50 %
+db.sql("insert into lots(card,k,owner) values (%s,0,%s),(%s,1,%s)", g3, str(B), g3, str(Cr))     # moitié Ben, moitié Cyr
+db.sql("insert into lots(card,k,owner,mort) values (%s,0,%s,100000)", g4, str(B))                 # hypothéqué : rien
+for u in (B, Cr): db.sql("delete from pay where owner=%s", str(u))
+for t_ in ("lots", "parts"):   # (les autres tests ont pu acheter près du trajet : on ne garde que les 4 immeubles du test)
+    db.sql(f"delete from {t_} where card in (select id from cards where cx between %s and %s and cy between %s and %s and _wsegd(cx / 1e5, cy / 1e5, %s, %s, %s, %s) <= 30) and card <> all(%s)",
+           int(ax * 1e5) - 60, int(bx * 1e5) + 60, int((ay - .0005) * 1e5), int((ay + .0005) * 1e5), ax, ay, bx, by, [g1, g2, g3, g4])
+put(A, ax, ay); db.sql("update profiles set km_free = 5, km_at = now(), km_buy = 0, cash = 10000000, land = null where id=%s", str(A)); db.sql("delete from toll_seen where user_id=%s", str(A))
+r = db.rpc(A, "fly", p_lon=bx, p_lat=by); tl = r["toll"]
+want = math.floor(r1 + r2 * 1.5 + r3 * .5 + r3 * .5 * 1.5)
+check("survoler : le loyer écrit sur la carte de chaque immeuble d'un autre joueur (Extrême droite +50 %, partagé, rien sur un bien hypothéqué)",
+      abs(tl["toll"] - want) <= 2 and tl["n"] == 3 and [h[0] for h in tl["hits"]] == [g1, g2, g3], (tl, want, (r1, r2, r3)))
+paid = lambda u: float(db.sql("select coalesce(sum(amount),0) from pay where owner=%s", str(u))[0][0])
+check("chacun touche sa part (« Loyer de passage reçu »)", abs(paid(B) - (r1 + r3 * .5)) <= 2 and abs(paid(Cr) - (r2 * 1.5 + r3 * .75)) <= 2, (paid(B), paid(Cr), r1, r2, r3))
+check("une ligne dans « Mon argent » : « Péage · 3 immeubles »", db.sql("select label, amount from ledger where owner=%s and kind='toll_paid' order by at desc, id desc limit 1", str(A))[0] == ("Péage · 3 immeubles", -tl["toll"]))
+check("les immeubles dans l'ordre du vol (pour le compteur sur la montgolfière)", [h[2] for h in tl["hits"]] == sorted(h[2] for h in tl["hits"]) and all(0 <= h[2] <= 1 for h in tl["hits"]))
+done(A)
+check("repasser le même jour : rien (une fois par jour par immeuble)", db.rpc(A, "fly", p_lon=ax, p_lat=ay)["toll"]["toll"] == 0)
+done(A); db.sql("update toll_seen set day = day - 1 where user_id=%s", str(A))
+check("le lendemain : on repaie", db.rpc(A, "fly", p_lon=bx, p_lat=by)["toll"]["toll"] > 0)
+done(A); db.sql("delete from toll_seen where user_id=%s", str(A)); db.sql("update profiles set cash = 1000 where id=%s", str(A))
+r = db.rpc(A, "fly", p_lon=ax, p_lat=ay)
+check("jamais plus de 10 % de son argent par vol (après le salaire)", r["toll"]["toll"] == math.floor((1000 + r["salary"]) * 0.1) and r["toll"]["cap"] is True, (r["toll"], r["salary"]))
+done(A); db.rpc(D, "world_join"); put(D, ax, ay); db.sql("update profiles set km_free = 5, km_at = now(), cash = 10000000 where id=%s", str(D))
+check("Extrême gauche : moitié prix", abs(db.rpc(D, "fly", p_lon=bx, p_lat=by)["toll"]["toll"] - want * .5) <= 2)
+db.rpc(D, "world_leave")
+db.sql("update profiles set cash = 10000000 where id=%s", str(A))
 
-# acheter : seulement là où l'on est tombé
+# se poser sur un immeuble : sa case ; libre, on l'achète à la banque (seulement là où l'on s'est posé) ; plus de bonus chez soi
+g = db.sql("select id from cards where arr=15 and lk='l' and lots between 3 and 10 and id not in (select card from lots) order by id limit 1")[0][0]
+gx, gy = cardxy(g); put(A, gx + 0.003, gy); db.sql("update profiles set km_free = 5, km_at = now() where id=%s", str(A))
+r = db.rpc(A, "fly", p_lon=None, p_lat=None, p_card=g); L = r["landing"]
+check("toucher un immeuble puis « Y aller » : on s'y pose, sa case s'ouvre", L["card"] == g and L["free"] > 0 and r["path"][-1] == [gx, gy]
+      and db.sql("select land, pos from profiles where id=%s", str(A))[0] == (g, g), L)
+done(A)
 db.rpc(A, "bank_buy", p_card=g, p_k=None)
-check("tombé sur un immeuble libre : on l'achète à la banque", db.sql("select count(*) from lots where card=%s and owner=%s", g, str(A))[0][0] == 1)
-check("un autre immeuble : refusé", "Tombez dessus avec le dé" in (err(lambda: db.rpc(A, "bank_buy", p_card=other, p_k=None)) or ""))
-check("sa case : seulement là où l'on est tombé", db.rpc(A, "world_arrive", p_card=g)["profile"]["land"] == g and "Lancez le dé" in (err(lambda: db.rpc(A, "world_arrive", p_card=other)) or ""))
-pend(A, g); c6 = cash(A); L = db.rpc(A, "dice_go", p_card=g)["landing"]
-check("chez soi : une journée de loyer de ses logements en bonus", L["bonus"] == rent and L["mine"] == 1 and cash(A) == c6 + 20000 + rent - 2 * rent, (L, rent))
+check("posé sur un immeuble libre : on l'achète à la banque", db.sql("select count(*) from lots where card=%s and owner=%s", g, str(A))[0][0] == 1)
+other = db.sql("select id from cards where lk='l' and id <> %s and id not in (select card from lots) order by abs(cx - %s) + abs(cy - %s) limit 1", g, int(gx * 1e5), int(gy * 1e5))[0][0]
+check("un autre immeuble : refusé", "Posez-vous dessus" in (err(lambda: db.rpc(A, "bank_buy", p_card=other, p_k=None)) or ""))
+check("sa case : seulement là où l'on s'est posé", db.rpc(A, "world_arrive", p_card=g)["profile"]["land"] == g and "Allez-y d'abord" in (err(lambda: db.rpc(A, "world_arrive", p_card=other)) or ""))
+check("recharger la page : la case où l'on s'est posé reste la sienne", db.rpc(A, "world_join")["land"] == g)
+put(A, gx + 0.003, gy); c6 = cash(A); r = db.rpc(A, "fly", p_lon=None, p_lat=None, p_card=g)
+check("chez soi : plus de bonus (on ferait des allers-retours entre ses biens)", "bonus" not in r["landing"] and cash(A) == c6 + r["salary"] - r["toll"]["toll"] and r["landing"]["mine"] == 1, r["landing"])
+done(A)
+r = db.rpc(A, "fly", p_lon=gx + 0.002, p_lat=gy)
+check("repartir dans une rue : ce n'est plus sa case", r["landing"] is None and db.sql("select land from profiles where id=%s", str(A))[0][0] is None
+      and "Posez-vous dessus" in (err(lambda: db.rpc(A, "bank_buy", p_card=g, p_k=None)) or ""))
 done(A)
 far = db.sql("select id from cards where lk='l' and cx not between %s and %s limit 1", round((gx - .03) * 1e5), round((gx + .03) * 1e5))[0][0]
 db.sql("update profiles set land=%s where id=%s", far, str(A))
 check("revenir dans Paris loin de sa case : elle ne l'est plus", db.rpc(A, "world_join")["land"] is None)
 
-# les « ? » : une carte Chance en tombant dessus (plus en passant)
+# les « ? » : une carte Chance en s'y posant (une fois par jour pour chacun)
 day = db.sql("select _wday()")[0][0]
 on = [x[0] for x in db.sql("select card from spots where _wchance_on(card, %s) order by card", day)]
 off = [x[0] for x in db.sql("select card from spots where not _wchance_on(card, %s) order by card limit 1", day)]
 check("environ 30 % des lieux ont un « ? » aujourd'hui", 0.2 < len(on) / db.sql("select count(*) from spots")[0][0] < 0.4, len(on))
 js = lambda c, d: ((c * 2654435761 + d * 97) % 4294967296) % 100 < 30
 check("le site fait le même calcul que le serveur", all(js(c, day) for c in on) and not any(js(c, day) for c in off))
-q = on[0]; qx, qy = cardxy(q); put(A, qx + 0.003, qy); pend(A, q)
-L = db.rpc(A, "dice_go", p_card=q)["landing"]
-check("tomber sur un « ? » : une carte Chance", (L["chance"] or {}).get("t") == "chance" and db.rpc(A, "world_join")["taken"] == [q], L["chance"])
-done(A); pend(A, q)
-check("une fois par jour pour chaque « ? »", db.rpc(A, "dice_go", p_card=q)["landing"]["chance"] is None)
+q = on[0]; qx, qy = cardxy(q); put(A, qx + 0.003, qy); db.sql("update profiles set km_free = 5, km_at = now() where id=%s", str(A))
+L = db.rpc(A, "fly", p_lon=None, p_lat=None, p_card=q)["landing"]
+check("se poser sur un « ? » : une carte Chance", (L["chance"] or {}).get("t") == "chance" and db.rpc(A, "world_join")["taken"] == [q], L["chance"])
+done(A); put(A, qx + 0.003, qy)
+check("une fois par jour pour chaque « ? »", db.rpc(A, "fly", p_lon=None, p_lat=None, p_card=q)["landing"]["chance"] is None)
 done(A); put(A, qx, qy)
-check("plus de « ? » ramassé en passant", "Tombez dessus" in (err(lambda: db.rpc(A, "world_chance", p_card=on[1])) or ""))
-q2 = on[1]; q2x, q2y = cardxy(q2)
-ids = [o["card"] for o in db.sql("select _dice_opts(%s, %s, %s, 300, null)", str(A), q2x, q2y - 300 / 110574)[0][0]]
-check("un « ? » du jour, 300 m devant soi : le dé le propose", q2 in ids, ids)
-
-# les lancers : 10 au plus, un de plus toutes les 30 min, 5 de plus contre l'argent du jeu
-db.sql("update profiles set rolls = 0, rolls_at = now() - interval '10 minutes', pend = null where id=%s", str(A))
-check("plus de lancers : le serveur dit quand revient le prochain", "le prochain dans 20 min" in (err(lambda: db.rpc(A, "roll")) or ""), err(lambda: db.rpc(A, "roll")))
-db.sql("update profiles set rolls_at = now() - interval '61 minutes' where id=%s", str(A))
-check("un lancer revient toutes les 30 min", db.rpc(A, "state")["profile"]["rolls"] == 2)
-c7 = cash(A); db.rpc(A, "buy_rolls"); db.rpc(A, "buy_rolls")
-check("acheter 5 lancers : 50 000 €, puis le prix double dans la journée", rolls(A) == 12 and c7 - cash(A) == 150000
-      and db.sql("select count(*) from ledger where owner=%s and kind='rolls'", str(A))[0][0] == 2, (rolls(A), c7 - cash(A)))
-pos = [[2.2526, 48.8622], [2.4383, 48.8336], [2.3950, 48.8610], [2.3300, 48.8270], [2.3800, 48.8850], [2.3000, 48.8800], [2.2750, 48.8450], [2.3480, 48.8530]]
-n3 = [len(db.sql("select _dice_opts(%s, %s, %s, %s, null)", str(A), lo, la, dd)[0][0]) for lo, la in pos for dd in (100, 600)]
-check("partout dans Paris, même au bord d'un bois : au moins une destination (et 3 presque toujours)", min(n3) >= 1 and sum(n >= 3 for n in n3) >= len(n3) - 4, n3)
+check("plus de « ? » ramassé en passant", "rechargez" in (err(lambda: db.rpc(A, "world_chance", p_card=on[1])) or ""))
 
 # le métro
 done(A); put(A, qx + 0.003, qy)
 check("le métro loin d'une station : refusé", "station" in (err(lambda: db.rpc(A, "world_metro", p_to=1578)) or ""))
 ex, ey = cardxy(602931)   # École Militaire
-put(A, ex + 0.0008, ey); db.sql("update profiles set rolls = 5, pend = array[%s]::int[], pend_die = 2 where id=%s", other, str(A))
-c5 = cash(A); r = db.rpc(A, "world_metro", p_to=1578)   # Châtelet
+put(A, ex + 0.0008, ey)
+c5 = cash(A); k5 = km(A)["km_free"]; r = db.rpc(A, "world_metro", p_to=1578)   # Châtelet
 cx_, cy_ = cardxy(1578)
-check("métro : de l'École Militaire à Châtelet (toutes les lignes), un ticket, on arrive à la station", r["from"] == 602931 and cash(A) == c5 - cfg["ticket"]
-      and M(W(A)[:2], (cx_, cy_)) < 1 and r["state"]["profile"]["land"] == 1578, (r["from"], c5 - cash(A)))
+check("métro : de l'École Militaire à Châtelet (toutes les lignes), un ticket, pas de km, on arrive à la station", r["from"] == 602931 and cash(A) == c5 - cfg["ticket"]
+      and M(W(A)[:2], (cx_, cy_)) < 1 and r["state"]["profile"]["land"] == 1578 and abs(km(A)["km_free"] - k5) < 0.01, (r["from"], c5 - cash(A)))
 t, ev = db.sql("select topic, payload from realtime.sent where payload->>'k' = 'move' order by at desc limit 1")[0]
 check("les autres voient qu'on a pris le métro", ev["d"].get("metro") is True)
-check("un dé lancé et pas joué est rendu en prenant le métro", rolls(A) == 6 and db.sql("select pend from profiles where id=%s", str(A))[0][0] is None)
 check("toutes les stations de Paris sont sur le réseau (331 arrêts, 16 lignes)", db.sql("select count(*), count(distinct line) from metro_stop")[0] == (331, 16)
       and db.sql("select count(*) from spots s where s.kind='m' and not exists (select 1 from metro_stop m where m.card = s.card)")[0][0] == 0)
 
@@ -235,9 +247,10 @@ check("quitter : on n'est plus visible", not db.sql("select 1 from world_people 
 check("les fonctions internes sont interdites aux joueurs", not any(db.sql("select has_function_privilege('authenticated', %s, 'execute')", f)[0][0] for f in
       ("_world_cfg()", "_wsettle(uuid)", "_wpos(walkers)", "_wemit(int,uuid,text,jsonb)", "_wcell(float8,float8)", "_wsal(float8,text)", "_wchance_on(int,int)",
        "_wlayer(uuid)", "_wg(int)", "_wsend(int,int,int,uuid,text,jsonb)", "_wregroup(int,uuid)", "_dice_opts(uuid,float8,float8,float8,int)",
-       "_dice_item(uuid,float8,float8,int)", "_land(uuid,int,int,int[])", "_near_or_fail(uuid,int)")))
+       "_dice_item(uuid,float8,float8,int)", "_land(uuid,int,int,int[])", "_near_or_fail(uuid,int)",
+       "_ftoll(uuid,float8,float8,float8,float8,int)", "_kmfree(profiles)", "km_price(profiles)")))
 check("un visiteur non connecté ne peut rien appeler", not any(db.sql("select has_function_privilege('anon', %s, 'execute')", f)[0][0] for f in
       ("world_join()", "world_move(float8,float8,float8,jsonb,boolean)", "world_arrive(int)", "world_metro(int)", "world_chance(int)", "world_say(text)", "world_stop()", "set_chat_off(boolean)", "world_look(int[])",
-       "roll()", "dice_go(int,jsonb)", "go_to(int)", "buy_rolls()")))
+       "roll()", "dice_go(int,jsonb)", "go_to(int)", "buy_rolls()", "fly(float8,float8,int)", "buy_km()")))
 print(f"\n{sum(R)}/{len(R)} OK")
 sys.exit(0 if all(R) else 1)

@@ -45,7 +45,7 @@ async function startGame(first) {
   refreshOffers(); setInterval(() => { if (!document.hidden) refreshOffers(); }, 60000);   // (rien quand l'onglet est caché)
   try { initWorld(); } catch (e) { console.warn("monde", e); }   // Paris à pied (place.js) : on y entre dès que la carte est prête
   setTimeout(claimGift, 1500);
-  try { if (first) { if (localStorage.getItem("hm_tut") == null) localStorage.setItem("hm_tut", "1"); localStorage.setItem("hm_hint3", "1"); } else if (localStorage.getItem("hm_tut") == null) localStorage.setItem("hm_tut", "99"); } catch (e) { }   // (« le dé revient » : seulement pour ceux qui ont connu la marche)
+  try { if (first) { if (localStorage.getItem("hm_tut") == null) localStorage.setItem("hm_tut", "1"); localStorage.setItem("hm_hint4", "1"); } else if (localStorage.getItem("hm_tut") == null) localStorage.setItem("hm_tut", "99"); } catch (e) { }   // (« fini le dé » : seulement pour ceux qui l'ont connu)
   setInterval(tutTick, 700);
   setInterval(() => {
     renderWallet();
@@ -90,7 +90,7 @@ function showWelcome() {
   R.innerHTML = `<div class="bstage"><div class="rays"></div><div class="welcome">
     <p class="eyebrow" style="color:#9FB4D6">Bienvenue à Paris</p>
     <h2>${esc(p.pseudo)}, Paris est à prendre</h2>
-    <div class="wl"><span>🎲</span><div><b>Lancez le dé</b><p>Choisissez où aller parmi 4 immeubles : votre montgolfière s'y pose. Libre ? Achetez-le.</p></div></div>
+    <div class="wl"><span>🎈</span><div><b>Volez où vous voulez</b><p>Touchez un immeuble : votre montgolfière s'y pose. Libre ? Achetez-le.</p></div></div>
     <div class="wl"><span>💶</span><div><b>${fmtE(p.cash)} et ${p.welcome} boosters pour démarrer</b><p>Un booster, c'est 4 biens de Paris au hasard + 1 carte Chance.</p></div></div>
     <div class="wl"><span>🏛️</span><div><b>Devenez maire</b><p>Le plus gros propriétaire d'un arrondissement touche 8 % des loyers des autres.</p></div></div>
     <div class="bbtns"><button class="btn white block" data-w="open">Ouvrir mon premier booster</button><button class="btn glass block" data-w="map">Aller dans Paris d'abord</button></div>
@@ -110,10 +110,11 @@ window.addEventListener("unhandledrejection", e => { const m = String(e.reason?.
 
 
 // =====================================================================
-//  Tutoriel en jouant : une bulle à la fois, au moment où la règle sert (21/10/2026 : le dé revient)
-//  1 lancer le dé · 1.5 choisir où aller · 2 la case · 3 après l'achat · 3.5 relancer · 4 les boosters · 5 les mairies · 99 fini
+//  Tutoriel en jouant : une bulle à la fois, au moment où la règle sert (26/10/2026 : la montgolfière vole où l'on veut ; avant : le dé)
+//  1 toucher un immeuble libre (en vert, tout près) · 1.5 « Y aller » · 2 la case · 3 après l'achat · 3.5 les km et le péage ·
+//  4 les boosters · 5 les mairies · 99 fini
 // =====================================================================
-let tutShown = "", tutMv = -1;
+let tutShown = "", tutMv = -1, tutG = null;
 // un point de la carte (un immeuble) où pointer la bulle ; null s'il n'est pas bien visible à l'écran
 function tutPoint(ll) {
   if (!map || !ll) return null;
@@ -123,38 +124,53 @@ function tutPoint(ll) {
   a.style.cssText = `position:fixed;left:${x - 1}px;top:${y - 1}px;width:2px;height:2px;pointer-events:none`;
   return "#tutpt";
 }
+// le premier immeuble à prendre : un immeuble de logements libre, à l'écran, près de sa montgolfière, en vert
+function tutMark(g) {
+  if (tutG === g) return;
+  if (tutG != null && mapReady && (!W.run || W.run.g !== tutG)) map.setFeatureState(Object.assign({ id: tutG }, BLD), { dst: 0 });
+  tutG = g; if (g != null && mapReady) map.setFeatureState(Object.assign({ id: g }, BLD), { dst: 2 });
+}
+function tutFree() {
+  const me = meP(); if (!me || !mapReady || map.isMoving()) return tutG;
+  if (tutG != null && freeOf(tutG) > 0) return tutG;
+  const q = map.project([me.lon, me.lat]); let best = null, bd = Infinity;
+  for (const f of map.queryRenderedFeatures([[q.x - 170, q.y - 260], [q.x + 170, q.y + 40]], { layers: ["bd"] })) {
+    const g = f.id, c = g != null && card(g); if (!c || c.lk !== "l" || freeOf(g) <= 0) continue;
+    const p = map.project(centerOf(g)), d = Math.hypot(p.x - q.x, p.y - q.y); if (d < 45) continue;
+    if (d < bd) { bd = d; best = g; }
+  }
+  tutMark(best); return best;
+}
 function tutGet() { try { return +(localStorage.getItem("hm_tut") || 99); } catch (e) { return 99; } }
 function tutSet(n) { try { localStorage.setItem("hm_tut", String(n)); } catch (e) { } tutTick(); }
 function tutTick() {
   const st = tutGet(); let k = "", anchor = null, html = "", ok = false;
-  const idle = cur() === "map" && $("#reveal").hidden && $("#onb").hidden && !moving && W.on && !W.rolling;
-  const caseOpen = panelKind === "land" && !landView, picking = W.opts.length > 0;
+  const idle = cur() === "map" && $("#reveal").hidden && $("#onb").hidden && !moving && W.on;
+  const caseOpen = panelKind === "land" && !landView, viewOpen = panelKind === "land" && landView && !!$("#movebar [data-lgo]");
+  if (st !== 1) tutMark(null);
   if ((st === 1 || st === 1.5) && caseOpen) return tutSet(2);
-  else if (st === 1 && picking) return tutSet(1.5);
-  else if (st === 1 && idle && !panelKind) { k = "1"; anchor = "#b-main"; html = "<b>Lancez le dé 🎲</b>Il vous propose 4 immeubles autour de vous."; }
-  else if (st === 1.5 && picking && idle) {
-    const i = Math.max(0, W.opts.findIndex(o => o.k[0] === "free")), ch = $("#dchips")?.children[i];   // la bulle pointe une flèche verte
-    if (ch) { ch.id = "tutchip"; anchor = "#tutchip"; }
-    k = "1.5"; html = "<b>Choisissez où aller</b>En vert : libre, vous pourrez l'acheter. En rose : on paie le loyer.";
+  else if (st === 1 && viewOpen) return tutSet(1.5);
+  else if (st === 1 && idle && !panelKind) {
+    const g = tutFree(); anchor = g != null ? tutPoint(centerOf(g)) : null;
+    k = "1"; html = "<b>Touchez un immeuble</b>En vert : il est libre, vous pourrez l'acheter.";
   }
+  else if (st === 1.5 && viewOpen) { k = "1.5"; anchor = "#movebar [data-lgo]"; html = "<b>Volez-y !</b>Chaque km volé vous rapporte 20 000 €."; }
+  else if (st === 1.5 && !panelKind && idle) return tutSet(1);
   else if (st === 2 && caseOpen) {
     if (justBought) return tutSet(3);
     const g = landPos(), fr = g != null ? freeOf(g) : 0;
     k = "2" + (fr > 0 ? "f" : "x"); anchor = "#movebar .lb"; ok = true;
     html = fr > 0 ? "<b>Il est libre : achetez-le !</b>À crédit, vous ne payez qu'une petite partie maintenant : la banque prête le reste, remboursé tout seul par le loyer."
-      : "<b>Tout est déjà pris ici</b>Relancez le dé : il y a des immeubles libres partout dans Paris.";
+      : "<b>Tout est déjà pris ici</b>Volez vers un autre immeuble : il y en a de libres partout dans Paris.";
   }
   else if ((st === 2 || st === 2.5) && !panelKind && idle) return tutSet(3.5);
   else if (st === 2.5 && justBought && caseOpen) return tutSet(3);
   else if (st === 3 && panelKind === "land") { k = "3"; anchor = ".money"; ok = true; html = "<b>Bravo, c'est votre premier bien !</b>Il vous rapporte des loyers en continu, même quand vous n'êtes pas connecté. Touchez votre argent, ici, pour voir tout l'historique."; }
   else if (st === 3 && !panelKind && idle) return tutSet(3.5);
   else if (st === 3.5 && idle && !panelKind) {
-    if (tutMv < 0) tutMv = W.rolls; else if (W.rolls > tutMv) return tutSet(4);
-    k = "w"; anchor = "#b-main"; ok = true; html = "<b>Relancez le dé 🎲</b>Chaque lancer rapporte 20 000 €. Un lancer revient toutes les 30 min.";
+    if (tutMv < 0) tutMv = W.flights || 0; else if ((W.flights || 0) > tutMv) return tutSet(4);
+    k = "w"; anchor = "#b-main"; ok = true; html = "<b>Vos km</b>500 m de plus toutes les 30 min. Survoler un immeuble rose (à un autre joueur) coûte le loyer de sa carte.";
   }
-  else if (st === 4 && idle && !panelKind) { k = "4"; anchor = "#b-pack"; html = "<b>Ouvrez vos boosters</b>Chacun contient 4 vrais biens de Paris et 1 carte Chance. Vous en avez à ouvrir !"; }
-  else if (st === 4 && (cur() === "booster" || !$("#reveal").hidden)) return tutSet(5);
-  else if (st === 5 && idle && !panelKind) { k = "5"; anchor = null; ok = true; html = "<b>Dernière chose : devenez maire 👑</b>Le plus gros propriétaire d'un arrondissement en devient le maire et touche 8 % des loyers du quartier. Bonne conquête de Paris !"; }
   // affichage de la bulle
   let el = $("#coach");
   if (!k) { if (el) el.remove(); tutShown = ""; return; }

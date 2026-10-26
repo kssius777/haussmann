@@ -1,6 +1,6 @@
-"""Un tour de Paris au format téléphone (400 × 820, écran ×2), comme un vrai joueur : lancer le dé dans plusieurs quartiers,
-dézoomer et aller loin, prendre le métro, ouvrir des cases, des fiches, des boosters, changer d'onglet, survoler les
-20 arrondissements ; pendant ce temps trois autres joueurs lancent le dé, parlent et achètent autour de lui.
+"""Un tour de Paris au format téléphone (400 × 820, écran ×2), comme un vrai joueur : voler dans plusieurs quartiers (depuis le
+26/10/2026 ; avant : lancer le dé), dézoomer et aller loin, prendre le métro, ouvrir des cases, des fiches, des boosters, changer
+d'onglet, survoler les 20 arrondissements ; pendant ce temps trois autres joueurs volent, parlent et achètent autour de lui.
 À chaque étape : la mémoire (tas JS de la page et des workers de la carte, après ramasse-miettes), les éléments de la page,
 les écouteurs, les minuteurs en cours, la mémoire des processus Chromium, les images par seconde, les longues tâches ;
 et toutes les erreurs. Puis on refait le même tour : ce qui grossit encore la 2e fois est une fuite.
@@ -123,11 +123,10 @@ async def main():
                         await asyncio.to_thread(lambda: (db.sql("update walkers set lon=%s, lat=%s, lon0=%s, lat0=%s, dur=0, path=null, settled=true, t0=now()-interval '1 minute' where user_id=%s", x, y, x, y, b),
                                                          db.sql("update world_people set lon=%s, lat=%s, cell=_wcell(%s,%s), seen=now() where user_id=%s", x, y, x, y, b)))
                         bp = (x, y)
-                    def go():   # un lancer, une destination au hasard (tout droit : le serveur fait le trajet)
-                        db.sql("update profiles set rolls = 99 where id=%s", b)
-                        db.sql("update walkers set t0 = now() - interval '1 minute' where user_id=%s", b)   # (sa course d'avant est finie)
-                        o = db.rpc(b, "roll")["options"]
-                        if o: db.rpc(b, "dice_go", p_card=random.choice(o)["card"])
+                    def go():   # un vol vers un point au hasard tout près (26/10/2026 : la montgolfière vole où l'on veut ; avant : le dé)
+                        db.sql("update profiles set km_free = 5, km_at = now() where id=%s", b)
+                        db.sql("update walkers set t0 = now() - interval '1 minute' where user_id=%s", b)   # (son vol d'avant est fini)
+                        db.rpc(b, "fly", p_lon=bp[0] + random.uniform(-.004, .004), p_lat=bp[1] + random.uniform(-.0027, .0027))
                     await asyncio.to_thread(go)
                     if time.time() - said[b] > 62:
                         said[b] = time.time()
@@ -145,18 +144,17 @@ async def main():
         bot_task = asyncio.create_task(life_of_bots())
 
         # ---- ce que fait le joueur ----
-        async def walk(far=False):   # un lancer de dé (dézoomé avant : far), une flèche au hasard, la course, sa case
-            db.sql("update profiles set rolls = 99 where id=%s", me); await E("refreshState().then(() => { renderDock(); return 1; })")
+        async def walk(far=False):   # un vol (dézoomé avant : far) vers un immeuble à l'écran, au hasard, ou une rue ; sa case
+            db.sql("update profiles set km_free = 5, km_at = now(), km_buy = 20 where id=%s", me); await E("refreshState().then(() => { renderDock(); return 1; })")
             if far:
-                await E("camOff(true); map.jumpTo({ center: [meP().lon, meP().lat], zoom: 13.3, pitch: 40 }); 1"); await pg.wait_for_timeout(1500)
-            await pg.click("#b-main")
-            try: await W("W.opts.length > 0", 30000)
-            except Exception: errs_all.append("dé : pas de destinations en 30 s"); return False
-            await pg.wait_for_timeout(900)
-            n = await E("document.querySelectorAll('.dchip').length")
-            await pg.click(f".dchip >> nth={random.randrange(n)}")
+                await E("camOff(true); map.jumpTo({ center: [meP().lon, meP().lat], zoom: 13.9, pitch: 40 }); 1"); await pg.wait_for_timeout(1500)
+            ok = await E("""(() => { const gs = [...new Set(map.queryRenderedFeatures({ layers: ['bd'] }).map(f => f.id).filter(g => g != null && card(g)))];
+              if (gs.length && Math.random() < .7) { flyMe(null, null, gs[Math.floor(Math.random() * gs.length)]); return true; }
+              const m = meP(); flyMe(m.lon + (Math.random() - .5) * .006, m.lat + (Math.random() - .5) * .004, null); return true; })()""")
+            try: await W("!!W.run", 10000)
+            except Exception: errs_all.append("vol : pas parti en 10 s"); return False
             try: await W("!W.run && !meP().path", 80000)
-            except Exception: errs_all.append("dé : pas arrivé en 80 s")
+            except Exception: errs_all.append("vol : pas arrivé en 80 s")
             await E("justBought = null; setMovebar(''); 1"); await pg.wait_for_timeout(600)
             return True
         bld = """(() => [...new Set(map.queryRenderedFeatures({ layers: ['bd'] }).map(f => f.id).filter(g => g != null && card(g)))].slice(0, 80))()"""

@@ -74,7 +74,7 @@ function renderWallet() {
   const pr = PARTIES[s.profile.party]; const av = $("#avatar");
   av.textContent = (s.profile.pseudo || "?")[0].toUpperCase(); av.style.background = pr ? pr.c : "#94A3B8";
   // la pastille du booster : combien il en reste, sinon (ordinateur) dans combien de temps le prochain gratuit
-  if (typeof renderDock === "function") renderDock();   // le bas de l'écran (le dé et ses lancers, « Parler »)
+  if (typeof renderDock === "function") renderDock();   // le bas de l'écran (sa montgolfière et ses km, « Salon »)
   const n = packsReady(), b = $("#packbadge"), m = Math.ceil(freeIn() / 60); b.hidden = false; b.textContent = n || (m >= 60 ? `${Math.floor(m / 60)} h` : `${m} min`); b.dataset.l = n > 1 ? " boosters" : n ? " booster" : "";
   const bp = $("#b-pack"); bp.classList.toggle("zero", !n); bp.setAttribute("aria-label", n ? `Ouvrir mes boosters (${n})` : "Boosters");
 }
@@ -530,14 +530,14 @@ async function adminPage() {
     <div class="box" style="margin-top:10px"><b>14 derniers jours</b>${bars}</div>
     ${R ? retentionHTML(R) : ""}
     <h2 class="h3">Activité</h2>
-    <div class="kpis k4">${K("Lancers de dé", N(d.rolls_today), `${N(d.rolls_7d)} sur 7 j`)}${K("Boosters ouverts", N(d.boosters_today), `${N(d.boosters_7d)} sur 7 j`)}${K("Achats", N(d.buys_today), `${N(d.buys_7d)} sur 7 j`)}${K("Ventes au Marché", N(d.sales_7d), "sur 7 j")}</div>
+    <div class="kpis k4">${K("Vols (salaires)", N(d.rolls_today), `${N(d.rolls_7d)} sur 7 j`)}${K("Boosters ouverts", N(d.boosters_today), `${N(d.boosters_7d)} sur 7 j`)}${K("Achats", N(d.buys_today), `${N(d.buys_7d)} sur 7 j`)}${K("Ventes au Marché", N(d.sales_7d), "sur 7 j")}</div>
     <h2 class="h3">Économie</h2>
     <div class="kpis k4">${K("Argent en circulation", fmtE(d.cash_total))}${K("Crédits en cours", fmtE(d.loans_total))}${K("Logements possédés", N(d.lots_owned))}${K("Partis", `<span style="font-size:14px;line-height:1.35;display:block">${Object.entries(d.parties || {}).map(([k, n]) => `${esc(PARTIES[k]?.n || "Sans parti")} ${n}`).join(" · ") || "—"}</span>`)}</div>
     <h2 class="h3">Classement</h2>
     <div class="box adlist">${(d.top || []).map((x, i) => `<div><span>${i + 1}. ${esc(x.pseudo)}</span><b class="num">${fmtE(x.worth)}</b></div>`).join("") || "—"}</div>
     <h2 class="h3">Derniers inscrits</h2>
     <div class="box adlist">${(d.latest || []).map(x => `<div><span>${esc(x.pseudo)} <small class="muted">${x.lots} logt · vu ${ago2(x.seen_at)}</small></span><small class="muted">inscrit ${ago2(x.created_at)}</small></div>`).join("") || "—"}</div>
-    <p class="sub" style="font-size:12px;margin-top:12px">« Actif » = a lancé le dé (ou marché, les 20 et 21/10/2026), acheté ou ouvert un booster (compté depuis le 17/10/2026 pour les boosters).</p>
+    <p class="sub" style="font-size:12px;margin-top:12px">« Actif » = a volé (lancé le dé du 21 au 26/10/2026, marché les 20 et 21/10), acheté ou ouvert un booster (compté depuis le 17/10/2026 pour les boosters).</p>
   </div>`;
 }
 // la charge (21/10/2026, « lève l'alerte quand ça chauffe et dis-moi ce que je dois faire ») : Supabase Pro bloque à 500 connexions
@@ -706,15 +706,17 @@ document.addEventListener("click", e => { const b = e.target.closest("[data-arrm
 
 // ---------------- BOUTIQUE, PROFIL ----------------
 // ---------------- MON ARGENT : historique ----------------
-const LK = { offer: ["🤝", "Offre de rachat"], rent: ["🏠", "Loyers"], rent_away: ["🌙", "Loyers pendant votre absence"], tax: ["🏛️", "Taxe des maires"], tax_in: ["👑", "Taxe de maire reçue"], salary: ["💼", "Salaire"], toll_paid: ["💸", "Loyer de passage payé"], toll_in: ["💰", "Loyer de passage reçu"], buy: ["🔑", "Achat"], sale: ["🤝", "Vente"], chance: ["🃏", "Carte Chance"], booster: ["📦", "Booster"], rolls: ["🎲", "Lancers"], mortgage: ["🏦", "Hypothèque"], lift: ["🏦", "Hypothèque remboursée"], repay: ["🏦", "Crédit remboursé"], bonus: ["🏠", "Bonus"], credit: ["🏦", "Remboursement des crédits"], walk: ["🚶", "Marche"], metro: ["🚇", "Métro"] };
+const LK = { offer: ["🤝", "Offre de rachat"], rent: ["🏠", "Loyers"], rent_away: ["🌙", "Loyers pendant votre absence"], tax: ["🏛️", "Taxe des maires"], tax_in: ["👑", "Taxe de maire reçue"], salary: ["💼", "Salaire"], toll_paid: ["💸", "Péage"], toll_in: ["💰", "Péage reçu"], buy: ["🔑", "Achat"], sale: ["🤝", "Vente"], chance: ["🃏", "Carte Chance"], booster: ["📦", "Booster"], rolls: ["🎲", "Lancers"], km: ["🎈", "Achat de km"], mortgage: ["🏦", "Hypothèque"], lift: ["🏦", "Hypothèque remboursée"], repay: ["🏦", "Crédit remboursé"], bonus: ["🏠", "Bonus"], credit: ["🏦", "Remboursement des crédits"], walk: ["🚶", "Marche"], metro: ["🚇", "Métro"] };
 async function moneyPage() {
   let rows = []; try { rows = await rpc("my_ledger"); } catch (e) { }
   await ensureCards(rows.filter(r => r.card != null).map(r => r.card));
   const s = ST.state; const days = new Map();
   for (const r of rows) { const d = new Date(r.at); const key = d.toDateString(); if (!days.has(key)) days.set(key, { d, items: [], tot: 0 }); const g = days.get(key); g.items.push(r); g.tot += +r.amount; }
   const dayLabel = d => { const t = new Date(), y = new Date(Date.now() - 864e5); return d.toDateString() === t.toDateString() ? "Aujourd'hui" : d.toDateString() === y.toDateString() ? "Hier" : d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }); };
+  // (« Salaire · 0,6 km », « Péage · 3 immeubles » : le détail en petit ; « Loyers pendant votre absence · 2 j 4 h » : « pendant 2 j 4 h »)
   const line = r => { const [ic, dft] = LK[r.kind] || ["•", r.kind]; const c = r.card != null ? card(r.card) : null; const a = +r.amount;
-    return `<${c ? `button data-push="b" data-arg="${r.card}"` : "div"} class="ml"><span class="ic">${ic}</span><span class="t"><b>${esc((r.label || dft).split(" · ")[0])}</b>${(r.label || "").includes(" · ") ? `<small>pendant ${esc(r.label.split(" · ")[1])}</small>` : c ? `<small>${esc(title(c))}</small>` : ""}</span><b class="num ${a >= 0 ? "green" : "red"}">${a >= 0 ? "+" : "−"}${fmtE(Math.abs(a))}</b></${c ? "button" : "div"}>`; };
+    const lbl = r.kind === "toll_in" ? dft : (r.label || dft), sub = lbl.includes(" · ") ? lbl.split(" · ")[1] : "";
+    return `<${c ? `button data-push="b" data-arg="${r.card}"` : "div"} class="ml"><span class="ic">${ic}</span><span class="t"><b>${esc(lbl.split(" · ")[0])}</b>${sub ? `<small>${r.kind === "rent_away" ? "pendant " : ""}${esc(sub)}</small>` : c ? `<small>${esc(title(c))}</small>` : ""}</span><b class="num ${a >= 0 ? "green" : "red"}">${a >= 0 ? "+" : "−"}${fmtE(Math.abs(a))}</b></${c ? "button" : "div"}>`; };
   return dhead("Mon argent") + `<div class="wrap">
     <div class="box" style="text-align:center"><p class="eyebrow">Trésorerie</p><b class="num" style="font-size:30px" id="cash2">${fmtE(liveCash())}</b><div class="sub" style="margin:4px 0 0">+${fmtE(netRate())} de loyers par jour${s?.loan_rate > 0 ? ` · ${fmtE(s.loan_rate)} / jour remboursent vos crédits` : ""}</div>
       </div>
