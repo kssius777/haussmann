@@ -41,7 +41,7 @@ async function startGame(first) {
   try { buildMap(BASE); } catch (e) { console.error(e); $("#map").innerHTML = `<div class="empty" style="margin:120px 16px 0">La carte 3D ne peut pas s'afficher sur cet appareil. Le reste du jeu fonctionne.</div>`; }
   $("#loading")?.remove();
   go("map"); renderWallet(); initPawnUI();
-  rpc("is_admin").then(v => { ST.admin = v === true; }).catch(() => { });
+  rpc("is_admin").then(v => { ST.admin = v === true; if (ST.admin) adminTabs(); }).catch(() => { });   // (l'admin : l'onglet « Stats », pages.js)
   refreshOffers(); setInterval(() => { if (!document.hidden) refreshOffers(); }, 60000);   // (rien quand l'onglet est caché)
   try { initWorld(); } catch (e) { console.warn("monde", e); }   // Paris à pied (place.js) : on y entre dès que la carte est prête
   setTimeout(claimGift, 1500);

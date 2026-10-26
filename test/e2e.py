@@ -490,6 +490,17 @@ async def main():
         await pg.mouse.click(dt["pt"][0], dt["pt"][1]); await pg.wait_for_timeout(600)
         check("ordinateur : un clic sur la carte ferme la case, sans faire avancer", await E("document.querySelector('#movebar').hidden && !meP().path"), dt)
         await pg.screenshot(path=T + "23_desktop_walk.png", timeout=120000)
+        # « Salon » à l'ordinateur (26/10/2026, « elle est pas centrée ») : l'icône au milieu de sa case, au-dessus de son nom
+        sal = await E("""(() => { const t = document.querySelector('#b-say').getBoundingClientRect(), s = document.querySelector('#b-say .ic svg').getBoundingClientRect(), l = document.querySelector('#b-say>small').getBoundingClientRect();
+          return [Math.round(s.left + s.width / 2 - (t.left + t.width / 2)), Math.round(s.top + s.height * 14 / 32 - t.top), Math.round(l.top - t.top)]; })()""")
+        check("ordinateur : l'icône « Salon » est au milieu de sa case (au-dessus de son nom)", abs(sal[0]) <= 1 and abs(sal[1] - sal[2] / 2) <= 3, sal)
+        # l'admin (26/10/2026, « c'est relou de devoir aller sur Profil puis Tableau de bord ») : l'onglet Patrimoine devient « Stats »
+        db.sql("insert into admins(id) values (%s) on conflict do nothing", uid)
+        await E("rpc('is_admin').then(v => { ST.admin = v === true; if (ST.admin) adminTabs(); return 1; })")
+        await pg.click('#tabs [data-tab="assets"]'); await W("!!document.querySelector('#p-assets .kpis')", 20000)
+        check("admin : l'onglet « Patrimoine » devient « Stats », le tableau de bord en un toucher", await E("""document.querySelector('#tabs [data-tab="assets"] span').textContent === 'Stats'
+          && document.querySelector('#p-assets h1').textContent === 'Stats' && document.querySelectorAll('#p-assets .kpi').length >= 8"""))
+        db.sql("delete from admins where id=%s", uid)
         check("aucune erreur JavaScript", not errs, errs[:5])
         await b.close()
     print(f"\n{sum(R)}/{len(R)} OK")

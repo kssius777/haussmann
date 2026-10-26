@@ -109,6 +109,7 @@ function sparkSVG(vals) {   // petite courbe d'évolution du patrimoine (30 dern
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${d}L${W} ${H}L0 ${H}Z" fill="rgba(37,99,235,.10)"/><path d="${d}" fill="none" stroke="#2563EB" stroke-width="2.5" stroke-linejoin="round"/></svg>`;
 }
 async function renderAssets() {
+  if (ST.admin) { const html = await adminBody("Stats"); if (tab === "assets") $("#p-assets").innerHTML = html; return; }   // (l'admin : ses stats à la place du patrimoine)
   try { await renderAssets0(); }
   catch (e) { console.error(e); $("#p-assets").innerHTML = `<div class="wrap"><h1 class="h1">Patrimoine</h1><p class="sub">Le chargement a échoué : ${esc(String(e?.message || e))}</p><button class="btn" onclick="renderAssets()">Réessayer</button></div>`; }
 }
@@ -517,14 +518,25 @@ function adminGiftBox(c, g, free) {
     ${adminLink && adminLink.g === g ? giftLinkHTML(adminLink.url) : ""}</div>`;
 }
 // ---- tableau de bord de l'administrateur ----
-async function adminPage() {
-  let d, R = null, L = null; try { [d, R, L] = await Promise.all([rpc("admin_stats"), rpc("admin_retention").catch(() => null), rpc("admin_load").catch(() => null)]); } catch (e) { return dhead("Tableau de bord") + `<div class="wrap"><p class="sub">${esc(e.message)}</p></div>`; }
+// (26/10/2026, demande du propriétaire : « c'est relou de devoir aller sur Profil puis Tableau de bord pour voir les stats ;
+// l'admin n'est pas censé jouer » : pour un admin, l'onglet Patrimoine devient « Stats », le tableau de bord en un toucher)
+const STATS_ICO = '<svg class="ti" viewBox="0 0 32 32"><defs><linearGradient id="tg5" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34D399"/><stop offset="1" stop-color="#047857"/></linearGradient></defs><rect x="1" y="1" width="30" height="30" rx="9" fill="url(#tg5)"/><rect x="1" y="1" width="30" height="15" rx="9" fill="#fff" opacity=".14"/><rect x="8" y="16" width="4" height="8" rx="1.2" fill="#fff"/><rect x="14" y="11" width="4" height="13" rx="1.2" fill="#fff"/><rect x="20" y="7" width="4" height="17" rx="1.2" fill="#fff"/><path d="M7 25.5h18" stroke="#A7F3D0" stroke-width="1.3"/></svg>';
+function adminTabs() {
+  const b = $('#tabs [data-tab="assets"]'); if (!b || !ST.admin || b.dataset.adm) return;
+  b.dataset.adm = "1"; b.querySelector("svg")?.remove(); b.insertAdjacentHTML("afterbegin", STATS_ICO);
+  const s = b.querySelector("span"); if (s) s.textContent = "Stats";
+  if (tab === "assets" && !$("#p-assets").hidden) renderAssets();
+}
+async function adminPage() { return dhead("Tableau de bord") + await adminBody(); }
+async function adminBody(title) {
+  const h1 = title ? `<h1 class="h1">${esc(title)}</h1>` : "";
+  let d, R = null, L = null; try { [d, R, L] = await Promise.all([rpc("admin_stats"), rpc("admin_retention").catch(() => null), rpc("admin_load").catch(() => null)]); } catch (e) { return `<div class="wrap">${h1}<p class="sub">${esc(e.message)}</p></div>`; }
   const N = n => fmtN(+n || 0), K = (t, v, sub) => `<div class="kpi"><span>${t}</span><b class="num">${v}</b>${sub ? `<small class="muted">${sub}</small>` : ""}</div>`;
   const days = d.by_day || [], mx = Math.max(1, ...days.map(x => Math.max(x.signups, x.active)));
   const bars = `<div class="adbars">${days.map(x => `<div title="${x.day} · ${x.signups} inscrits · ${x.active} actifs"><i class="a" style="height:${x.active / mx * 100}%"></i><i class="s" style="height:${x.signups / mx * 100}%"></i><small>${x.day.slice(8, 10)}</small></div>`).join("")}</div>
     <div class="adleg"><span><i class="a"></i>joueurs actifs</span><span><i class="s"></i>inscrits</span></div>`;
   const ago2 = t => t ? ago(t) : "—";
-  return dhead("Tableau de bord") + `<div class="wrap">
+  return `<div class="wrap">${h1}
     ${L ? chargeHTML(L) : ""}
     <h2 class="h3">Joueurs</h2>
     <div class="kpis k4">${K("Inscrits", N(d.players), `+${N(d.new_today)} aujourd'hui`)}${K("Nouveaux 7 j", N(d.new_7d), `${N(d.new_30d)} sur 30 j`)}${K("Actifs aujourd'hui", N(d.active_today))}${K("Actifs 7 j", N(d.active_7d), d.players ? `${Math.round(d.active_7d / d.players * 100)} % des inscrits` : "")}</div>

@@ -2295,8 +2295,9 @@ body.picking .smark{display:none}
 #b-say>small{color:var(--ink2)!important;font-weight:700!important}
 @media (max-width:899px){body.mapfull #b-say{display:grid;position:absolute;left:0;bottom:84px;margin:0}}
 @media (min-width:900px){
-  #b-say.dside{width:92px!important;height:92px!important;padding:0!important;display:grid;place-items:center;align-content:center;border-radius:22px}
-  #b-say .ic svg{width:46px;height:46px;margin-top:-8px}
+  #b-say.dside{width:92px!important;height:92px!important;padding:0!important;display:grid;grid-template-rows:auto;place-items:center;align-content:center;border-radius:22px}
+  #b-say .ic{width:46px;height:46px;margin-top:-10px}   /* (26/10/2026, « elle est pas centrée » : la boîte de l'icône faisait 30 px pour un dessin de 46, qui débordait de 8 px à droite) */
+  #b-say .ic svg{width:46px;height:46px}
   #b-say>small{position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);padding:3px 11px;border-radius:999px;background:#0B0C10;color:#fff!important;border:2px solid #fff;font:700 12px/1.35 var(--f)!important;white-space:nowrap}
 }
 /* les flèches des destinations du dé, autour de son personnage (rose : loyer · vert : libre · bleu : chez soi · violet : « ? ») */
