@@ -17,7 +17,7 @@ cur.execute("""create schema if not exists realtime;
   $$ insert into realtime.sent(payload, event, topic, private) values (payload, event, topic, private) $$;
   truncate realtime.sent;""")
 for f in ["migration_admin.sql", "migration_chat.sql", "migration_chat_look.sql", "migration_metro.sql", "migration_lieux.sql",
-          "migration_monde.sql", "migration_monde_paris.sql", "migration_monde_paris.sql", "migration_vitesse.sql", "migration_temps_reel.sql", "migration_chat_minute.sql", "migration_vitesse2.sql", "migration_groupes.sql", "migration_groupes.sql", "migration_depart.sql", "migration_depart.sql", "migration_de.sql", "migration_de.sql", "migration_course.sql", "migration_course.sql", "migration_vol.sql", "migration_vol.sql"]:
+          "migration_monde.sql", "migration_monde_paris.sql", "migration_monde_paris.sql", "migration_vitesse.sql", "migration_temps_reel.sql", "migration_chat_minute.sql", "migration_vitesse2.sql", "migration_groupes.sql", "migration_groupes.sql", "migration_depart.sql", "migration_depart.sql", "migration_de.sql", "migration_de.sql", "migration_course.sql", "migration_course.sql", "migration_vol.sql", "migration_vol.sql", "migration_viseur.sql", "migration_viseur.sql", "migration_mur.sql", "migration_mur.sql"]:
     cur.execute(open("supabase/" + f).read())   # la dernière 2 fois : rejouable
 c0.commit()
 db.sql("truncate place_people, chat_msg, chat_bans, walkers, world_people, chance_taken, toll_seen")
@@ -139,6 +139,12 @@ put(A, ax, ay); db.sql("update profiles set km_free = 0.1, km_at = now(), km_buy
 q = db.rpc(A, "fly_quote", p_lon=bx, p_lat=by)
 check("viser plus loin que ses km : pas d'accord (why = km) et ce qu'il reste", q["ok"] is False and q["why"] == "km" and abs(q["km"] - 0.1) < 0.01, q)
 check("viser hors de Paris : why = paris", db.rpc(A, "fly_quote", p_lon=2.6, p_lat=48.85)["why"] == "paris")
+# la limite, c'est le mur de glace (26/10/2026, « oui, le mur est la limite ») : Neuilly est dans l'ancien rectangle, mais derrière le mur
+check("le mur est la limite : viser Neuilly (dans l'ancien rectangle) : why = paris", db.rpc(A, "fly_quote", p_lon=2.27, p_lat=48.885)["why"] == "paris")
+try: db.rpc(A, "fly", p_lon=2.27, p_lat=48.885); refus = ""
+except Exception as e: refus = str(e)
+check("… et y voler est refusé (« Restez dans Paris »)", "Restez dans Paris" in refus, refus[:80])
+check("dans le mur : Notre-Dame et le bois de Vincennes oui ; Neuilly et Boulogne non", db.sql("select _in_paris(2.3499, 48.8530), _in_paris(2.4350, 48.8350), _in_paris(2.27, 48.885), _in_paris(2.2400, 48.8350)")[0] == (True, True, False, False))
 db.sql("update profiles set km_free = 5, km_at = now() where id=%s", str(A))
 
 # se poser sur un immeuble : sa case ; libre, on l'achète à la banque (seulement là où l'on s'est posé) ; plus de bonus chez soi
@@ -259,7 +265,7 @@ check("les fonctions internes sont interdites aux joueurs", not any(db.sql("sele
       ("_world_cfg()", "_wsettle(uuid)", "_wpos(walkers)", "_wemit(int,uuid,text,jsonb)", "_wcell(float8,float8)", "_wsal(float8,text)", "_wchance_on(int,int)",
        "_wlayer(uuid)", "_wg(int)", "_wsend(int,int,int,uuid,text,jsonb)", "_wregroup(int,uuid)", "_dice_opts(uuid,float8,float8,float8,int)",
        "_dice_item(uuid,float8,float8,int)", "_land(uuid,int,int,int[])", "_near_or_fail(uuid,int)",
-       "_ftoll(uuid,float8,float8,float8,float8,int)", "_ftoll_rows(uuid,float8,float8,float8,float8,int)", "_kmfree(profiles)", "km_price(profiles)")))
+       "_ftoll(uuid,float8,float8,float8,float8,int)", "_ftoll_rows(uuid,float8,float8,float8,float8,int)", "_kmfree(profiles)", "km_price(profiles)", "_paris_ring()", "_in_paris(float8,float8)")))
 check("un visiteur non connecté ne peut rien appeler", not any(db.sql("select has_function_privilege('anon', %s, 'execute')", f)[0][0] for f in
       ("world_join()", "world_move(float8,float8,float8,jsonb,boolean)", "world_arrive(int)", "world_metro(int)", "world_chance(int)", "world_say(text)", "world_stop()", "set_chat_off(boolean)", "world_look(int[])",
        "roll()", "dice_go(int,jsonb)", "go_to(int)", "buy_rolls()", "fly(float8,float8,int)", "buy_km()", "fly_quote(float8,float8,int)")))

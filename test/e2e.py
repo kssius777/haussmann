@@ -411,6 +411,19 @@ async def main():
         await pg.click("[data-slx]"); await W("!S.on && !map.isMoving()", 20000); await pg.wait_for_timeout(600)
         check("« ← » : retour dans la partie, là où l'on était (le salon le sait)", await E("!document.body.classList.contains('insalon') && !W.away && meP().vis && getComputedStyle(document.querySelector('#tabs')).display !== 'none' && !document.querySelector('#wsay')")
               and not db.sql("select 1 from place_people where user_id=%s", me))
+        # le mur de glace (26/10/2026, « un mur de glace aux frontières de Paris, avec des remontées mécaniques », « sans abîmer la vue ») :
+        # autour de Paris, dehors ; la caméra dehors (elle regarde Paris à travers le mur) : il s'efface ; au-delà du mur : « Hors de Paris »
+        await W("!!map.getLayer('mur') && !!WALL.ring", 30000)
+        mur = await E("""(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)); camOff();
+            map.jumpTo({ center: [2.3253, 48.8212], zoom: 17.2, pitch: 60, bearing: 10 }); await wait(700); const dehors = WALL.out, op1 = map.getPaintProperty('mur', 'fill-extrusion-opacity');
+            map.jumpTo({ center: [2.3253, 48.8212], zoom: 17.2, pitch: 60, bearing: 190 }); await wait(700);
+            return { n: WALL.ring.length, nd: inParisLL(2.3499, 48.8530), vin: inParisLL(2.4350, 48.8350), neu: inParisLL(2.27, 48.885), dehors, op1, dedans: WALL.out === false,
+              op2: map.getPaintProperty('mur', 'fill-extrusion-opacity'), l: !!map.getLayer('mur-l'), b: !!map.getLayer('mur-b') }; })()""")
+        check("le mur de glace : autour de Paris (Notre-Dame et le bois de Vincennes dedans, Neuilly dehors), un trait dézoomé, les ascenseurs ; la caméra dehors : il s'efface",
+              mur["n"] > 100 and mur["nd"] and mur["vin"] and not mur["neu"] and mur["dehors"] is True and mur["op1"] < .5 and mur["dedans"] and mur["op2"] > .9 and mur["l"] and mur["b"], mur)
+        await E("aimAt(2.27, 48.885, false); 1"); await pg.wait_for_timeout(400)
+        check("au-delà du mur : « Hors de Paris » (le serveur refuse aussi : test_monde)", await E("document.querySelector('.aim .ab')?.textContent === 'Hors de Paris'"), await E("document.querySelector('.aim .ab')?.textContent"))
+        await E("aimClear(); 1")
         # dézoomé (26/10/2026) : « Vous » en petite montgolfière (plus un point bleu comme ses biens) ; les limites des arrondissements
         await E("camOff(); map.jumpTo({ center: [meP().lon, meP().lat], zoom: 12.6, pitch: 0 }); 1"); await pg.wait_for_timeout(800); await W("!map.isMoving()", 20000)
         check("dézoomé : « Vous » en petite montgolfière, les arrondissements délimités", await E("(() => { const e = document.querySelector('#wpl .wp.me'); return e.classList.contains('dot') && getComputedStyle(e.querySelector('.bl')).display === 'block' && !!e.querySelector('.bl svg') && !!map.getLayer('arrsym') && map.hasImage('arrdash'); })()"))

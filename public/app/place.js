@@ -680,7 +680,7 @@ function worldGround(e) {
   const p = e.point, box = [[p.x - 12, p.y - 12], [p.x + 12, p.y + 12]];
   if (map.getLayer("wq-c")) { const f = map.queryRenderedFeatures(box, { layers: ["wq-c"] })[0]; if (f) return worldTapCard(+f.properties.g); }
   hideHint();
-  if (aimHoverDev()) return flyMe(e.lngLat.lng, e.lngLat.lat, null);
+  if (aimHoverDev()) return inParisLL(e.lngLat.lng, e.lngLat.lat) ? flyMe(e.lngLat.lng, e.lngLat.lat, null) : toast("Hors de Paris", "bad");   // (à la souris, un clic vole : pas au-delà du mur)
   aimAt(e.lngLat.lng, e.lngLat.lat, false);
 }
 async function worldTapCard(g) {
@@ -752,10 +752,15 @@ function aimAt(lon, lat, hover) {
     if (seq === AIM.seq && AIM.on) aimText(q);
   }, hover ? 260 : 0);   // (à la souris : quand elle s'arrête)
 }
+// dans Paris = dans la boucle du mur de glace (26/10/2026, « oui, le mur est la limite » ; map.js, WALL.ring ; le serveur : _in_paris)
+function inParisLL(lo, la) {
+  const c = W.cfg || {}; if (lo < (c.w ?? 2.21) || lo > (c.e ?? 2.48) || la < (c.s ?? 48.805) || la > (c.n ?? 48.91)) return false;
+  return typeof WALL === "undefined" || !WALL.ring || inPolyLL(WALL.ring, lo, la);
+}
 function aimText(q) {
-  const me = meP(), c = W.cfg || {}; if (!me) return;
+  const me = meP(); if (!me) return;
   const L = mLL([me.lon, me.lat], [AIM.lon, AIM.lat]), left = q?.km != null ? +q.km : kmLeft();
-  const out = AIM.lon < (c.w ?? 2.21) || AIM.lon > (c.e ?? 2.48) || AIM.lat < (c.s ?? 48.805) || AIM.lat > (c.n ?? 48.91);
+  const out = !inParisLL(AIM.lon, AIM.lat);
   const far = q?.why === "far", short = !out && !far && (q ? q.why === "km" : L / 1000 > left + .0005);
   AIM.state = out ? "out" : far ? "far" : short ? "km" : "ok"; AIM.L = L;
   const b = AIM.el.querySelector(".ab"), p = AIM.el.querySelector(".ap");
@@ -784,7 +789,7 @@ function aimHoverNow() {
   if (e.originalEvent?.buttons || (typeof S !== "undefined" && S.on)) { if (AIM.hov) aimClear(); return set(""); }   // (on fait glisser la carte ; au salon : salon.js)
   const lay = ["bd", "rf", "wq-c"].filter(l => map.getLayer(l));
   if (map.queryRenderedFeatures(e.point, { layers: lay }).length) { if (AIM.hov) aimClear(); return set("pointer"); }
-  if (aimHoverDev() && aimCanFly() && panelKind !== "land") { set("crosshair"); aimAt(e.lngLat.lng, e.lngLat.lat, true); }
+  if (aimHoverDev() && aimCanFly() && panelKind !== "land") { set(inParisLL(e.lngLat.lng, e.lngLat.lat) ? "crosshair" : "not-allowed"); aimAt(e.lngLat.lng, e.lngLat.lat, true); }
   else { if (AIM.hov) aimClear(); set(""); }
 }
 // les boutons de la case : là où l'on s'est posé, une station : « Prendre le métro »

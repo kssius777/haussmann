@@ -51,6 +51,35 @@ function addArrBorders() {
       "icon-size": ["interpolate", ["linear"], ["zoom"], 11, .7, 13, .9, 14, 1] },
     paint: { "icon-opacity": ["interpolate", ["linear"], ["zoom"], 14, .95, 14.9, 0] } }, map.getLayer("snames") ? "snames" : undefined);
 }
+// le mur de glace autour de Paris (26/10/2026, demande du propriétaire : « aux frontières de Paris, un mur de glace, avec des
+// remontées mécaniques, tout autour, afin de délimiter visuellement », « tout en n'abîmant pas la vue de Paris, surtout aux
+// frontières ») : scripts/make_wall.py → data/mur.json. Juste à l'extérieur de la limite (il ne cache aucun immeuble), des blocs de
+// glace un peu transparents avec des pics, un ascenseur en bois aux grandes portes ; dézoomé, un trait de glace fait le tour de
+// Paris. Quand la caméra est dehors et regarde Paris à travers le mur, il devient presque transparent (wallFade).
+const MUR_V = "20261027a", WALL = { ring: null, out: null };
+const WALL_A = .94, WALL_OUT = .25;
+function addWall() {
+  fetch(DATA + "mur.json?v=" + MUR_V).then(r => r.json()).then(g => {
+    if (!map || map.getSource("mur")) return;
+    const r = g.features.find(f => f.properties.k === "r"); WALL.ring = r ? r.geometry.coordinates : null;
+    map.addSource("mur", { type: "geojson", data: g, buffer: 16, tolerance: .2 });
+    map.addLayer({ id: "mur-l", type: "line", source: "mur", maxzoom: 13.6, filter: ["==", ["get", "k"], "r"], layout: { "line-join": "round" },
+      paint: { "line-color": "#9CCDF0", "line-width": ["interpolate", ["linear"], ["zoom"], 11, 3, 13, 6], "line-opacity": ["interpolate", ["linear"], ["zoom"], 12.8, .95, 13.5, 0] } }, "arrline");
+    map.addLayer({ id: "mur", type: "fill-extrusion", source: "mur", minzoom: 13, filter: ["in", ["get", "k"], ["literal", ["w", "s", "t"]]],
+      paint: { "fill-extrusion-color": ["match", ["get", "k"], "s", "#FFFFFF", "t", "#FFFFFF", ["match", ["get", "c"], 1, "#DCEAF4", 2, "#F3F8FC", "#E8F2F9"]],   // (une glace blanche, à peine bleutée : « plus blanc », choix du propriétaire ; la neige et les pics tout blancs)
+        "fill-extrusion-height": ["get", "h"], "fill-extrusion-base": ["get", "b"], "fill-extrusion-opacity": WALL_A, "fill-extrusion-vertical-gradient": true } }, "anchor-top");
+    map.addLayer({ id: "mur-b", type: "fill-extrusion", source: "mur", minzoom: 14, filter: ["in", ["get", "k"], ["literal", ["lw", "lc", "lk", "lr"]]],
+      paint: { "fill-extrusion-color": ["match", ["get", "k"], "lc", "#9A7048", "lk", "#2F3640", "lr", "#F7FAFC", "#6B4F36"],
+        "fill-extrusion-height": ["get", "h"], "fill-extrusion-base": ["get", "b"], "fill-extrusion-opacity": 1, "fill-extrusion-vertical-gradient": true } }, "anchor-top");
+    WALL.out = null; map.on("move", wallFade); wallFade();
+  }).catch(() => { });
+}
+const wallFade = throttle(() => {
+  if (!WALL.ring || !map?.getLayer("mur")) return;
+  let out = false;
+  try { const c = map.transform.getCameraPosition().lngLat; out = !inPolyLL(WALL.ring, c.lng, c.lat); } catch (e) { }   // (où est la caméra : MapLibre 4.7)
+  if (out !== WALL.out) { WALL.out = out; map.setPaintProperty("mur", "fill-extrusion-opacity", out ? WALL_OUT : WALL_A); }
+}, 250);
 function partyFill() {
   return ["match", ["coalesce", ["feature-state", "p"], ""], ...PARTY_ORDER.flatMap(k => [k, PARTIES[k].c]), "#FFFFFF"];
 }
@@ -134,7 +163,7 @@ function buildMap(base) {
   const fitMin = () => { const c = map.cameraForBounds([[2.235, 48.818], [2.455, 48.900]], { padding: 8 }); if (c?.zoom) map.setMinZoom(Math.max(10.5, Math.min(12.6, c.zoom - .15))); };
   addEventListener("resize", () => setTimeout(fitMin, 50));
   map.on("load", () => { fitMin();
-    mapReady = true; addArrBorders();
+    mapReady = true; addArrBorders(); addWall();
     for (const L of ["bd", "rf"]) {
       map.on("click", L, ev => { const f = ev.features[0]; if (!ev.defaultPrevented && f && f.id != null) { ev.preventDefault(); mapTap(ev, f.id); } });
     }   // (le curseur : la main sur les immeubles, la cible sur le sol — aimMove dans place.js)
